@@ -5,7 +5,7 @@
         x:Class="HCG.Mail.App.Views.ComposeWindow"
         x:DataType="vm:ComposeViewModel"
         Title="{Binding WindowTitle}"
-        Icon="/Assets/Icons/hcg-mail-placeholder.ico"
+        Icon="/Assets/Icons/hcg-mail.ico"
         Width="860" Height="700" MinWidth="600" MinHeight="460"
         WindowStartupLocation="CenterOwner">
   <Window.KeyBindings>

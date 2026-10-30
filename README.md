@@ -64,7 +64,7 @@ tests/
   HCG.Mail.Tests/           unit tests + opt-in end-to-end tests against a local test server
   HCG.Mail.App.Tests/       headless UI tests (real views rendered with Skia)
   integration-server/       script that creates a disposable Dovecot/Postfix server for end-to-end tests
-assets/branding, assets/icons   brand asset slots (official logo pending — placeholder in use)
+assets/branding, assets/icons   application icon (supplied) and brand asset slots
 docs/                       ARCHITECTURE, SETUP, SECURITY, WINDOWS_BUILD, ROADMAP, TESTING, MANUAL_TEST_CHECKLIST
 scripts/                    publish-windows.sh / publish-windows.ps1
 ```
@@ -81,7 +81,10 @@ suite fast and free of UI dependencies.
 
 ## Branding
 
-The official HCG logo was not available in the repository. The app uses a **clearly marked temporary
-placeholder** mark (text "HCG" in a tile, labelled as a placeholder in its tooltip and on the About page).
-Drop the official asset into `src/HCG.Mail.App/Assets/Branding/hcg-logo.png` and it replaces the
-placeholder automatically — see [assets/branding/README.md](assets/branding/README.md).
+The **application icon** (exe, taskbar, window title bars) is the official HCG Mail artwork supplied by
+the founder — see [assets/branding/README.md](assets/branding/README.md).
+
+The in-app logo mark (sidebar, welcome card, About page) is still a **clearly marked temporary
+placeholder** (text "HCG" in a tile, labelled as a placeholder in its tooltip and on the About page).
+Drop the official logo into `src/HCG.Mail.App/Assets/Branding/hcg-logo.png` and it replaces the
+placeholder automatically.

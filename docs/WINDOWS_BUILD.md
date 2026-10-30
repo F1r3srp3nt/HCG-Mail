@@ -22,7 +22,7 @@ dotnet publish src/HCG.Mail.App -c Release -r win-x64 --self-contained true \
 On Windows itself: `powershell -ExecutionPolicy Bypass -File scripts\publish-windows.ps1`.
 
 The build embeds the Windows application manifest (Windows 10/11 compatibility, Per-Monitor-V2 DPI
-awareness, long paths), the placeholder icon and version information (Hakmi Capital Group / HCG Mail
+awareness, long paths), the HCG Mail application icon and version information (Hakmi Capital Group / HCG Mail
 0.1.0).
 
 ## Install on the test PC (no installer yet)

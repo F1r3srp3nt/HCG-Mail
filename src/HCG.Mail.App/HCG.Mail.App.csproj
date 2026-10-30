@@ -5,7 +5,7 @@
     <AssemblyName>HCGMail</AssemblyName>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\Icons\hcg-mail-placeholder.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\Icons\hcg-mail.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

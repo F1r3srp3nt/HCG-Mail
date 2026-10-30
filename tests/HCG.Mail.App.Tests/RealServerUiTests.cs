@@ -73,7 +73,7 @@ public class RealServerUiTests
     {
         var token = Guid.NewGuid().ToString("N")[..8];
         var builder = new BodyBuilder { TextBody = "Text alternative" };
-        var logo = builder.LinkedResources.Add("chart.png", File.ReadAllBytes(Path.Combine(RepoRoot(), "assets", "icons", "hcg-mail-placeholder.png")));
+        var logo = builder.LinkedResources.Add("chart.png", File.ReadAllBytes(Path.Combine(RepoRoot(), "assets", "icons", "hcg-mail-1024.png")));
         logo.ContentId = MimeUtils.GenerateMessageId();
         builder.HtmlBody = $"""
             <html><body style="font-family:Arial;color:#1a1f24">

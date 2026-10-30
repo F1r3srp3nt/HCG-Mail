@@ -6,7 +6,7 @@
         x:Class="HCG.Mail.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="HCG Mail"
-        Icon="/Assets/Icons/hcg-mail-placeholder.ico"
+        Icon="/Assets/Icons/hcg-mail.ico"
         Width="1380" Height="880" MinWidth="1000" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"

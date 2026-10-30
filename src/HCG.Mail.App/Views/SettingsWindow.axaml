@@ -6,7 +6,7 @@
         x:Class="HCG.Mail.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="HCG Mail settings"
-        Icon="/Assets/Icons/hcg-mail-placeholder.ico"
+        Icon="/Assets/Icons/hcg-mail.ico"
         Width="900" Height="660" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
   <Window.Styles>

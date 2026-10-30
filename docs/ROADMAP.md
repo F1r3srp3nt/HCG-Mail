@@ -13,7 +13,8 @@ Windows hardware is pending.
 - [ ] Run the [Domene.no checklist](MANUAL_TEST_CHECKLIST.md) on Windows and on the Mac.
 - [ ] Run `--check-credential-store` on macOS (Keychain implementation not yet executed on a Mac).
 - [ ] Fix any Windows-specific issues found (title bar, DPI, GPU rendering).
-- [ ] Supply the official HCG logo and application icon ([assets/branding](../assets/branding/README.md)).
+- [x] Application icon supplied and integrated.
+- [ ] Supply the official HCG logo mark for the in-app sidebar ([assets/branding](../assets/branding/README.md)).
 
 ## Short term
 
