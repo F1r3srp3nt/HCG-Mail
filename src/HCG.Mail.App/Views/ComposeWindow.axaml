@@ -1,0 +1,138 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:HCG.Mail.App.ViewModels"
+        xmlns:controls="using:HCG.Mail.App.Controls"
+        x:Class="HCG.Mail.App.Views.ComposeWindow"
+        x:DataType="vm:ComposeViewModel"
+        Title="{Binding WindowTitle}"
+        Icon="/Assets/Icons/hcg-mail-placeholder.ico"
+        Width="860" Height="700" MinWidth="600" MinHeight="460"
+        WindowStartupLocation="CenterOwner">
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+Enter" Command="{Binding SendCommand}" />
+    <KeyBinding Gesture="Ctrl+S" Command="{Binding SaveDraftCommand}" />
+  </Window.KeyBindings>
+  <Window.Styles>
+    <Style Selector="TextBlock.fieldLabel">
+      <Setter Property="Width" Value="64" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Tertiary}" />
+    </Style>
+    <Style Selector="TextBlock.statusText.error">
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Danger}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Background="{DynamicResource Hcg.Bg.Reader}">
+
+    <!-- Toolbar -->
+    <Border Background="{DynamicResource Hcg.Bg.TitleBar}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,0,0,1" Padding="16,10">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+        <Border CornerRadius="10" BoxShadow="{DynamicResource Hcg.Shadow.Glow}">
+          <Button Classes="primary" Command="{Binding SendCommand}" ToolTip.Tip="Send (Ctrl+Enter)">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <controls:IconView Data="{StaticResource Icon.Sent}" Width="16" Height="16" StrokeThickness="2" />
+              <TextBlock Text="Send" />
+            </StackPanel>
+          </Button>
+        </Border>
+        <Button Grid.Column="1" Classes="toolbar" Margin="10,0,0,0" Command="{Binding SaveDraftCommand}" ToolTip.Tip="Save draft to the server (Ctrl+S)">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <controls:IconView Data="{StaticResource Icon.Drafts}" Width="16" Height="16" />
+            <TextBlock Text="Save draft" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="2" Classes="toolbar" Command="{Binding AddAttachmentsCommand}" ToolTip.Tip="Attach files">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <controls:IconView Data="{StaticResource Icon.Paperclip}" Width="16" Height="16" />
+            <TextBlock Text="Attach" />
+          </StackPanel>
+        </Button>
+        <TextBlock Grid.Column="3" Text="{Binding Heading}" Classes="caption" VerticalAlignment="Center" HorizontalAlignment="Center" />
+        <Button Grid.Column="4" Classes="toolbar danger" Command="{Binding DiscardCommand}" ToolTip.Tip="Discard this message">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <controls:IconView Data="{StaticResource Icon.Trash}" Width="16" Height="16" />
+            <TextBlock Text="Discard" />
+          </StackPanel>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Header fields -->
+    <StackPanel Grid.Row="1" Margin="20,14,20,6" Spacing="8">
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Classes="fieldLabel" Text="From" />
+        <ComboBox ItemsSource="{Binding FromAccounts}" SelectedItem="{Binding SelectedFrom}" MinWidth="320" IsEnabled="{Binding HasMultipleAccounts}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:AccountViewModel">
+              <TextBlock>
+                <Run Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                <Run Text="{Binding EmailAddress, StringFormat=' &lt;{0}&gt;'}" Foreground="{DynamicResource Hcg.Text.Secondary}" />
+              </TextBlock>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+      </StackPanel>
+      <TextBlock Text="{Binding FromWarning}" Classes="error" IsVisible="{Binding FromWarning, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="64,0,0,0" />
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <TextBlock Classes="fieldLabel" Text="To" />
+        <TextBox x:Name="ToBox" Grid.Column="1" Text="{Binding To}" Watermark="name@example.com, Name &lt;other@example.com&gt;" />
+        <Button Grid.Column="2" Classes="link" Margin="12,0,2,0" Content="Cc / Bcc" Command="{Binding ToggleCcBccCommand}" VerticalAlignment="Center" />
+      </Grid>
+      <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding ShowCcBcc}">
+        <TextBlock Classes="fieldLabel" Text="Cc" />
+        <TextBox Grid.Column="1" Text="{Binding Cc}" />
+      </Grid>
+      <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding ShowCcBcc}">
+        <TextBlock Classes="fieldLabel" Text="Bcc" />
+        <TextBox Grid.Column="1" Text="{Binding Bcc}" Watermark="Hidden from other recipients" />
+      </Grid>
+      <Grid ColumnDefinitions="Auto,*">
+        <TextBlock Classes="fieldLabel" Text="Subject" />
+        <TextBox Grid.Column="1" Text="{Binding Subject}" FontWeight="SemiBold" />
+      </Grid>
+    </StackPanel>
+
+    <!-- Body -->
+    <Border Grid.Row="2" Classes="card" Margin="20,8,20,10" BoxShadow="{DynamicResource Hcg.Shadow.None}" Padding="2">
+      <TextBox x:Name="BodyBox" Classes="bare" Text="{Binding Body}" AcceptsReturn="True" AcceptsTab="False" TextWrapping="Wrap"
+               FontSize="14" Padding="16,14" VerticalContentAlignment="Top" Watermark="Write your message…" />
+    </Border>
+
+    <!-- Attachments -->
+    <ItemsControl Grid.Row="3" ItemsSource="{Binding Attachments}" IsVisible="{Binding HasAttachments}" Margin="20,0,20,6">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <WrapPanel />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ComposeAttachmentViewModel">
+          <Border Classes="chip" Margin="0,0,8,8" Padding="10,5,4,5">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <controls:IconView Data="{StaticResource Icon.Paperclip}" Width="14" Height="14" Foreground="{DynamicResource Hcg.Text.Secondary}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding Name}" MaxWidth="240" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding SizeText}" Classes="caption" VerticalAlignment="Center" />
+              <Button Classes="icon" MinWidth="24" MinHeight="24" Padding="5" ToolTip.Tip="Remove attachment"
+                      Command="{Binding $parent[Window].((vm:ComposeViewModel)DataContext).RemoveAttachmentCommand}" CommandParameter="{Binding}">
+                <controls:IconView Data="{StaticResource Icon.Close}" Width="12" Height="12" />
+              </Button>
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- Status -->
+    <Border Grid.Row="4" Background="{DynamicResource Hcg.Bg.TitleBar}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,1,0,0" Padding="20,7">
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+          <TextBlock Classes="statusText" Classes.error="{Binding StatusIsError}" Text="{Binding StatusMessage}" FontSize="12"
+                     Foreground="{DynamicResource Hcg.Text.Secondary}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Grid.Column="1" Classes="caption" Text="Plain text · Ctrl+Enter to send" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,185 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:HCG.Mail.App.ViewModels"
+        xmlns:accounts="using:HCG.Mail.Core.Accounts"
+        xmlns:controls="using:HCG.Mail.App.Controls"
+        x:Class="HCG.Mail.App.Views.AccountSetupWindow"
+        x:DataType="vm:AccountSetupViewModel"
+        Title="{Binding Title}"
+        Icon="/Assets/Icons/hcg-mail-placeholder.ico"
+        Width="1000" Height="760" MinWidth="860" MinHeight="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Window.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+      <Setter Property="Margin" Value="0,0,0,5" />
+    </Style>
+    <Style Selector="StackPanel.field">
+      <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+    <Style Selector="controls|IconView.stepIcon">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+    </Style>
+  </Window.Styles>
+
+  <Grid RowDefinitions="*,Auto" Background="{DynamicResource Hcg.Bg.Reader}">
+    <Grid ColumnDefinitions="*,400">
+
+      <!-- Form -->
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="30,26,26,20">
+          <TextBlock Classes="h1" Text="{Binding Title}" />
+          <TextBlock Classes="muted" Margin="0,6,0,0" TextWrapping="Wrap"
+                     Text="Connect an existing mailbox with IMAP (incoming) and SMTP (outgoing). Your provider gives you these details." />
+          <Border Classes="banner" Margin="0,14,0,0" IsVisible="{Binding HasIntroMessage}">
+            <TextBlock Text="{Binding IntroMessage}" TextWrapping="Wrap" Foreground="{DynamicResource Hcg.Text.Accent}" />
+          </Border>
+
+          <TextBlock Classes="section" Text="PROVIDER" Margin="0,22,0,8" />
+          <ComboBox ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}" HorizontalAlignment="Stretch">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="accounts:ProviderPreset">
+                <TextBlock Text="{Binding DisplayName}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Classes="caption" Text="{Binding HostnameHint}" TextWrapping="Wrap" Margin="2,6,0,0" />
+
+          <TextBlock Classes="section" Text="YOUR DETAILS" Margin="0,22,0,10" />
+          <Grid ColumnDefinitions="*,16,*">
+            <StackPanel Classes="field">
+              <TextBlock Classes="label" Text="Email address" />
+              <TextBox Text="{Binding EmailAddress}" Watermark="you@yourdomain.no" Classes.invalid="{Binding EmailError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="error" Text="{Binding EmailError}" IsVisible="{Binding EmailError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Classes="field">
+              <TextBlock Classes="label" Text="Display name" />
+              <TextBox Text="{Binding DisplayName}" Watermark="Name shown to recipients" />
+              <TextBlock Classes="error" Text="{Binding DisplayNameError}" IsVisible="{Binding DisplayNameError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
+            </StackPanel>
+          </Grid>
+          <Grid ColumnDefinitions="*,16,*">
+            <StackPanel Classes="field">
+              <TextBlock Classes="label" Text="Username" />
+              <TextBox Text="{Binding Username}" Watermark="Usually your full email address" Classes.invalid="{Binding UsernameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="error" Text="{Binding UsernameError}" IsVisible="{Binding UsernameError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Classes="field">
+              <TextBlock Classes="label" Text="Password" />
+              <TextBox Text="{Binding Password}" PasswordChar="●" Watermark="{Binding PasswordWatermark}" RevealPassword="False"
+                       Classes.invalid="{Binding PasswordError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="error" Text="{Binding PasswordError}" IsVisible="{Binding PasswordError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
+            </StackPanel>
+          </Grid>
+
+          <TextBlock Classes="section" Text="INCOMING MAIL (IMAP)" Margin="0,12,0,10" />
+          <Grid ColumnDefinitions="*,12,96,12,200">
+            <StackPanel Classes="field">
+              <TextBlock Classes="label" Text="Server" />
+              <TextBox Text="{Binding ImapHost}" Watermark="e.g. imap.yourprovider.no" Classes.invalid="{Binding ImapHostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="error" Text="{Binding ImapHostError}" IsVisible="{Binding ImapHostError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Classes="field">
+              <TextBlock Classes="label" Text="Port" />
+              <TextBox Text="{Binding ImapPort}" Classes.invalid="{Binding ImapPortError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="error" Text="{Binding ImapPortError}" IsVisible="{Binding ImapPortError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="4" Classes="field">
+              <TextBlock Classes="label" Text="Security" />
+              <ComboBox ItemsSource="{Binding SecurityOptions}" SelectedItem="{Binding ImapSecurity}" HorizontalAlignment="Stretch" />
+            </StackPanel>
+          </Grid>
+
+          <TextBlock Classes="section" Text="OUTGOING MAIL (SMTP)" Margin="0,8,0,10" />
+          <Grid ColumnDefinitions="*,12,96,12,200">
+            <StackPanel Classes="field">
+              <TextBlock Classes="label" Text="Server" />
+              <TextBox Text="{Binding SmtpHost}" Watermark="e.g. smtp.yourprovider.no" Classes.invalid="{Binding SmtpHostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="error" Text="{Binding SmtpHostError}" IsVisible="{Binding SmtpHostError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Classes="field">
+              <TextBlock Classes="label" Text="Port" />
+              <TextBox Text="{Binding SmtpPort}" Classes.invalid="{Binding SmtpPortError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="error" Text="{Binding SmtpPortError}" IsVisible="{Binding SmtpPortError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
+            </StackPanel>
+            <StackPanel Grid.Column="4" Classes="field">
+              <TextBlock Classes="label" Text="Security" />
+              <ComboBox ItemsSource="{Binding SecurityOptions}" SelectedItem="{Binding SmtpSecurity}" HorizontalAlignment="Stretch" />
+            </StackPanel>
+          </Grid>
+
+          <Border Classes="banner" Margin="0,8,0,0">
+            <Grid ColumnDefinitions="Auto,*">
+              <controls:IconView Data="{StaticResource Icon.Lock}" Width="16" Height="16" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Top" Margin="0,1,0,0" />
+              <TextBlock Grid.Column="1" Margin="10,0,0,0" Text="{Binding CredentialStorageNote}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Hcg.Text.Secondary}" />
+            </Grid>
+          </Border>
+          <Border Classes="banner" Margin="0,8,0,0">
+            <Grid ColumnDefinitions="Auto,*">
+              <controls:IconView Data="{StaticResource Icon.Shield}" Width="16" Height="16" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Top" Margin="0,1,0,0" />
+              <TextBlock Grid.Column="1" Margin="10,0,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Hcg.Text.Secondary}"
+                         Text="HCG Mail only makes encrypted connections and always verifies the server's certificate. If STARTTLS is chosen and the server does not offer it, the connection is refused rather than continuing unencrypted." />
+            </Grid>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Connection test -->
+      <Border Grid.Column="1" Background="{DynamicResource Hcg.Bg.List}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="1,0,0,0">
+        <Grid RowDefinitions="Auto,*,Auto" Margin="22,26,22,16">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="h2" Text="Connection test" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Checks each step separately. Signs in to both servers but never sends an email." />
+          </StackPanel>
+          <ScrollViewer Grid.Row="1" Margin="0,16,0,10" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl ItemsSource="{Binding Steps}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ConnectionStepViewModel">
+                  <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,14">
+                    <Panel Width="24" VerticalAlignment="Top" Margin="0,1,0,0">
+                      <Ellipse Width="16" Height="16" Stroke="{DynamicResource Hcg.Border.Strong}" StrokeThickness="1.5" IsVisible="{Binding IsPending}" />
+                      <controls:IconView Classes="stepIcon spin" Data="{StaticResource Icon.Refresh}" Foreground="{DynamicResource Hcg.Warning}" IsVisible="{Binding IsRunning}">
+                        <controls:IconView.RenderTransform>
+                          <RotateTransform />
+                        </controls:IconView.RenderTransform>
+                      </controls:IconView>
+                      <controls:IconView Classes="stepIcon" Data="{StaticResource Icon.Check}" Foreground="{DynamicResource Hcg.Success}" StrokeThickness="2.4" IsVisible="{Binding IsPassed}" />
+                      <controls:IconView Classes="stepIcon" Data="{StaticResource Icon.Close}" Foreground="{DynamicResource Hcg.Danger}" StrokeThickness="2.4" IsVisible="{Binding IsFailed}" />
+                      <controls:IconView Classes="stepIcon" Data="{StaticResource Icon.Dot}" Foreground="{DynamicResource Hcg.Text.Tertiary}" StrokeThickness="5" IsVisible="{Binding IsSkipped}" />
+                    </Panel>
+                    <StackPanel Grid.Column="1" Margin="8,0,0,0" Spacing="3">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Detail}" FontSize="11.5" Foreground="{DynamicResource Hcg.Text.Secondary}" TextWrapping="Wrap"
+                                 IsVisible="{Binding Detail, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <StackPanel Grid.Row="2" Spacing="10">
+            <TextBlock Text="{Binding TestSummary}" IsVisible="{Binding HasTestSummary}" TextWrapping="Wrap" FontSize="12.5"
+                       Foreground="{DynamicResource Hcg.Text.Primary}" />
+            <Button Classes="subtle" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Command="{Binding TestConnectionCommand}" Content="{Binding TestButtonText}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Footer -->
+    <Border Grid.Row="1" Background="{DynamicResource Hcg.Bg.TitleBar}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,1,0,0" Padding="24,12">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Button Classes="ghost danger" Content="Remove account" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" />
+        <TextBlock Grid.Column="1" Classes="error" Text="{Binding FormError}" IsVisible="{Binding HasFormError}" VerticalAlignment="Center" Margin="12,0" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+          <Button Classes="subtle" Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True" />
+          <Button Classes="primary" Content="Save account" Command="{Binding SaveCommand}" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

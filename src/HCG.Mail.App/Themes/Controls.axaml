@@ -1,0 +1,301 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:HCG.Mail.App.Controls">
+  <!-- Shared control styling for both skins. Colours always come from Palette.axaml tokens. -->
+
+  <Style Selector="Window">
+    <Setter Property="FontFamily" Value="{StaticResource Hcg.Font}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.App}" />
+  </Style>
+
+  <!-- ===== Typography ===== -->
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="21" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="TextBlock.h3">
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Tertiary}" />
+  </Style>
+  <Style Selector="TextBlock.section">
+    <Setter Property="FontSize" Value="10.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="1.4" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Tertiary}" />
+  </Style>
+  <Style Selector="TextBlock.error">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Danger}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.wordmark">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LetterSpacing" Value="3.2" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Brush.Metal}" />
+  </Style>
+
+  <!-- ===== Cards & surfaces ===== -->
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Card}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Glass}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Hcg.Radius.Large}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource Hcg.Shadow.Card}" />
+  </Style>
+  <Style Selector="Border.banner">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Banner}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Default}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Hcg.Radius.Medium}" />
+    <Setter Property="Padding" Value="12,8" />
+  </Style>
+  <Style Selector="Border.paper">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Paper}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Default}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Hcg.Radius.Large}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Border.chip">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Elevated}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Default}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Hcg.Radius.Medium}" />
+  </Style>
+
+  <!-- ===== Buttons ===== -->
+  <Style Selector="Button">
+    <Setter Property="CornerRadius" Value="{StaticResource Hcg.Radius.Medium}" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Brush.PrimaryButton}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.OnAccent}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="16,8" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Brush.PrimaryButtonHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.OnAccent}" />
+  </Style>
+  <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Brush.PrimaryButton}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.OnAccent}" />
+  </Style>
+  <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Elevated}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Tertiary}" />
+  </Style>
+
+  <Style Selector="Button.subtle">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Elevated}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Default}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    <Setter Property="Padding" Value="12,7" />
+  </Style>
+  <Style Selector="Button.subtle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Hover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Strong}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="Button.subtle:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Pressed}" />
+  </Style>
+
+  <Style Selector="Button.ghost, Button.toolbar, Button.icon, Button.nav, Button.link">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+  </Style>
+  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.toolbar:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.icon:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Hover}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="Button.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.toolbar:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.icon:pressed /template/ ContentPresenter#PART_ContentPresenter, Button.nav:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Pressed}" />
+  </Style>
+  <Style Selector="Button.ghost:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.toolbar:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Tertiary}" />
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
+  <Style Selector="Button.toolbar">
+    <Setter Property="Padding" Value="9,6" />
+  </Style>
+  <Style Selector="Button.icon">
+    <Setter Property="Padding" Value="7" />
+    <Setter Property="MinWidth" Value="32" />
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="Button.nav">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Padding" Value="10,8" />
+  </Style>
+  <Style Selector="Button.link">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Accent}" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="Button.danger">
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Danger}" />
+  </Style>
+  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Danger}" />
+  </Style>
+
+  <!-- ===== Inputs ===== -->
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Input}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Default}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="CaretBrush" Value="{DynamicResource Hcg.Accent}" />
+    <Setter Property="SelectionBrush" Value="{DynamicResource Hcg.Bg.Selected}" />
+  </Style>
+  <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Input}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Strong}" />
+  </Style>
+  <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Input}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Focus}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="TextBox:pointerover, TextBox:focus">
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="TextBox /template/ TextBlock#PART_Watermark, TextBox /template/ TextBlock#PART_FloatingWatermark">
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Tertiary}" />
+  </Style>
+  <Style Selector="TextBox:disabled /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Input}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Subtle}" />
+  </Style>
+  <Style Selector="TextBox:disabled">
+    <Setter Property="Opacity" Value="0.55" />
+  </Style>
+  <Style Selector="TextBox.bare">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBox.bare:pointerover /template/ Border#PART_BorderElement, TextBox.bare:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBox.invalid /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Danger}" />
+  </Style>
+
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Input}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Default}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+
+  <!-- ===== Lists ===== -->
+  <Style Selector="ListBox">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="0,1" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+  </Style>
+  <Style Selector="ListBox.messages ListBoxItem">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="6,1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem, ListBox.messages ListBoxItem">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.messages ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Hover}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.messages ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Pressed}" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter, ListBox.messages ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Selected}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter, ListBox.messages ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Selected}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter, ListBox.messages ListBoxItem:selected:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Selected}" />
+  </Style>
+  <Style Selector="ListBox.nav ListBoxItem:disabled">
+    <Setter Property="Opacity" Value="0.42" />
+  </Style>
+
+  <!-- ===== Misc ===== -->
+  <Style Selector="GridSplitter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Border.Subtle}" />
+    <Setter Property="MinWidth" Value="1" />
+  </Style>
+  <Style Selector="ProgressBar">
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Accent}" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="controls|IconView.spin">
+    <Style.Animations>
+      <Animation Duration="0:0:1" IterationCount="INFINITE">
+        <KeyFrame Cue="0%">
+          <Setter Property="RotateTransform.Angle" Value="0" />
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="RotateTransform.Angle" Value="360" />
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+  <Style Selector="Ellipse.pulse">
+    <Style.Animations>
+      <Animation Duration="0:0:1.4" IterationCount="INFINITE" PlaybackDirection="Alternate">
+        <KeyFrame Cue="0%">
+          <Setter Property="Opacity" Value="1" />
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="Opacity" Value="0.25" />
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+</Styles>

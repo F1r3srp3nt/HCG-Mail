@@ -1,0 +1,156 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.App.ViewModels"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.App.Views.MessageListPane"
+             x:DataType="vm:MainWindowViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.sender">
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+    </Style>
+    <Style Selector="TextBlock.sender.unread">
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    </Style>
+    <Style Selector="TextBlock.subject">
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+    </Style>
+    <Style Selector="TextBlock.subject.unread">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    </Style>
+    <Style Selector="TextBlock.date.unread">
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Accent}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="ListBoxItem:selected TextBlock.sender, ListBoxItem:selected TextBlock.subject">
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    </Style>
+    <Style Selector="Button.flag">
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover Button.flag, Button.flag.on">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.flag.on controls|IconView">
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Warning}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource Hcg.Bg.List}">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+
+      <!-- Header -->
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="18,18,12,10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="h2" Text="{Binding MessageList.FolderTitle}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Classes="caption" Text="{Binding MessageList.CountText}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <Button Grid.Column="1" Classes="icon" Command="{Binding RefreshCommand}" ToolTip.Tip="Refresh (F5)" VerticalAlignment="Top">
+          <controls:IconView Data="{StaticResource Icon.Refresh}" Classes.spin="{Binding IsBusy}">
+            <controls:IconView.RenderTransform>
+              <RotateTransform />
+            </controls:IconView.RenderTransform>
+          </controls:IconView>
+        </Button>
+      </Grid>
+
+      <!-- Search -->
+      <TextBox Grid.Row="1" x:Name="SearchBox" Margin="14,0,14,10" Text="{Binding MessageList.SearchText}"
+               Watermark="Search loaded messages" IsEnabled="{Binding MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <TextBox.InnerLeftContent>
+          <controls:IconView Data="{StaticResource Icon.Search}" Width="15" Height="15" Margin="10,0,0,0"
+                             Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+        </TextBox.InnerLeftContent>
+        <TextBox.InnerRightContent>
+          <Button Classes="icon" MinWidth="26" MinHeight="26" Padding="5" Command="{Binding MessageList.ClearSearchCommand}"
+                  IsVisible="{Binding MessageList.IsSearching}" ToolTip.Tip="Clear search">
+            <controls:IconView Data="{StaticResource Icon.Close}" Width="13" Height="13" />
+          </Button>
+        </TextBox.InnerRightContent>
+      </TextBox>
+
+      <ProgressBar Grid.Row="2" IsIndeterminate="True" Height="2" MinHeight="2" Margin="14,0"
+                   IsVisible="{Binding MessageList.IsLoading}" />
+
+      <!-- Content -->
+      <Panel Grid.Row="3">
+        <ListBox x:Name="Messages" Classes="messages" ItemsSource="{Binding MessageList.Items}"
+                 SelectedItem="{Binding MessageList.SelectedItem}" SelectionMode="Single"
+                 IsVisible="{Binding MessageList.ShowList}" Padding="0,4">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:MessageItemViewModel">
+              <Grid ColumnDefinitions="16,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="8,10,10,10" Background="Transparent">
+                <Ellipse Grid.RowSpan="2" Width="8" Height="8" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,5,0,0"
+                         Fill="{DynamicResource Hcg.Accent}" IsVisible="{Binding !IsRead}" />
+                <TextBlock Grid.Column="1" Classes="sender" Classes.unread="{Binding !IsRead}" Text="{Binding Sender}"
+                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SenderAddress}" />
+                <TextBlock Grid.Column="2" Classes="caption date" Classes.unread="{Binding !IsRead}" Text="{Binding DateText}"
+                           Margin="8,0,0,0" ToolTip.Tip="{Binding FullDateText}" />
+
+                <TextBlock Grid.Row="1" Grid.Column="1" Classes="subject" Classes.unread="{Binding !IsRead}" Text="{Binding Subject}"
+                           TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
+                <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="6,0,0,0" HorizontalAlignment="Right">
+                  <controls:IconView Data="{StaticResource Icon.Reply}" Width="13" Height="13" IsVisible="{Binding IsAnswered}"
+                                     Foreground="{DynamicResource Hcg.Text.Tertiary}" ToolTip.Tip="Replied" VerticalAlignment="Center" />
+                  <controls:IconView Data="{StaticResource Icon.Paperclip}" Width="14" Height="14" IsVisible="{Binding HasAttachments}"
+                                     Foreground="{DynamicResource Hcg.Text.Tertiary}" ToolTip.Tip="Has attachments" VerticalAlignment="Center" />
+                  <Button Classes="icon flag" Classes.on="{Binding IsFlagged}" MinWidth="22" MinHeight="22" Padding="3"
+                          Command="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).ToggleFlagCommand}"
+                          CommandParameter="{Binding}" ToolTip.Tip="Flag / unflag">
+                    <controls:IconView Data="{StaticResource Icon.Flag}" Width="14" Height="14" />
+                  </Button>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Classes="caption" Text="{Binding Preview}"
+                           IsVisible="{Binding HasPreview}" TextTrimming="CharacterEllipsis" MaxLines="1" Margin="0,3,0,0" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Empty folder / no search results -->
+        <StackPanel IsVisible="{Binding MessageList.IsEmpty}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" Margin="24">
+          <controls:IconView Data="{StaticResource Icon.Inbox}" Width="34" Height="34" Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+          <TextBlock Text="{Binding MessageList.EmptyText}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- Folder failed to load -->
+        <StackPanel IsVisible="{Binding MessageList.HasError}" VerticalAlignment="Center" Spacing="12" Margin="28">
+          <controls:IconView Data="{StaticResource Icon.Warning}" Width="30" Height="30" Foreground="{DynamicResource Hcg.Danger}" />
+          <TextBlock Text="{Binding MessageList.ErrorMessage}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+          <Button Classes="subtle" HorizontalAlignment="Center" Content="Try again" Command="{Binding RefreshCommand}" />
+        </StackPanel>
+
+        <!-- Account-level states -->
+        <StackPanel IsVisible="{Binding ShowConnecting}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" Margin="28">
+          <ProgressBar IsIndeterminate="True" Width="160" />
+          <TextBlock Text="Connecting to your mail server…" Classes="muted" HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding ShowNeedsPassword}" VerticalAlignment="Center" Spacing="12" Margin="28">
+          <controls:IconView Data="{StaticResource Icon.Lock}" Width="30" Height="30" Foreground="{DynamicResource Hcg.Accent}" />
+          <TextBlock Text="Password required" Classes="h3" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding SelectedAccount.EmailAddress, StringFormat='Enter the password for {0} to connect.'}"
+                     Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+          <Button Classes="primary" HorizontalAlignment="Center" Content="Enter password" Command="{Binding EnterPasswordCommand}" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding ShowAccountError}" VerticalAlignment="Center" Spacing="12" Margin="28">
+          <controls:IconView Data="{StaticResource Icon.Warning}" Width="30" Height="30" Foreground="{DynamicResource Hcg.Danger}" />
+          <TextBlock Text="Could not connect" Classes="h3" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding SelectedAccount.StatusText}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+            <Button Classes="primary" Content="Reconnect" Command="{Binding ReconnectCommand}" />
+            <Button Classes="subtle" Content="Account settings" Command="{Binding OpenAccountSettingsCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Panel>
+
+      <!-- Footer -->
+      <Button Grid.Row="4" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="10,4,10,10"
+              Command="{Binding MessageList.LoadOlderCommand}" IsVisible="{Binding MessageList.HasOlder}" Content="Load older messages" />
+    </Grid>
+  </Border>
+</UserControl>

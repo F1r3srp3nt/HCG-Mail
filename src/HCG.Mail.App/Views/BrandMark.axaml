@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="HCG.Mail.App.Views.BrandMark">
+  <StackPanel Orientation="Horizontal" Spacing="11">
+    <Panel Width="38" Height="38">
+      <!-- Official logo slot: shown automatically when Assets/Branding/hcg-logo.png exists. -->
+      <Image x:Name="OfficialLogo" IsVisible="False" Stretch="Uniform" />
+      <!-- TEMPORARY PLACEHOLDER MARK — not the official HCG logo. See assets/branding/README.md. -->
+      <Border x:Name="PlaceholderMark" CornerRadius="10" Background="{DynamicResource Hcg.Brush.Mark}"
+              BorderBrush="{DynamicResource Hcg.Accent}" BorderThickness="1"
+              BoxShadow="{DynamicResource Hcg.Shadow.GlowSoft}"
+              ToolTip.Tip="Temporary placeholder mark — the official HCG logo asset has not been supplied yet.">
+        <TextBlock Text="HCG" FontSize="11.5" FontWeight="Bold" LetterSpacing="0.6"
+                   Foreground="{DynamicResource Hcg.Brush.MarkText}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Border>
+    </Panel>
+    <StackPanel VerticalAlignment="Center" Spacing="1">
+      <TextBlock Classes="wordmark" Text="HCG MAIL" FontSize="16" />
+      <TextBlock Text="HAKMI CAPITAL GROUP" FontSize="8.5" LetterSpacing="1.6" FontWeight="SemiBold"
+                 Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

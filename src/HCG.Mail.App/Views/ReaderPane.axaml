@@ -1,0 +1,181 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.App.ViewModels"
+             xmlns:views="using:HCG.Mail.App.Views"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.App.Views.ReaderPane"
+             x:DataType="vm:MainWindowViewModel">
+  <UserControl.Styles>
+    <Style Selector="Button.toolbar > StackPanel">
+      <Setter Property="Orientation" Value="Horizontal" />
+      <Setter Property="Spacing" Value="7" />
+    </Style>
+    <Style Selector="Button.toolbar controls|IconView">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+    </Style>
+    <Style Selector="Border.attachment.dangerous">
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Warning}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource Hcg.Bg.Reader}">
+    <Panel>
+
+      <!-- Welcome: no account configured yet -->
+      <Border Classes="card" IsVisible="{Binding ShowWelcome}" MaxWidth="520" Padding="34,30" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24">
+        <StackPanel Spacing="14">
+          <views:BrandMark HorizontalAlignment="Left" />
+          <Rectangle Height="1" Fill="{DynamicResource Hcg.Brush.AccentLine}" Margin="0,6" />
+          <TextBlock Classes="h1" Text="Welcome to HCG Mail" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" LineHeight="20"
+                     Text="Connect your existing email account using IMAP and SMTP. HCG Mail works with privately hosted domain email such as Domene.no — no Outlook, Microsoft 365 or HCG account is required." />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+            <controls:IconView Data="{StaticResource Icon.Shield}" Width="16" Height="16" Foreground="{DynamicResource Hcg.Accent}" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" MaxWidth="420" VerticalAlignment="Center"
+                       Text="Encrypted connections only. Passwords stay in your operating system's secure credential store." />
+          </StackPanel>
+          <Border CornerRadius="10" BoxShadow="{DynamicResource Hcg.Shadow.Glow}" HorizontalAlignment="Left" Margin="0,8,0,0">
+            <Button Classes="primary" Command="{Binding AddAccountCommand}" Padding="18,10">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <controls:IconView Data="{StaticResource Icon.Plus}" Width="16" Height="16" StrokeThickness="2" />
+                <TextBlock Text="Add email account" />
+              </StackPanel>
+            </Button>
+          </Border>
+        </StackPanel>
+      </Border>
+
+      <!-- Nothing selected -->
+      <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
+        <StackPanel.IsVisible>
+          <MultiBinding Converter="{x:Static BoolConverters.And}">
+            <Binding Path="Reader.ShowPlaceholder" />
+            <Binding Path="HasAccounts" />
+          </MultiBinding>
+        </StackPanel.IsVisible>
+        <Border Width="64" Height="64" CornerRadius="32" Background="{DynamicResource Hcg.Bg.AccentSoft}" HorizontalAlignment="Center">
+          <controls:IconView Data="{StaticResource Icon.MailOpen}" Width="28" Height="28" Foreground="{DynamicResource Hcg.Accent}" />
+        </Border>
+        <TextBlock Text="Select a message to read" Classes="h3" HorizontalAlignment="Center" />
+        <TextBlock Text="Use ↑ and ↓ in the message list to move between messages." Classes="caption" HorizontalAlignment="Center" />
+      </StackPanel>
+
+      <!-- Loading / error -->
+      <StackPanel IsVisible="{Binding Reader.IsLoading}" VerticalAlignment="Top" Margin="28,28" Spacing="10">
+        <ProgressBar IsIndeterminate="True" Height="2" MinHeight="2" />
+        <TextBlock Text="Loading message…" Classes="caption" />
+      </StackPanel>
+      <StackPanel IsVisible="{Binding Reader.HasError}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" Margin="28" MaxWidth="460">
+        <controls:IconView Data="{StaticResource Icon.Warning}" Width="30" Height="30" Foreground="{DynamicResource Hcg.Danger}" />
+        <TextBlock Text="The message could not be opened" Classes="h3" HorizontalAlignment="Center" />
+        <TextBlock Text="{Binding Reader.ErrorMessage}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <!-- Message -->
+      <Grid IsVisible="{Binding Reader.HasMessage}" RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="26,14,26,18">
+
+        <!-- Actions -->
+        <Grid ColumnDefinitions="*,Auto" Margin="-8,0,0,14">
+          <WrapPanel>
+            <Button Classes="toolbar" Command="{Binding ReplyCommand}" ToolTip.Tip="Reply (Ctrl+R)">
+              <StackPanel><controls:IconView Data="{StaticResource Icon.Reply}" /><TextBlock Text="Reply" /></StackPanel>
+            </Button>
+            <Button Classes="toolbar" Command="{Binding ReplyAllCommand}" ToolTip.Tip="Reply all (Ctrl+Shift+R)">
+              <StackPanel><controls:IconView Data="{StaticResource Icon.ReplyAll}" /><TextBlock Text="Reply all" /></StackPanel>
+            </Button>
+            <Button Classes="toolbar" Command="{Binding ForwardCommand}" ToolTip.Tip="Forward (Ctrl+Shift+F)">
+              <StackPanel><controls:IconView Data="{StaticResource Icon.Forward}" /><TextBlock Text="Forward" /></StackPanel>
+            </Button>
+            <Rectangle Width="1" Height="18" Fill="{DynamicResource Hcg.Border.Default}" Margin="6,0" VerticalAlignment="Center" />
+            <Button Classes="toolbar" Command="{Binding ArchiveCommand}" ToolTip.Tip="Move to Archive">
+              <StackPanel><controls:IconView Data="{StaticResource Icon.Archive}" /><TextBlock Text="Archive" /></StackPanel>
+            </Button>
+            <Button Classes="toolbar" Command="{Binding DeleteCommand}" ToolTip.Tip="Move to Trash (Delete)">
+              <StackPanel><controls:IconView Data="{StaticResource Icon.Trash}" /><TextBlock Text="Delete" /></StackPanel>
+            </Button>
+            <Rectangle Width="1" Height="18" Fill="{DynamicResource Hcg.Border.Default}" Margin="6,0" VerticalAlignment="Center" />
+            <Button Classes="toolbar" Command="{Binding ToggleReadCommand}" ToolTip.Tip="Mark read / unread (Ctrl+U)">
+              <StackPanel><controls:IconView Data="{StaticResource Icon.Mail}" /><TextBlock Text="{Binding ReadToggleText}" /></StackPanel>
+            </Button>
+            <Button Classes="toolbar" Command="{Binding ToggleFlagCommand}" CommandParameter="{x:Null}" ToolTip.Tip="Flag / unflag">
+              <StackPanel><controls:IconView Data="{StaticResource Icon.Flag}" /><TextBlock Text="{Binding FlagToggleText}" /></StackPanel>
+            </Button>
+          </WrapPanel>
+          <Button Grid.Column="1" Classes="primary" Command="{Binding EditDraftCommand}" IsVisible="{Binding IsDraftsFolder}" VerticalAlignment="Top">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <controls:IconView Data="{StaticResource Icon.Compose}" Width="15" Height="15" />
+              <TextBlock Text="Edit draft" />
+            </StackPanel>
+          </Button>
+        </Grid>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="1" Spacing="12" Margin="0,0,0,14">
+          <SelectableTextBlock Text="{Binding Reader.Subject}" FontSize="21" FontWeight="SemiBold" TextWrapping="Wrap"
+                               Foreground="{DynamicResource Hcg.Text.Primary}" />
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource Hcg.Brush.Avatar}" VerticalAlignment="Top">
+              <TextBlock Text="{Binding Reader.Initials}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Margin="12,0,12,0" Spacing="3">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <SelectableTextBlock Text="{Binding Reader.FromName}" FontWeight="SemiBold" Foreground="{DynamicResource Hcg.Text.Primary}" />
+                <SelectableTextBlock Text="{Binding Reader.FromAddress}" Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+              </StackPanel>
+              <SelectableTextBlock Text="{Binding Reader.ToLine, StringFormat='To: {0}'}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Hcg.Text.Secondary}" />
+              <SelectableTextBlock Text="{Binding Reader.CcLine, StringFormat='Cc: {0}'}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource Hcg.Text.Secondary}" IsVisible="{Binding Reader.HasCc}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Right">
+              <TextBlock Text="{Binding Reader.DateText}" Classes="caption" HorizontalAlignment="Right" />
+              <Button Classes="link" FontSize="11.5" HorizontalAlignment="Right" IsVisible="{Binding Reader.HasHtml}"
+                      Content="{Binding Reader.ViewModeText}" Command="{Binding Reader.ToggleViewModeCommand}" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+
+        <!-- Remote content blocked -->
+        <Border Grid.Row="2" Classes="banner" IsVisible="{Binding Reader.ShowRemoteBanner}" Margin="0,0,0,12">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <controls:IconView Data="{StaticResource Icon.Shield}" Width="17" Height="17" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Reader.RemoteBannerText}" FontSize="12.5" TextWrapping="Wrap" />
+              <TextBlock Text="Loading them lets the sender see that and when you opened this message." Classes="caption" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button Grid.Column="2" Classes="subtle" Content="Load images" Command="{Binding Reader.LoadRemoteImagesCommand}" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+
+        <!-- Attachments -->
+        <ItemsControl Grid.Row="3" ItemsSource="{Binding Reader.Attachments}" IsVisible="{Binding Reader.HasAttachments}" Margin="0,0,0,12">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:AttachmentViewModel">
+              <Border Classes="chip attachment" Classes.dangerous="{Binding IsDangerous}" Margin="0,0,8,8" Padding="10,6,6,6" ToolTip.Tip="{Binding ToolTip}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <controls:IconView Data="{StaticResource Icon.Paperclip}" Width="15" Height="15" Foreground="{DynamicResource Hcg.Text.Secondary}" VerticalAlignment="Center" />
+                  <controls:IconView Data="{StaticResource Icon.Warning}" Width="15" Height="15" Foreground="{DynamicResource Hcg.Warning}"
+                                     IsVisible="{Binding IsDangerous}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Name}" MaxWidth="260" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding SizeText}" Classes="caption" VerticalAlignment="Center" />
+                  <Button Classes="icon" MinWidth="28" MinHeight="28" Padding="6" Command="{Binding SaveCommand}" ToolTip.Tip="Save to your download folder">
+                    <controls:IconView Data="{StaticResource Icon.Download}" Width="15" Height="15" />
+                  </Button>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Body -->
+        <views:MessageBodyView Grid.Row="4" DataContext="{Binding Reader}" />
+      </Grid>
+    </Panel>
+  </Border>
+</UserControl>

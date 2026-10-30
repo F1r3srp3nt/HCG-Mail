@@ -1,0 +1,75 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:HCG.Mail.App.ViewModels"
+        xmlns:views="using:HCG.Mail.App.Views"
+        xmlns:controls="using:HCG.Mail.App.Controls"
+        x:Class="HCG.Mail.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="HCG Mail"
+        Icon="/Assets/Icons/hcg-mail-placeholder.ico"
+        Width="1380" Height="880" MinWidth="1000" MinHeight="620"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="PreferSystemChrome"
+        ExtendClientAreaTitleBarHeightHint="38">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+N" Command="{Binding ComposeCommand}" />
+    <KeyBinding Gesture="F5" Command="{Binding RefreshCommand}" />
+    <KeyBinding Gesture="Ctrl+R" Command="{Binding ReplyCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+R" Command="{Binding ReplyAllCommand}" />
+    <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding ForwardCommand}" />
+    <KeyBinding Gesture="Ctrl+U" Command="{Binding ToggleReadCommand}" CommandParameter="{x:Null}" />
+    <KeyBinding Gesture="Delete" Command="{Binding DeleteCommand}" />
+  </Window.KeyBindings>
+
+  <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+    <!-- Custom title bar (Windows/macOS when the client area extends into the window chrome) -->
+    <Border x:Name="TitleBar" Grid.Row="0" Height="38" Background="{DynamicResource Hcg.Bg.TitleBar}"
+            BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,0,0,1"
+            IsVisible="{Binding $parent[Window].IsExtendedIntoWindowDecorations}">
+      <Grid ColumnDefinitions="Auto,*">
+        <StackPanel x:Name="TitleContent" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="16,0,0,0" IsHitTestVisible="False">
+          <TextBlock Classes="wordmark" Text="HCG MAIL" FontSize="11" LetterSpacing="2.6" VerticalAlignment="Center" />
+          <Rectangle Width="1" Height="12" Fill="{DynamicResource Hcg.Border.Strong}" VerticalAlignment="Center" />
+          <TextBlock Text="Hakmi Capital Group" FontSize="11" Foreground="{DynamicResource Hcg.Text.Tertiary}" VerticalAlignment="Center" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Development preview banner -->
+    <Border Grid.Row="1" IsVisible="{Binding IsPreviewMode}" Background="{DynamicResource Hcg.Bg.Preview}" Padding="16,6">
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+        <controls:IconView Data="{StaticResource Icon.Warning}" Width="15" Height="15" Foreground="{DynamicResource Hcg.Text.Preview}" />
+        <TextBlock Foreground="{DynamicResource Hcg.Text.Preview}" FontWeight="SemiBold" FontSize="12"
+                   Text="DEVELOPMENT PREVIEW — sample messages only. Not connected to any mail server; nothing is sent." />
+      </StackPanel>
+    </Border>
+
+    <!-- Three panes -->
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="256" MinWidth="220" />
+        <ColumnDefinition Width="400" MinWidth="300" />
+        <ColumnDefinition Width="1" />
+        <ColumnDefinition Width="*" MinWidth="380" />
+      </Grid.ColumnDefinitions>
+      <views:NavigationPane Grid.Column="0" />
+      <views:MessageListPane x:Name="MessageListPane" Grid.Column="1" />
+      <GridSplitter Grid.Column="2" ResizeDirection="Columns" />
+      <views:ReaderPane Grid.Column="3" />
+    </Grid>
+
+    <!-- Status bar -->
+    <Border Grid.Row="3" Background="{DynamicResource Hcg.Bg.TitleBar}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,1,0,0" Padding="14,5">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+          <controls:IconView Data="{StaticResource Icon.Lock}" Width="12" Height="12" Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+          <TextBlock FontSize="11" Foreground="{DynamicResource Hcg.Text.Tertiary}" Text="Encrypted IMAP/SMTP · remote content blocked by default" />
+        </StackPanel>
+        <TextBlock Grid.Column="2" FontSize="11" Foreground="{DynamicResource Hcg.Text.Tertiary}" Text="{Binding StatusText}" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

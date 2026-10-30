@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.App.ViewModels"
+             xmlns:html="using:TheArtOfDev.HtmlRenderer.Avalonia"
+             x:Class="HCG.Mail.App.Views.MessageBodyView"
+             x:DataType="vm:MessageReaderViewModel">
+  <Panel>
+    <!-- Sanitized HTML on a light "paper" surface: most HTML email assumes a white background. -->
+    <Border Classes="paper" IsVisible="{Binding ShowHtmlView}">
+      <html:HtmlPanel x:Name="Html" Text="{Binding SanitizedHtml}" Background="{DynamicResource Hcg.Bg.Paper}"
+                      IsContextMenuEnabled="False" IsSelectionEnabled="True"
+                      BaseStylesheet="body { margin: 18px 22px; color: #1a1f24; font-size: 10.5pt; } a { color: #0b63a8; }" />
+    </Border>
+
+    <!-- Plain text -->
+    <ScrollViewer IsVisible="{Binding ShowTextView}" HorizontalScrollBarVisibility="Disabled">
+      <SelectableTextBlock Text="{Binding TextBody}" TextWrapping="Wrap" FontSize="14" LineHeight="22"
+                           Foreground="{DynamicResource Hcg.Text.Primary}" Margin="2,4,12,24"
+                           SelectionBrush="{DynamicResource Hcg.Bg.Selected}" />
+    </ScrollViewer>
+  </Panel>
+</UserControl>

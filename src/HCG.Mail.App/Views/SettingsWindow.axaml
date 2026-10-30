@@ -1,0 +1,232 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:HCG.Mail.App.ViewModels"
+        xmlns:views="using:HCG.Mail.App.Views"
+        xmlns:controls="using:HCG.Mail.App.Controls"
+        x:Class="HCG.Mail.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="HCG Mail settings"
+        Icon="/Assets/Icons/hcg-mail-placeholder.ico"
+        Width="900" Height="660" MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Window.Styles>
+    <Style Selector="TabControl">
+      <Setter Property="TabStripPlacement" Value="Left" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="18,0" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+    </Style>
+    <Style Selector="TabItem:selected">
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    </Style>
+    <Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+      <Setter Property="Background" Value="{DynamicResource Hcg.Accent}" />
+    </Style>
+    <Style Selector="StackPanel.page">
+      <Setter Property="Margin" Value="30,26,30,26" />
+      <Setter Property="Spacing" Value="14" />
+    </Style>
+    <Style Selector="Border.option">
+      <Setter Property="Padding" Value="16,12" />
+    </Style>
+    <Style Selector="Border.themeCard">
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Default}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected Border.themeCard">
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Accent}" />
+      <Setter Property="BoxShadow" Value="{DynamicResource Hcg.Shadow.GlowSoft}" />
+    </Style>
+  </Window.Styles>
+
+  <Border Background="{DynamicResource Hcg.Bg.Reader}">
+    <TabControl Background="{DynamicResource Hcg.Bg.Sidebar}">
+
+      <!-- Appearance -->
+      <TabItem Header="Appearance">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <TextBlock Classes="h1" Text="Appearance" />
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="Choose a skin. The change applies immediately and does not affect your accounts or connections." />
+            <ListBox ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" Background="Transparent">
+              <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Columns="2" />
+                </ItemsPanelTemplate>
+              </ListBox.ItemsPanel>
+              <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                  <Setter Property="Padding" Value="0" />
+                  <Setter Property="Margin" Value="0,0,14,0" />
+                  <Setter Property="Background" Value="Transparent" />
+                </Style>
+                <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter, ListBoxItem:selected /template/ ContentPresenter, ListBoxItem:selected:pointerover /template/ ContentPresenter">
+                  <Setter Property="Background" Value="Transparent" />
+                </Style>
+              </ListBox.Styles>
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ThemeOption">
+                  <Border Classes="card themeCard" BorderThickness="2" Padding="16" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+                    <StackPanel Spacing="8">
+                      <Border Height="92" CornerRadius="9" ClipToBounds="True">
+                        <views:ThemeSwatch Kind="{Binding Kind}" />
+                      </Border>
+                      <TextBlock Text="{Binding Name}" Classes="h3" />
+                      <TextBlock Text="{Binding Description}" Classes="caption" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Accounts -->
+      <TabItem Header="Accounts">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="h1" Text="Accounts" />
+              <Button Grid.Column="1" Classes="primary" Command="{Binding AddAccountCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                  <controls:IconView Data="{StaticResource Icon.Plus}" Width="15" Height="15" StrokeThickness="2" />
+                  <TextBlock Text="Add account" />
+                </StackPanel>
+              </Button>
+            </Grid>
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding CredentialStorage, StringFormat='Passwords are stored in: {0}'}" />
+            <ItemsControl ItemsSource="{Binding Accounts}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AccountViewModel">
+                  <Border Classes="card" Padding="14,12" Margin="0,0,0,10" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <Border Width="36" Height="36" CornerRadius="18" Background="{DynamicResource Hcg.Brush.Avatar}">
+                        <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Margin="12,0" Spacing="2">
+                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding EmailAddress}" Classes="caption" />
+                        <TextBlock Classes="caption">
+                          <Run Text="{Binding Account.Imap.Host}" />
+                          <Run Text="·" />
+                          <Run Text="{Binding StatusText}" />
+                        </TextBlock>
+                      </StackPanel>
+                      <Button Grid.Column="2" Classes="subtle" Content="Edit" VerticalAlignment="Center"
+                              Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).EditAccountCommand}" CommandParameter="{Binding}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Mail -->
+      <TabItem Header="Mail">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <TextBlock Classes="h1" Text="Mail" />
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="h3" Text="Check for new messages" />
+                <ComboBox ItemsSource="{Binding RefreshOptions}" SelectedItem="{Binding SelectedRefresh}" MinWidth="220" />
+                <TextBlock Classes="caption" Text="{Binding RefreshExplanation}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Notifications" />
+                <ToggleSwitch IsChecked="{Binding NotifyOnNewMail}" OnContent="Show a notification inside HCG Mail when new messages arrive" OffContent="Show a notification inside HCG Mail when new messages arrive" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Notifications appear in the HCG Mail window. Windows/macOS system notifications are not supported yet." />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Reading and sending" />
+                <ToggleSwitch IsChecked="{Binding MarkAsReadWhenOpened}" OnContent="Mark messages as read when opened" OffContent="Mark messages as read when opened" />
+                <ToggleSwitch IsChecked="{Binding SaveCopyToSentFolder}" OnContent="Save a copy of sent messages in the Sent folder" OffContent="Save a copy of sent messages in the Sent folder" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="HCG Mail checks first whether the server already saved the message, so no duplicates are created." />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Downloads & startup -->
+      <TabItem Header="Downloads &amp; startup">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <TextBlock Classes="h1" Text="Downloads &amp; startup" />
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Attachment download location" />
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <TextBox Text="{Binding DownloadDirectory}" IsReadOnly="True" />
+                  <Button Grid.Column="1" Classes="subtle" Margin="8,0,0,0" Content="Browse…" Command="{Binding BrowseDownloadDirectoryCommand}" />
+                  <Button Grid.Column="2" Classes="ghost" Margin="4,0,0,0" Content="Reset" Command="{Binding ResetDownloadDirectoryCommand}" />
+                </Grid>
+                <ToggleSwitch IsChecked="{Binding AskWhereToSaveAttachments}" OnContent="Ask where to save each attachment" OffContent="Ask where to save each attachment" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Attachments are only ever saved — HCG Mail never opens or runs them. File names from the sender are cleaned before saving." />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Startup" />
+                <ToggleSwitch IsChecked="{Binding ConnectOnStartup}" OnContent="Connect to my accounts when HCG Mail starts" OffContent="Connect to my accounts when HCG Mail starts" />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Links" />
+                <ToggleSwitch IsChecked="{Binding ConfirmBeforeOpeningLinks}" OnContent="Show the real destination and ask before opening links" OffContent="Show the real destination and ask before opening links" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- About -->
+      <TabItem Header="About">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <views:BrandMark />
+            <Rectangle Height="1" Fill="{DynamicResource Hcg.Brush.AccentLine}" />
+            <TextBlock Classes="h1" Text="HCG Mail" />
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="An independent email client in the Hakmi Capital Group ecosystem. Works with any standard IMAP/SMTP mailbox and does not require an HCG account, HCG Connect, HCG ERP or any HCG server." />
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" >
+                <Grid.Styles>
+                  <Style Selector="TextBlock">
+                    <Setter Property="Margin" Value="0,4" />
+                    <Setter Property="TextWrapping" Value="Wrap" />
+                  </Style>
+                </Grid.Styles>
+                <TextBlock Classes="caption" Text="Version" />
+                <SelectableTextBlock Grid.Column="1" Text="{Binding Version}" Margin="0,4" />
+                <TextBlock Grid.Row="1" Classes="caption" Text="Runtime" />
+                <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Runtime}" Margin="0,4" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="2" Classes="caption" Text="Password storage" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding CredentialStorage}" />
+                <TextBlock Grid.Row="3" Classes="caption" Text="Settings folder" />
+                <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding DataDirectory}" Margin="0,4" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="4" Classes="caption" Text="Privacy" />
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="No telemetry. Credentials and messages are only exchanged with your own mail servers. Message bodies are not cached on disk." />
+              </Grid>
+            </Border>
+            <Border Classes="banner">
+              <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Hcg.Text.Secondary}"
+                         Text="Branding note: the logo mark shown is a temporary placeholder. The official HCG logo and application icon will replace it when supplied (see assets/branding/README.md)." />
+            </Border>
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Built with .NET, Avalonia UI, MailKit/MimeKit (MIT), HtmlSanitizer (MIT), HtmlRenderer (BSD-3) and the Inter typeface (OFL)." />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+  </Border>
+</Window>

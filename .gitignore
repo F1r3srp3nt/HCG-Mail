@@ -1,0 +1,23 @@
+# Build output
+bin/
+obj/
+artifacts/
+publish/
+*.user
+*.suo
+.vs/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Test output
+TestResults/
+*.trx
+coverage*/
+
+# Local runtime data (never commit mailbox data or logs)
+*.log
+*.db
+*.db-shm
+*.db-wal

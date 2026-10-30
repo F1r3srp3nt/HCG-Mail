@@ -1,0 +1,23 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:HCG.Mail.App.Controls"
+        x:Class="HCG.Mail.App.Views.ConfirmDialog"
+        Width="460" SizeToContent="Height" CanResize="False" ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner" Title="HCG Mail">
+  <Border Background="{DynamicResource Hcg.Bg.Elevated}" Padding="24,22,24,18">
+    <StackPanel Spacing="16">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <Border x:Name="IconBadge" Width="34" Height="34" CornerRadius="17" Background="{DynamicResource Hcg.Bg.AccentSoft}" VerticalAlignment="Top">
+          <controls:IconView x:Name="DialogIcon" Data="{StaticResource Icon.Info}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Accent}" />
+        </Border>
+        <TextBlock x:Name="TitleText" Classes="h2" TextWrapping="Wrap" MaxWidth="360" VerticalAlignment="Center" />
+      </StackPanel>
+      <SelectableTextBlock x:Name="MessageText" TextWrapping="Wrap" Foreground="{DynamicResource Hcg.Text.Secondary}" LineHeight="20" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
+        <Button x:Name="CancelButton" Classes="subtle" IsCancel="True" />
+        <Button x:Name="SecondaryButton" Classes="subtle" IsVisible="False" />
+        <Button x:Name="PrimaryButton" Classes="primary" IsDefault="True" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>
