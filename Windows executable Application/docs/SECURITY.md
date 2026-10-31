@@ -25,7 +25,9 @@ they are enforced in code, and the known limitations.
     when `SslPolicyErrors == None`** (identical strictness to the .NET default) and records why a
     certificate was rejected so the UI can explain it;
   * `CheckCertificateRevocation = true` (hard-fail: an unreachable CRL/OCSP responder fails the
-    connection rather than being ignored);
+    connection rather than being ignored). An undeterminable status is reported separately
+    (`RevocationUnavailable`) and never as a revoked or untrusted certificate. macOS-specific behaviour,
+    the investigation and the policy options are in [TLS_REVOCATION.md](TLS_REVOCATION.md);
   * TLS 1.2 + 1.3 only (TLS 1.3 is not requested on Windows 10 builds whose TLS stack lacks client
     support); TLS 1.0/1.1 are never offered;
   * 45-second network timeouts.

@@ -52,6 +52,12 @@ public static class MailErrorTranslator
             case TimeoutException:
                 return new(MailErrorKind.Timeout, $"The {server} server '{host}' did not respond in time.", ex);
 
+            // MailKit wraps a handshake that never completed in SslHandshakeException; that is a
+            // timeout (server silent or a firewall dropping packets), not a TLS or certificate problem.
+            case SslHandshakeException when recorder?.HasFailure != true && HasInner<TimeoutException>(ex):
+                return new(MailErrorKind.Timeout,
+                    $"The {server} server '{host}' did not respond in time during the secure (TLS) handshake on port {endpoint.Port}. A firewall may be blocking the port, or the server may be unavailable.", ex);
+
             case SslHandshakeException:
                 return TranslateTls(ex, server, endpoint, recorder);
 
@@ -99,6 +105,15 @@ public static class MailErrorTranslator
     {
         if (recorder?.HasFailure == true)
         {
+            // Name, trust, dates and revocation are all fine except that revocation could not be
+            // determined: say exactly that, and never present it as a revoked or untrusted certificate.
+            if (recorder.IsValidApartFromRevocation)
+            {
+                return new(MailErrorKind.RevocationUnavailable,
+                    $"Secure connection to the {server} server '{endpoint.Host}' stopped: {DescribeRevocationProblem(recorder, OperatingSystem.IsMacOS())}",
+                    ex);
+            }
+
             var errors = recorder.Errors!.Value;
             var cert = recorder.DescribeCertificate();
             string reason;
@@ -107,21 +122,58 @@ public static class MailErrorTranslator
             else if (errors.HasFlag(SslPolicyErrors.RemoteCertificateNameMismatch))
                 reason = $"the certificate belongs to {cert}, which does not match '{endpoint.Host}'. Your provider may use a different server name";
             else if (recorder.ChainStatus.HasFlag(X509ChainStatusFlags.Revoked))
-                reason = "the certificate has been revoked";
+                reason = $"the certificate has been revoked by its certificate authority ({cert})";
             else if (recorder.ChainStatus.HasFlag(X509ChainStatusFlags.NotTimeValid))
                 reason = $"the certificate has expired or is not yet valid ({cert})";
             else if (recorder.ChainStatus.HasFlag(X509ChainStatusFlags.UntrustedRoot) || recorder.ChainStatus.HasFlag(X509ChainStatusFlags.PartialChain))
                 reason = $"the certificate is not issued by a trusted authority ({cert}); it may be self-signed or intercepted";
-            else if (recorder.ChainStatus.HasFlag(X509ChainStatusFlags.RevocationStatusUnknown) || recorder.ChainStatus.HasFlag(X509ChainStatusFlags.OfflineRevocation))
-                reason = "the certificate's revocation status could not be checked because the certificate authority could not be reached";
             else
                 reason = $"the certificate could not be verified ({recorder.ChainStatus})";
-            return new(MailErrorKind.Certificate, $"Secure connection to the {server} server refused: {reason}. HCG Mail does not connect to servers with untrusted certificates.", ex);
+            return new(MailErrorKind.Certificate, $"Secure connection to the {server} server refused: {reason}. HCG Mail does not connect to servers whose certificate fails verification.", ex);
         }
 
         return new(MailErrorKind.Tls,
             $"A secure (TLS) connection to '{endpoint.Host}:{endpoint.Port}' could not be established. Check that the security setting matches the port.", ex);
     }
+
+    /// <summary>
+    /// Explains an undeterminable revocation status: the certificate is otherwise valid, which revocation
+    /// endpoints it publishes, and — on macOS — why a certificate without OCSP cannot be checked there.
+    /// </summary>
+    public static string DescribeRevocationProblem(TlsValidationRecorder recorder, bool isMacOS)
+    {
+        var endpoints = new List<string>();
+        if (recorder.OcspUrls.Count > 0)
+            endpoints.Add("OCSP " + string.Join(", ", recorder.OcspUrls.Select(HostOf).Distinct()));
+        if (recorder.CrlUrls.Count > 0)
+            endpoints.Add("CRL " + string.Join(", ", recorder.CrlUrls.Select(HostOf).Distinct()));
+        var where = endpoints.Count > 0 ? $" ({string.Join("; ", endpoints)})" : " (the certificate lists no revocation service)";
+
+        var text = $"the certificate ({recorder.DescribeCertificate()}) is otherwise valid — trusted issuer, matching name, not expired — " +
+                   $"but its revocation status could not be checked{where}. This is not evidence that it is revoked. " +
+                   "HCG Mail requires a successful revocation check, so it did not connect. Check that your network, firewall or VPN allows " +
+                   "access to the certificate authority's revocation service, then try again.";
+
+        if (isMacOS && recorder.OcspUrls.Count == 0 && recorder.CrlUrls.Count > 0)
+        {
+            text += " Note: this certificate publishes only a CRL and no OCSP address. On macOS, revocation checks are performed by the " +
+                    "system's certificate service using OCSP, so the status of such certificates often cannot be determined on a Mac even " +
+                    "when the network is fine. Run 'HCGMail --diagnose-tls host:port' for details.";
+        }
+        return text;
+    }
+
+    private static bool HasInner<T>(Exception ex) where T : Exception
+    {
+        for (var e = ex.InnerException; e is not null; e = e.InnerException)
+        {
+            if (e is T)
+                return true;
+        }
+        return false;
+    }
+
+    private static string HostOf(string url) => Uri.TryCreate(url, UriKind.Absolute, out var u) ? u.Host : url;
 
     private static MailOperationException TranslateSmtpCommand(SmtpCommandException ex) => ex.ErrorCode switch
     {

@@ -158,7 +158,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
 
     public void ReportError(MailOperationException ex)
     {
-        if (ex.IsTransient || ex.Kind is MailErrorKind.Authentication or MailErrorKind.Certificate or MailErrorKind.Tls)
+        if (ex.IsTransient || ex.Kind is MailErrorKind.Authentication or MailErrorKind.Certificate or MailErrorKind.RevocationUnavailable or MailErrorKind.Tls)
             SetStatus(AccountStatus.Error, ex.UserMessage);
     }
 
