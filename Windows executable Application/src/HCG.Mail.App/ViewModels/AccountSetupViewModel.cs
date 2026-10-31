@@ -42,7 +42,7 @@ public sealed partial class AccountSetupViewModel : ObservableObject
     private readonly IConnectionTester _tester;
     private readonly ICredentialVault _vault;
     private readonly Func<MailAccount, Task> _onSaved;
-    private readonly Func<MailAccount, Task>? _onRemove;
+    private readonly Func<MailAccount, Task<bool>>? _onRemove;
     private readonly MailAccount? _existing;
     private bool _usernameEdited;
     private bool _validated;
@@ -87,7 +87,7 @@ public sealed partial class AccountSetupViewModel : ObservableObject
         ICredentialVault vault,
         Func<MailAccount, Task> onSaved,
         MailAccount? existing = null,
-        Func<MailAccount, Task>? onRemove = null,
+        Func<MailAccount, Task<bool>>? onRemove = null,
         string? message = null)
     {
         _tester = tester;
@@ -298,8 +298,9 @@ public sealed partial class AccountSetupViewModel : ObservableObject
     {
         if (_existing is null || _onRemove is null)
             return;
-        await _onRemove(_existing);
-        CloseRequested?.Invoke(this, false);
+        // Close only when the account was actually removed (not when the user cancelled).
+        if (await _onRemove(_existing))
+            CloseRequested?.Invoke(this, false);
     }
 
     private async Task<string?> ResolvePasswordAsync()

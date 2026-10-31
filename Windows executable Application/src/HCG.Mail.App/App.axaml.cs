@@ -57,15 +57,21 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
+    /// <summary>Names the failure and where the details are, without exposing any data.</summary>
+    internal static string UnexpectedErrorMessage(Exception exception, string logDirectory) =>
+        $"An unexpected error occurred ({exception.GetType().Name}). Nothing was sent or deleted because of it. " +
+        $"Technical details were written to the log file hcg-mail-{DateTime.Now:yyyyMMdd}.log in {logDirectory} — please include it when reporting the problem.";
+
     private static void InstallErrorHandlers(IServiceProvider services)
     {
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("HCG.Mail.App");
         var notifications = services.GetRequiredService<INotificationService>();
+        var logDirectory = services.GetRequiredService<Infrastructure.AppPaths>().LogDirectory;
 
         Dispatcher.UIThread.UnhandledException += (_, e) =>
         {
             logger.LogError(e.Exception, "Unhandled UI exception");
-            notifications.Error("Something went wrong", "An unexpected error occurred. Details were written to the log file.");
+            notifications.Error("Something went wrong", UnexpectedErrorMessage(e.Exception, logDirectory));
             e.Handled = true;
         };
         TaskScheduler.UnobservedTaskException += (_, e) =>
