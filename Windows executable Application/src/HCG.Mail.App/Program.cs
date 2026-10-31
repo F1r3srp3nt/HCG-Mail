@@ -12,6 +12,8 @@ internal static class Program
     {
         if (args.Contains(CredentialStoreCheck.Argument, StringComparer.OrdinalIgnoreCase))
             return CredentialStoreCheck.Run();
+        if (TlsDiagnosisCommand.TryRun(args) is { } exitCode)
+            return exitCode;
 
         App.Mode = new ViewModels.AppMode(IsDeveloperPreviewRequested(args));
 

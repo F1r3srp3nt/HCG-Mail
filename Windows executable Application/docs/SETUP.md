@@ -40,6 +40,7 @@ Useful switches and variables:
 | `--developer-preview` | **Debug builds only** (ignored in Release builds): development preview with labelled sample messages. Nothing is persisted, nothing is sent, a banner says so. A normal start never loads sample data, and no environment variable enables preview. |
 | `HCG_MAIL_DATA_DIR=/some/folder` | Use another settings folder (handy for testing a clean first run). |
 | `--software-rendering` or `HCG_MAIL_SOFTWARE_RENDERING=1` | Force CPU rendering (troubleshooting for VMs/RDP/broken GPU drivers). |
+| `--diagnose-tls host[:port]` | Read-only TLS/certificate diagnosis for a mail server (no login, no credentials): chain, revocation addresses and reachability. Saves `tls-diagnosis-<host>-<port>.txt` in the settings folder. |
 | `--check-credential-store` | Verifies the OS credential store with a throwaway entry, writes `credential-store-check.txt` to the settings folder, exit code 0 = OK. |
 | `HCG_MAIL_SCREENSHOT_DIR=/folder` | UI tests save PNG screenshots there. |
 | `HCG_MAIL_E2E=1` | Enables the end-to-end tests (needs the local test server below). |
@@ -89,5 +90,5 @@ leave the machine. **Never point the end-to-end tests at a real mailbox.**
 | `A compatible .NET SDK was not found` | Install .NET SDK 10.0.x. |
 | Window opens but stays black (VM/RDP) | Start with `--software-rendering`. |
 | Connection test fails at *TLS negotiation* | Check that the security setting matches the port (993/465 = SSL/TLS, 143/587 = STARTTLS) and the server name matches the provider's certificate. |
-| "revocation status could not be checked" | The certificate authority's CRL/OCSP server was unreachable (firewall/proxy). HCG Mail does not skip revocation checks. |
+| "revocation status could not be checked" | The certificate is otherwise valid but its revocation status is unknown — often a CRL-only certificate on macOS, or a blocked revocation server. Run `dotnet run --project src/HCG.Mail.App -- --diagnose-tls host:993` (no login) and see [TLS_REVOCATION.md](TLS_REVOCATION.md). HCG Mail does not skip revocation checks. |
 | Logs | `logs/` inside the settings folder (no passwords or message content). |

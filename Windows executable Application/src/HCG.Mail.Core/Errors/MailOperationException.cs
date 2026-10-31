@@ -9,6 +9,9 @@ public enum MailErrorKind
     Timeout,
     Tls,
     Certificate,
+
+    /// <summary>The certificate is otherwise valid but its revocation status could not be determined. Not evidence of revocation.</summary>
+    RevocationUnavailable,
     Authentication,
     ServerRejected,
     Protocol,

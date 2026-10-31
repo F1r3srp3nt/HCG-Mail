@@ -349,7 +349,7 @@ public sealed class MailKitMailSession : IMailSession
         catch (Exception ex) when (ex is not MailOperationException || ((MailOperationException)ex).IsTransient)
         {
             var translated = MailErrorTranslator.Translate(ex, MailProtocol.Imap, Account.Imap, _imapTls);
-            if (IsConnectionLoss(ex) || translated.Kind is MailErrorKind.Authentication or MailErrorKind.Tls or MailErrorKind.Certificate or MailErrorKind.Dns or MailErrorKind.Timeout or MailErrorKind.Network)
+            if (IsConnectionLoss(ex) || translated.Kind is MailErrorKind.Authentication or MailErrorKind.Tls or MailErrorKind.Certificate or MailErrorKind.RevocationUnavailable or MailErrorKind.Dns or MailErrorKind.Timeout or MailErrorKind.Network)
             {
                 await ResetConnectionAsync(graceful: false).ConfigureAwait(false);
                 SetState(MailConnectionState.Failed);
