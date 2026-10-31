@@ -20,7 +20,7 @@ This folder is reserved for the **Mac App Store distribution** of HCG Mail.
 
 ## Relationship to the existing application
 
-There is **one** HCG Mail implementation, in [`../Windows executable Application/`](../Windows%20executable%20Application/).
+There is **one** HCG Mail implementation, in [`../Windows-executable-Application/`](../Windows-executable-Application/).
 The App Store build must reuse it; only sandbox entitlements, store packaging, metadata and
 submission material should live here. It shares packaging work with
 [`../Mac OS executable Application/`](../Mac%20OS%20executable%20Application/) — that direct-download
