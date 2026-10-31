@@ -39,7 +39,7 @@ OCSP/CRL server is blocked by a firewall, VPN, proxy or content filter.
 **Confirm with** (read-only, no login, no credentials):
 
 ```bash
-cd "HCG-Mail/Windows executable Application"
+cd HCG-Mail/Windows-executable-Application
 dotnet run --project src/HCG.Mail.App -- --diagnose-tls <your IMAP server>:993
 dotnet run --project src/HCG.Mail.App -- --diagnose-tls <your SMTP server>:465
 ```
@@ -146,7 +146,7 @@ Details that matter for review:
 ### Verify on the Mac
 
 ```bash
-cd "HCG-Mail/Windows executable Application"
+cd HCG-Mail/Windows-executable-Application
 git pull && dotnet build && dotnet test
 dotnet run --project src/HCG.Mail.App -- --diagnose-tls mail.hakmicapitalgroup.com:993
 ```

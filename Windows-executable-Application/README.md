@@ -1,8 +1,8 @@
-# HCG Mail — Windows executable Application
+# HCG Mail — Windows-executable-Application
 
 **Native email client for Windows 10/11 · Hakmi Capital Group**
 
-> This folder (`Windows executable Application/` in the
+> This folder (`Windows-executable-Application/` in the
 > [HCG Mail repository](../README.md)) contains the HCG Mail application: one .NET 10 / Avalonia
 > codebase that is published as the Windows executable and also builds and runs on macOS for
 > development. All commands below are run **from this folder**; all paths in this folder's
@@ -46,7 +46,7 @@ Honest test record: see [docs/TESTING.md](docs/TESTING.md). Manual Domene.no che
 # once: install the .NET 10 SDK (https://dotnet.microsoft.com/download) — e.g. brew install --cask dotnet-sdk
 dotnet --version          # 10.0.x
 
-cd "HCG-Mail/Windows executable Application"     # quotes needed: the folder name has spaces
+cd HCG-Mail/Windows-executable-Application
 dotnet restore
 dotnet build
 dotnet test

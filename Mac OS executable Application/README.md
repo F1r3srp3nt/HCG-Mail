@@ -12,7 +12,7 @@ HCG, outside the Mac App Store).
 |---|---|
 | macOS application packaging | Build an `HCG Mail.app` bundle (`Info.plist`, `Contents/MacOS`, `Contents/Resources`) from the existing app published with `dotnet publish -r osx-arm64` / `osx-x64` |
 | Apple Silicon support | Native `osx-arm64` build (already compiles), plus `osx-x64` for Intel Macs or a universal binary |
-| macOS application icons | `.icns` generated from the official icon master `../Windows executable Application/assets/icons/hcg-mail-1024.png` |
+| macOS application icons | `.icns` generated from the official icon master `../Windows-executable-Application/assets/icons/hcg-mail-1024.png` |
 | Code signing | Developer ID Application certificate, hardened runtime, entitlements required by .NET |
 | Developer ID distribution | Signed download for distribution outside the App Store |
 | Apple notarization | `notarytool` submission and stapling so Gatekeeper accepts the app |
@@ -21,11 +21,11 @@ HCG, outside the Mac App Store).
 
 ## Relationship to the existing application
 
-There is **one** HCG Mail implementation, in [`../Windows executable Application/`](../Windows%20executable%20Application/).
+There is **one** HCG Mail implementation, in [`../Windows-executable-Application/`](../Windows-executable-Application/).
 It is cross-platform .NET 10 / Avalonia and **already runs on macOS** for development:
 
 ```bash
-cd "HCG-Mail/Windows executable Application"
+cd HCG-Mail/Windows-executable-Application
 dotnet run --project src/HCG.Mail.App
 ```
 
