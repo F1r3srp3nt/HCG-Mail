@@ -25,6 +25,7 @@ run against a real mailbox.
 | Secure storage abstraction | `Infrastructure/CredentialVaultTests` (session vault, platform factory, real OS vault round-trip on Windows/macOS) |
 | Error handling | `Email/ErrorTranslatorTests`, `Email/ConnectionTesterTests` (mocked DNS/TCP/TLS/auth failures) |
 | HTML safety | `Email/HtmlSanitizerTests` (scripts, handlers, frames, forms, SVG, `javascript:`, remote images/CSS, `@import`, renderer colour compatibility) |
+| Certificate revocation | `Email/CertificateValidationTests` (valid, expired, hostname mismatch, untrusted CA, revoked, unreachable CRL, CRL server error, combined problems, handshake timeout — real .NET chain building with a local CRL server) and `Email/CrlFallbackTests` (macOS CRL fallback: good/revoked CRLs, forged signer with the issuer's name, tampered, wrong issuer, issuer without `cRLSign`, stale/future/no `nextUpdate`, other partition, `onlySomeReasons`, delta, unknown critical extension, malformed/truncated input, caching, size limit, non-HTTP addresses, and that name/trust/date failures never reach the fallback) |
 | Security policy | `SecurityOptionsTests` (never plaintext/auto modes, strict certificate callback, TLS ≥ 1.2) |
 | Real-account mode | `RealAccountModeTests` (normal start has no preview/sample data, existing `accounts.json`/`settings.json` loaded and left untouched, preview cannot be enabled implicitly, no periodic timer, refresh is single-flight, cancellable and reports success, official logo embedded with original proportions) |
 | UI behaviour | `MainWindowTests` (load, read + mark read, sanitized HTML + remote images, search, delete/flag/read, skins), `ComposeViewModelTests`, `AccountSetupViewModelTests` |
@@ -45,15 +46,13 @@ through a relay that the test cuts and restores): error state while offline, lis
 automatic recovery on refresh using the new connection. That test caught — and now guards against — a
 bug where the message list kept using the closed connection after a reconnect.
 
-## Last recorded run (development container, Ubuntu 24.04, .NET SDK 10.0.114)
+## Last recorded run (development container, Ubuntu 24.04, .NET SDK 10.0.114, 2026-10-31)
 
 ```
-dotnet build -c Release            → 0 warnings, 0 errors
-dotnet publish -r osx-arm64 / osx-x64 / win-x64 → Mach-O arm64, Mach-O x86_64, PE32+ x64 GUI
-dotnet test                        → HCG.Mail.Tests 198 passed, 13 skipped · HCG.Mail.App.Tests 25 passed, 2 skipped
-HCG_MAIL_E2E=1 dotnet test (Debug and Release)
-  HCG.Mail.Tests       Passed 211 / Failed 0   (198 unit + 13 end-to-end)
-  HCG.Mail.App.Tests   Passed  27 / Failed 0   (25 UI + 2 end-to-end UI)
+dotnet test                        → HCG.Mail.Tests 259 passed, 13 skipped · HCG.Mail.App.Tests 41 passed, 2 skipped
+HCG_MAIL_E2E=1 dotnet test
+  HCG.Mail.Tests       Passed 272 / Failed 0   (259 unit + 13 end-to-end)
+  HCG.Mail.App.Tests   Passed  43 / Failed 0   (41 UI + 2 end-to-end UI)
 ```
 
 Additional manual verification performed in the container:

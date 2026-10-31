@@ -26,8 +26,13 @@ they are enforced in code, and the known limitations.
     certificate was rejected so the UI can explain it;
   * `CheckCertificateRevocation = true` (hard-fail: an unreachable CRL/OCSP responder fails the
     connection rather than being ignored). An undeterminable status is reported separately
-    (`RevocationUnavailable`) and never as a revoked or untrusted certificate. macOS-specific behaviour,
-    the investigation and the policy options are in [TLS_REVOCATION.md](TLS_REVOCATION.md);
+    (`RevocationUnavailable`) and never as a revoked or untrusted certificate;
+  * **macOS only:** when the platform's *only* complaint is "revocation status unknown" (name, dates and
+    trust already passed), HCG Mail downloads the certificate's CRL itself and accepts the connection only
+    if the CRL is verified (issuer signature, issuer name and `cRLSign`, current `thisUpdate`/`nextUpdate`,
+    matching partition, complete CRL, no unknown critical extensions) **and** does not list the
+    certificate. A listed certificate is refused as revoked; any failure keeps the connection blocked.
+    Windows and Linux are unchanged. Details in [TLS_REVOCATION.md](TLS_REVOCATION.md);
   * TLS 1.2 + 1.3 only (TLS 1.3 is not requested on Windows 10 builds whose TLS stack lacks client
     support); TLS 1.0/1.1 are never offered;
   * 45-second network timeouts.

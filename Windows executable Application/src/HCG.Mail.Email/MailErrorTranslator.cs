@@ -154,6 +154,9 @@ public static class MailErrorTranslator
                    "HCG Mail requires a successful revocation check, so it did not connect. Check that your network, firewall or VPN allows " +
                    "access to the certificate authority's revocation service, then try again.";
 
+        if (recorder.FallbackResult is { Status: Revocation.CrlStatus.Unknown } fallback)
+            text += $" HCG Mail's own CRL check could not confirm it either: {fallback.Detail}.";
+
         if (isMacOS && recorder.OcspUrls.Count == 0 && recorder.CrlUrls.Count > 0)
         {
             text += " Note: this certificate publishes only a CRL and no OCSP address. On macOS, revocation checks are performed by the " +

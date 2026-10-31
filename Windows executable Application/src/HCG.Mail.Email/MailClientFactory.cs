@@ -4,6 +4,7 @@ using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using HCG.Mail.Email.Revocation;
 
 namespace HCG.Mail.Email;
 
@@ -23,6 +24,13 @@ public sealed class MailClientFactory : IMailClientFactory
 {
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(45);
 
+    /// <summary>
+    /// Verified CRL check used when the platform cannot determine revocation status. Enabled on macOS only,
+    /// where .NET requires a positive OCSP-style answer that CRL-only certificates cannot provide
+    /// (see docs/TLS_REVOCATION.md). Windows and Linux fetch CRLs natively and keep their behaviour.
+    /// </summary>
+    public IRevocationFallback? RevocationFallback { get; init; } = OperatingSystem.IsMacOS() ? CrlRevocationFallback.Shared : null;
+
     public IImapClient CreateImapClient(TlsValidationRecorder recorder)
     {
         var client = new ImapClient();
@@ -41,6 +49,7 @@ public sealed class MailClientFactory : IMailClientFactory
     {
         service.Timeout = (int)Timeout.TotalMilliseconds;
         service.CheckCertificateRevocation = true;
+        recorder.RevocationFallback = RevocationFallback;
         service.ServerCertificateValidationCallback = recorder.Validate;
         service.SslProtocols = SupportedProtocols;
     }

@@ -1,8 +1,8 @@
 # TLS certificate revocation — investigation and decision record
 
-**Status:** diagnosis and reporting improvements implemented; **security policy unchanged**
-(an undeterminable revocation status still blocks the connection). A policy change needs founder
-approval — see *Options* below.
+**Status:** root cause established; **verified CRL fallback on macOS implemented** (approved by the
+founder, 2026-10-31). An undeterminable revocation status still blocks the connection; the fallback can
+only turn "unknown" into a *verified* "not revoked" or "revoked". Windows and Linux are unchanged.
 
 ## Reported problem
 
@@ -71,7 +71,93 @@ unknown revocation status as acceptable (soft-fail), which HCG Mail currently do
 * Regression tests with real .NET chain building and a local CRL server: valid, expired, hostname
   mismatch, untrusted CA, revoked, CRL unreachable, CRL server error, combined problems, timeout.
 
-## Options for founder decision
+## Root cause — established (2026-10-31)
+
+Affected server: `mail.hakmicapitalgroup.com:993`, Let's Encrypt certificate issued by intermediate
+**YR1**, expiring 2026-12-25, revocation information only as a CRL at `yr1.c.lencr.org` (Let's Encrypt
+ended OCSP in 2025). Hostname, dates and chain trust pass; only revocation is `RevocationStatusUnknown`.
+
+Evidence from the .NET source (dotnet/runtime, `main` at 591622c; related issue dotnet/runtime#113971):
+
+* `src/native/libs/System.Security.Cryptography.Native.Apple/pal_x509chain.c` — the macOS revocation policy is
+  `SecPolicyCreateRevocation(kSecRevocationUseAnyAvailableMethod | kSecRevocationRequirePositiveResponse)`.
+  With *RequirePositiveResponse*, Apple's trust service must obtain a definite "good" answer; the result
+  key `RevocationResponseRequired` is mapped to `RevocationStatusUnknown` (same file, status mapping).
+* `ChainPal.Apple.cs` — every `X509Chain`/`SslStream` validation on macOS goes through this `SecTrust` path.
+* Apple's trust service obtains positive answers via OCSP; it does not fetch CRLs for this purpose. A
+  certificate with **no OCSP responder** therefore can never satisfy *RequirePositiveResponse* on macOS,
+  regardless of network access.
+* Windows (CryptoAPI) and Linux (.NET's own CRL download) fetch the CRL from the certificate's CRL
+  distribution point, so the same chain validates there when `yr1.c.lencr.org` is reachable (shown on Linux
+  with HCG Mail's CRL-only test PKI).
+
+Conclusion: a **macOS-specific .NET platform behaviour**, not a fault in the certificate, the server or
+HCG Mail's validation code (MailKit passes `CheckCertificateRevocation = true`; HCG Mail's callback only
+reads the platform verdict). A server-side change is not a durable fix: Let's Encrypt has no OCSP, and
+OCSP is optional industry-wide, so CRL-only certificates are becoming the norm.
+
+## Fix (approved and implemented) — verified CRL fallback on macOS
+
+Trigger: **macOS only**, and only when the platform reports `RevocationStatusUnknown`/`OfflineRevocation`
+as the *sole* problem (hostname, dates and chain trust already passed). Then, for every non-root
+certificate in the validated chain:
+
+1. Read its CRL distribution point (HTTP), download the CRL (size and time limits, no cookies).
+2. Accept the CRL only if: its issuer name equals the certificate's issuer; its signature verifies with the
+   issuer certificate's public key from the validated chain; `thisUpdate` ≤ now ≤ `nextUpdate`; it has no
+   unknown critical extensions; and, for partitioned CRLs (Let's Encrypt), its Issuing Distribution Point
+   names the same URL the certificate points to — otherwise an attacker could serve a different, genuinely
+   signed shard that does not list the certificate.
+3. If the serial number is listed → **revoked** (hard failure). If not listed → verified good.
+4. Any failure (unreachable, unparsable, stale, wrong signature, delta-CRL required) → status stays
+   **unknown** and the connection stays blocked, exactly as today.
+
+Connect only when every non-root certificate is verified "not revoked". Verified CRLs are cached in
+memory until `nextUpdate`; nothing is written to disk. Windows and Linux are unchanged.
+
+Security impact: no weakening — the fallback only turns "unknown" into a verified "good" or "revoked";
+unknown remains blocking. Residual risk lies in the correctness of the new CRL verification code, which
+needs focused tests (signature, issuer, freshness, partition, revoked serial, oversized/malformed input).
+
+### Implementation
+
+| Part | File |
+|---|---|
+| CRL verification (RFC 5280, fail-closed) | `src/HCG.Mail.Email/Revocation/CrlVerifier.cs` |
+| Fallback per chain element, in-memory cache, HTTP download (10 MB limit, 12 s timeout, ≤ 3 redirects, no cookies, HTTP 200 only) | `src/HCG.Mail.Email/Revocation/CrlRevocationFallback.cs` |
+| Trigger and decision (`errors == RemoteCertificateChainErrors` and the chain status contains only `RevocationStatusUnknown`/`OfflineRevocation`) | `TlsValidationRecorder.Validate` |
+| Enabled on macOS only | `MailClientFactory.RevocationFallback` |
+| Error message when the fallback could not confirm the status | `MailErrorTranslator.DescribeRevocationProblem` |
+| Fallback result in the diagnosis report | `Diagnostics/TlsDiagnostics.cs` (`--diagnose-tls`) |
+
+Details that matter for review:
+
+* The signature is verified **before** any CRL content is interpreted; RSA PKCS#1 (SHA-256/384/512) and
+  ECDSA (SHA-256/384/512) are supported, anything else is "unknown".
+* The issuer used is the next element of the chain the platform already validated, never a certificate
+  taken from the CRL or the network.
+* Revoked entries with a `certificateIssuer` extension (indirect CRLs), delta CRLs, `FreshestCRL`,
+  `onlySomeReasons`, `onlyContainsAttributeCerts` and unknown critical extensions → "unknown".
+* A clock skew of ±5 minutes is tolerated on `thisUpdate`/`nextUpdate`.
+* A CRL that fails verification is never cached; a verified one is cached until its `nextUpdate`.
+* Tests: `tests/HCG.Mail.Tests/Email/CrlFallbackTests.cs` (CRL verifier, fallback, callback integration,
+  HTTP fetcher) next to the existing `CertificateValidationTests.cs`.
+
+### Verify on the Mac
+
+```bash
+cd "HCG-Mail/Windows executable Application"
+git pull && dotnet build && dotnet test
+dotnet run --project src/HCG.Mail.App -- --diagnose-tls mail.hakmicapitalgroup.com:993
+```
+
+Section 1 should say the platform could not determine revocation status and that it was *verified by
+HCG Mail's CRL check*; section 3 shows the CRL that was checked and section 6 concludes that HCG Mail can
+connect. Then start HCG Mail normally (`dotnet run --project src/HCG.Mail.App`) and run the account's
+connection test. On Windows the same commands apply (PowerShell or cmd); there the platform checks the CRL
+itself, so `--diagnose-tls` should report the certificate as accepted without the fallback.
+
+## Options considered (decision: option 2)
 
 | Option | What changes | Security impact | Effort |
 |---|---|---|---|
@@ -80,7 +166,5 @@ unknown revocation status as acceptable (soft-fail), which HCG Mail currently do
 | **2. HCG Mail checks CRLs itself on macOS** | When macOS reports "unknown" and the certificate has a CRL address, download the CRL over HTTP, verify its signature against the issuing CA from the validated chain, check freshness and look up the serial number; accept only on a verified "not revoked". | Keeps hard-fail semantics (an unreachable CRL still blocks) and fixes the CRL-only case. Adds security-sensitive parsing/verification code that needs careful review and tests. | medium |
 | 3. Per-account opt-in override | User explicitly allows "connect when revocation can't be verified" for one server, with a warning | Same risk as option 1, limited to accounts where the user chose it | small |
 
-**Recommendation:** first run `--diagnose-tls` on the Mac to confirm the cause. If it confirms a
-CRL-only certificate on macOS, implement **option 2** (keeps the strict policy and fixes the real
-problem); option 1 is the industry-standard compromise if a faster fix is preferred. Neither will be
-implemented without explicit approval.
+**Decision:** option 2 (approved by the founder, 2026-10-31) — it keeps the strict policy and fixes the
+real problem. Options 1 and 3 were not implemented.
