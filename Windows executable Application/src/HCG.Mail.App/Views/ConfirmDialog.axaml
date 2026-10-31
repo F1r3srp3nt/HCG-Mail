@@ -4,11 +4,23 @@
         x:Class="HCG.Mail.App.Views.ConfirmDialog"
         Width="460" SizeToContent="Height" CanResize="False" ShowInTaskbar="False"
         WindowStartupLocation="CenterOwner" Title="HCG Mail">
+  <!-- Icon styling lives in styles (resolved once the dialog has a skin), not in code: looking up
+       skin resources in the constructor fails before the window is attached. -->
+  <Window.Styles>
+    <Style Selector="controls|IconView#DialogIcon">
+      <Setter Property="Data" Value="{StaticResource Icon.Info}" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Accent}" />
+    </Style>
+    <Style Selector="controls|IconView#DialogIcon.destructive">
+      <Setter Property="Data" Value="{StaticResource Icon.Warning}" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Danger}" />
+    </Style>
+  </Window.Styles>
   <Border Background="{DynamicResource Hcg.Bg.Elevated}" Padding="24,22,24,18">
     <StackPanel Spacing="16">
       <StackPanel Orientation="Horizontal" Spacing="12">
         <Border x:Name="IconBadge" Width="34" Height="34" CornerRadius="17" Background="{DynamicResource Hcg.Bg.AccentSoft}" VerticalAlignment="Top">
-          <controls:IconView x:Name="DialogIcon" Data="{StaticResource Icon.Info}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Accent}" />
+          <controls:IconView x:Name="DialogIcon" Width="18" Height="18" />
         </Border>
         <TextBlock x:Name="TitleText" Classes="h2" TextWrapping="Wrap" MaxWidth="360" VerticalAlignment="Center" />
       </StackPanel>

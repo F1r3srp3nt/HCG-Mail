@@ -151,6 +151,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         foreach (var account in _accountStore.Load())
             Accounts.Add(CreateAccountViewModel(account));
 
+        await RetryPendingCredentialDeletionsAsync();
+
         var last = Accounts.FirstOrDefault(a => a.Account.Id == _settings.Current.LastAccountId) ?? Accounts.FirstOrDefault();
         SelectedAccount = last;
 
@@ -647,31 +649,123 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         await _dialogs.ShowAccountSetupAsync(vm);
     }
 
-    private async Task RemoveAccountAsync(MailAccount account)
+    /// <summary>Longest time removal waits for an account's connection to close before detaching it.</summary>
+    internal static TimeSpan SessionShutdownTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Removes an account from HCG Mail. Works whatever the account's connection state (connected,
+    /// offline, TLS or sign-in failure, never connected) because it never contacts the mail server.
+    /// Nothing is deleted on the server and other accounts are untouched. Returns true when the
+    /// account was removed.
+    /// </summary>
+    public async Task<bool> RemoveAccountAsync(MailAccount account)
     {
         if (!await _dialogs.ConfirmAsync(
                 "Remove this account?",
-                $"{account.EmailAddress} will be removed from HCG Mail and its saved password deleted from {_vault.StorageDescription}. No email on the server is deleted.",
+                $"{account.EmailAddress} will be removed from HCG Mail on this computer, and its saved password will be deleted from {_vault.StorageDescription}.\n\n" +
+                "No email is deleted from the mail server — you can add the account again at any time. HCG Mail does not store message contents on this computer, so there are no local messages to delete. Your other accounts are not affected.",
                 "Remove account",
                 destructive: true))
-            return;
+            return false;
 
+        _logger.LogInformation("Removing account {AccountId}", account.Id);
         var vm = Accounts.FirstOrDefault(a => a.Account.Id == account.Id);
+
+        // 1. Persist first: if the accounts file cannot be written, nothing has changed yet.
         try
         {
-            await _vault.DeleteAsync(account.CredentialKey);
+            _accountStore.Save(Accounts.Where(a => a.Account.Id != account.Id).Select(a => a.Account).ToList());
         }
-        catch (CredentialVaultException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            _logger.LogWarning(ex, "Could not delete stored password for account {AccountId}", account.Id);
+            _logger.LogError(ex, "Could not save accounts file while removing account {AccountId}", account.Id);
+            _notifications.Error("Account not removed", $"HCG Mail could not update its settings file ({ex.GetType().Name}: {ex.Message}). Nothing was changed; check that the settings folder is writable and try again.");
+            return false;
         }
-        _accountStore.Save(Accounts.Where(a => a.Account.Id != account.Id).Select(a => a.Account).ToList());
+
+        // 2. Update the interface immediately and stop the account's operations (never waiting on the server).
         if (vm is not null)
         {
+            vm.PropertyChanged -= OnAccountPropertyChanged;
+            if (SelectedAccount == vm)
+                SelectedAccount = Accounts.FirstOrDefault(a => a != vm);
             Accounts.Remove(vm);
-            await vm.DisposeAsync();
+            await ShutDownAccountAsync(vm);
         }
-        SelectedAccount = Accounts.FirstOrDefault();
+
+        // 3. Delete the stored password. A failure is reported honestly and retried at the next start.
+        var credentialsDeleted = await TryDeleteCredentialAsync(account.CredentialKey, account.Id);
+        if (credentialsDeleted)
+        {
+            _notifications.Success("Account removed", $"{account.EmailAddress} and its saved password were removed. No email was deleted from the server.");
+        }
+        else
+        {
+            _settings.Update(s => s with { PendingCredentialDeletions = s.PendingCredentialDeletions.Append(account.CredentialKey).ToList() });
+            _notifications.Warning("Account removed — password not deleted",
+                $"{account.EmailAddress} was removed, but its saved password could not be deleted from {_vault.StorageDescription}. " +
+                "HCG Mail will try again the next time it starts. To remove it now, open " +
+                (OperatingSystem.IsWindows() ? "Credential Manager → Windows Credentials and remove \"HCG Mail/" + account.CredentialKey + "\"."
+                    : OperatingSystem.IsMacOS() ? "Keychain Access, search for \"HCG Mail\" and delete the item for " + account.CredentialKey + "."
+                    : "your system's credential store and remove the entry " + account.CredentialKey + "."));
+        }
+        _logger.LogInformation("Removed account {AccountId}; credentials deleted: {CredentialsDeleted}", account.Id, credentialsDeleted);
+        return true;
+    }
+
+    private async Task ShutDownAccountAsync(AccountViewModel account)
+    {
+        try
+        {
+            var dispose = account.DisposeAsync().AsTask();
+            if (await Task.WhenAny(dispose, Task.Delay(SessionShutdownTimeout)) != dispose)
+            {
+                _logger.LogWarning("Connection of removed account {AccountId} did not close within {Timeout}; it was detached and will close in the background", account.Account.Id, SessionShutdownTimeout);
+                _ = dispose.ContinueWith(t => _logger.LogDebug(t.Exception, "Background close of removed account finished"), TaskScheduler.Default);
+            }
+            else
+            {
+                await dispose;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Closing a connection must never prevent removal.
+            _logger.LogWarning(ex, "Error while closing the connection of removed account {AccountId}", account.Account.Id);
+        }
+    }
+
+    private async Task<bool> TryDeleteCredentialAsync(string key, string accountId)
+    {
+        try
+        {
+            await _vault.DeleteAsync(key);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not delete stored password for account {AccountId}", accountId);
+            return false;
+        }
+    }
+
+    /// <summary>Retries password deletions that failed when accounts were removed earlier.</summary>
+    private async Task RetryPendingCredentialDeletionsAsync()
+    {
+        var pending = _settings.Current.PendingCredentialDeletions;
+        if (pending.Count == 0)
+            return;
+        var stillPending = new List<string>();
+        foreach (var key in pending)
+        {
+            if (Accounts.Any(a => a.Account.CredentialKey == key))
+                continue; // the account was added again; its password is in use
+            if (!await TryDeleteCredentialAsync(key, key))
+                stillPending.Add(key);
+        }
+        _settings.Update(s => s with { PendingCredentialDeletions = stillPending });
+        if (stillPending.Count > 0)
+            _notifications.Warning("Saved password not yet removed", $"{stillPending.Count} password(s) from removed accounts could not be deleted from {_vault.StorageDescription}. HCG Mail will try again next time.");
     }
 
     [RelayCommand]

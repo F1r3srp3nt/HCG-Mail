@@ -35,7 +35,11 @@ public sealed class FileLoggerProvider : ILoggerProvider
           .Append(" [").Append(level.ToString().ToUpperInvariant()[..4]).Append("] ")
           .Append(category[(category.LastIndexOf('.') + 1)..]).Append(": ").Append(message);
         if (exception is not null)
-            sb.Append(" | ").Append(exception.GetType().FullName).Append(": ").Append(exception.Message);
+        {
+            // Full exception including stack trace and inner exceptions, so failures can be reproduced.
+            // HCG Mail never puts passwords or tokens into exception messages.
+            sb.Append(Environment.NewLine).Append(exception);
+        }
         sb.Append(Environment.NewLine);
 
         var path = Path.Combine(_directory, $"hcg-mail-{DateTime.Now:yyyyMMdd}.log");

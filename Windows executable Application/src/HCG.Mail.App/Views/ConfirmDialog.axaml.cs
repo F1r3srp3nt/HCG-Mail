@@ -1,5 +1,4 @@
 using Avalonia.Controls;
-using Avalonia.Media;
 using HCG.Mail.App.Services;
 
 namespace HCG.Mail.App.Views;
@@ -25,8 +24,7 @@ public partial class ConfirmDialog : Window
         }
         if (destructive)
         {
-            DialogIcon.Data = (Geometry?)this.FindResource("Icon.Warning");
-            DialogIcon.Foreground = (IBrush?)this.FindResource("Hcg.Danger");
+            DialogIcon.Classes.Add("destructive");
             PrimaryButton.IsDefault = false;
         }
 

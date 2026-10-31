@@ -30,11 +30,28 @@ public sealed record AppSettings
     public bool ConfirmBeforeOpeningLinks { get; init; } = true;
     public string? LastAccountId { get; init; }
 
+    /// <summary>
+    /// Credential-store keys of removed accounts whose password could not be deleted. HCG Mail retries
+    /// the deletion at every start until it succeeds. Contains key names only, never secrets.
+    /// </summary>
+    public IReadOnlyList<string> PendingCredentialDeletions { get; init; } = [];
+
+    // Returns the same instance when nothing changes, so value equality of AppSettings (used to skip
+    // needless saves) is not broken by a fresh list allocation.
+    private static IReadOnlyList<string> NormalizeKeys(IReadOnlyList<string>? keys)
+    {
+        if (keys is null || keys.Count == 0)
+            return [];
+        var cleaned = keys.Where(k => !string.IsNullOrWhiteSpace(k)).Distinct().ToList();
+        return cleaned.Count == keys.Count ? keys : cleaned;
+    }
+
     public AppSettings Normalize() => this with
     {
         Version = CurrentVersion,
         Theme = Enum.IsDefined(Theme) ? Theme : ThemeKind.HcgFuture,
         DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirectory) ? null : DownloadDirectory,
+        PendingCredentialDeletions = NormalizeKeys(PendingCredentialDeletions),
     };
 }
 

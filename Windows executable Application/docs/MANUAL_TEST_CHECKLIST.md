@@ -40,7 +40,9 @@ Do not send test mail to people outside the test. Nothing in this checklist is a
 | 25 | Sleep / resume | Put the computer to sleep for > 10 min, wake, open a message | Reconnects automatically on the next action | |
 | 26 | **Manual refresh only** | Send yourself a message from the second mailbox and wait 10 minutes without touching HCG Mail; then press Refresh (F5) | Nothing changes while you wait (no background checking). After Refresh: spinner + *Cancel* while running, the new message appears, a notification says "1 new message", status bar shows "Last refreshed HH:mm". Pressing F5 repeatedly never starts a second refresh at the same time | |
 | 27 | Skins | Settings → Appearance → HCG Classic / HCG Future | Switches instantly; connection stays up; choice remembered after restart | |
-| 28 | Remove account | Account settings → Remove account | Confirmation; account and stored password removed; no mail deleted on the server | |
+| 28 | Remove account | Account settings → Remove account | Warning-style confirmation explaining what is removed; after *Remove account*: success notification, account gone from the sidebar immediately, still gone after restarting HCG Mail; password removed from Keychain Access / Credential Manager; no mail deleted on the server | |
+| 29 | Remove an account that cannot connect | With the network off (or an account showing a TLS / password error), Account settings → Remove account | Removal works exactly as in 28 — it never needs the server | |
+| 30 | Remove one of two accounts | Add a second account, remove the first | The second account stays connected and unchanged | |
 
 **Sign-off**
 
