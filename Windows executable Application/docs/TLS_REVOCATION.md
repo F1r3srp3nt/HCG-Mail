@@ -71,6 +71,54 @@ unknown revocation status as acceptable (soft-fail), which HCG Mail currently do
 * Regression tests with real .NET chain building and a local CRL server: valid, expired, hostname
   mismatch, untrusted CA, revoked, CRL unreachable, CRL server error, combined problems, timeout.
 
+## Root cause — established (2026-10-31)
+
+Affected server: `mail.hakmicapitalgroup.com:993`, Let's Encrypt certificate issued by intermediate
+**YR1**, expiring 2026-12-25, revocation information only as a CRL at `yr1.c.lencr.org` (Let's Encrypt
+ended OCSP in 2025). Hostname, dates and chain trust pass; only revocation is `RevocationStatusUnknown`.
+
+Evidence from the .NET source (dotnet/runtime, `main` at 591622c; related issue dotnet/runtime#113971):
+
+* `src/native/libs/System.Security.Cryptography.Native.Apple/pal_x509chain.c` — the macOS revocation policy is
+  `SecPolicyCreateRevocation(kSecRevocationUseAnyAvailableMethod | kSecRevocationRequirePositiveResponse)`.
+  With *RequirePositiveResponse*, Apple's trust service must obtain a definite "good" answer; the result
+  key `RevocationResponseRequired` is mapped to `RevocationStatusUnknown` (same file, status mapping).
+* `ChainPal.Apple.cs` — every `X509Chain`/`SslStream` validation on macOS goes through this `SecTrust` path.
+* Apple's trust service obtains positive answers via OCSP; it does not fetch CRLs for this purpose. A
+  certificate with **no OCSP responder** therefore can never satisfy *RequirePositiveResponse* on macOS,
+  regardless of network access.
+* Windows (CryptoAPI) and Linux (.NET's own CRL download) fetch the CRL from the certificate's CRL
+  distribution point, so the same chain validates there when `yr1.c.lencr.org` is reachable (shown on Linux
+  with HCG Mail's CRL-only test PKI).
+
+Conclusion: a **macOS-specific .NET platform behaviour**, not a fault in the certificate, the server or
+HCG Mail's validation code (MailKit passes `CheckCertificateRevocation = true`; HCG Mail's callback only
+reads the platform verdict). A server-side change is not a durable fix: Let's Encrypt has no OCSP, and
+OCSP is optional industry-wide, so CRL-only certificates are becoming the norm.
+
+## Proposed fix (awaiting founder approval) — verified CRL fallback on macOS
+
+Trigger: **macOS only**, and only when the platform reports `RevocationStatusUnknown`/`OfflineRevocation`
+as the *sole* problem (hostname, dates and chain trust already passed). Then, for every non-root
+certificate in the validated chain:
+
+1. Read its CRL distribution point (HTTP), download the CRL (size and time limits, no cookies).
+2. Accept the CRL only if: its issuer name equals the certificate's issuer; its signature verifies with the
+   issuer certificate's public key from the validated chain; `thisUpdate` ≤ now ≤ `nextUpdate`; it has no
+   unknown critical extensions; and, for partitioned CRLs (Let's Encrypt), its Issuing Distribution Point
+   names the same URL the certificate points to — otherwise an attacker could serve a different, genuinely
+   signed shard that does not list the certificate.
+3. If the serial number is listed → **revoked** (hard failure). If not listed → verified good.
+4. Any failure (unreachable, unparsable, stale, wrong signature, delta-CRL required) → status stays
+   **unknown** and the connection stays blocked, exactly as today.
+
+Connect only when every non-root certificate is verified "not revoked". Verified CRLs are cached in
+memory until `nextUpdate`; nothing is written to disk. Windows and Linux are unchanged.
+
+Security impact: no weakening — the fallback only turns "unknown" into a verified "good" or "revoked";
+unknown remains blocking. Residual risk lies in the correctness of the new CRL verification code, which
+needs focused tests (signature, issuer, freshness, partition, revoked serial, oversized/malformed input).
+
 ## Options for founder decision
 
 | Option | What changes | Security impact | Effort |
