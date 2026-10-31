@@ -44,12 +44,12 @@ public class RealServerUiTests
         PresetId = ProviderPresets.DomeneNo.Id,
     };
 
-    private static string RepoRoot()
+    private static string AppRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "HCG.Mail.sln")))
             dir = dir.Parent;
-        return dir?.FullName ?? throw new DirectoryNotFoundException("Repository root not found.");
+        return dir?.FullName ?? throw new DirectoryNotFoundException("Application folder (containing HCG.Mail.sln) not found.");
     }
 
     /// <summary>Runs an async test body on the headless UI thread, pumping the dispatcher until it completes.</summary>
@@ -73,7 +73,7 @@ public class RealServerUiTests
     {
         var token = Guid.NewGuid().ToString("N")[..8];
         var builder = new BodyBuilder { TextBody = "Text alternative" };
-        var logo = builder.LinkedResources.Add("chart.png", File.ReadAllBytes(Path.Combine(RepoRoot(), "assets", "icons", "hcg-mail-1024.png")));
+        var logo = builder.LinkedResources.Add("chart.png", File.ReadAllBytes(Path.Combine(AppRoot(), "assets", "icons", "hcg-mail-1024.png")));
         logo.ContentId = MimeUtils.GenerateMessageId();
         builder.HtmlBody = $"""
             <html><body style="font-family:Arial;color:#1a1f24">
