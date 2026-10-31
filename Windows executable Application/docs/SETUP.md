@@ -17,6 +17,13 @@ dotnet --info      # SDK 10.0.x must be listed
 
 ## Everyday commands (macOS / Linux / Windows)
 
+Run these from the application folder, `Windows executable Application/`, which contains
+`HCG.Mail.sln` (quote the path, it contains spaces):
+
+```bash
+cd "HCG-Mail/Windows executable Application"
+```
+
 ```bash
 dotnet restore                                        # download NuGet packages
 dotnet build                                          # build all projects (Debug)
