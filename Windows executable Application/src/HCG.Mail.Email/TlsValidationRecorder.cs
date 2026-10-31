@@ -1,6 +1,7 @@
 using System.Formats.Asn1;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
+using HCG.Mail.Email.Revocation;
 
 namespace HCG.Mail.Email;
 
@@ -9,9 +10,11 @@ public sealed record ChainElementInfo(string Subject, string Issuer, DateTime No
 
 /// <summary>
 /// Strict server-certificate validation that also remembers why a certificate was rejected,
-/// so the UI can explain the failure. It accepts a certificate only when the platform reports
-/// no policy errors at all — exactly the default .NET/MailKit behaviour, never weaker. Everything
-/// else recorded here is diagnostic evidence and never influences the accept/reject decision.
+/// so the UI can explain the failure. It accepts a certificate when the platform reports no policy
+/// errors at all — the default .NET/MailKit behaviour. The single exception: when the platform's only
+/// problem is that revocation status could not be determined (hostname, dates and chain trust all
+/// passed) and a <see cref="RevocationFallback"/> is configured (macOS), the fallback must positively
+/// verify every affected certificate as not revoked; "revoked" and "still unknown" stay rejected.
 /// </summary>
 public sealed class TlsValidationRecorder
 {
@@ -29,6 +32,15 @@ public sealed class TlsValidationRecorder
     public IReadOnlyList<string> CrlUrls { get; private set; } = [];
     public IReadOnlyList<ChainElementInfo> ChainElements { get; private set; } = [];
 
+    /// <summary>Verified CRL check for "revocation unknown"; set by <see cref="MailClientFactory"/> on macOS only.</summary>
+    public IRevocationFallback? RevocationFallback { get; set; }
+
+    /// <summary>Outcome of the CRL fallback, when it ran.</summary>
+    public RevocationFallbackResult? FallbackResult { get; private set; }
+
+    /// <summary>True when the certificate was accepted because the CRL fallback verified it.</summary>
+    public bool VerifiedByFallback => FallbackResult?.Status == CrlStatus.Good && Errors != SslPolicyErrors.None;
+
     public bool HasFailure => Errors is { } e && e != SslPolicyErrors.None;
 
     /// <summary>
@@ -45,6 +57,7 @@ public sealed class TlsValidationRecorder
         Errors = sslPolicyErrors;
         ChainStatus = X509ChainStatusFlags.NoError;
         ChainElements = [];
+        FallbackResult = null;
         if (chain is not null)
         {
             foreach (var status in chain.ChainStatus)
@@ -75,8 +88,20 @@ public sealed class TlsValidationRecorder
             CrlUrls = ReadCrlDistributionPoints(cert2);
         }
 
-        // The decision: exactly the platform's verdict. Nothing above can relax it.
-        return sslPolicyErrors == SslPolicyErrors.None;
+        if (sslPolicyErrors == SslPolicyErrors.None)
+            return true;
+
+        // Only "revocation unknown" with everything else valid may be resolved — and only by a positive check.
+        if (RevocationFallback is not null && chain is not null && IsValidApartFromRevocation)
+        {
+            var certificates = chain.ChainElements.Select(e => e.Certificate).ToList();
+            FallbackResult = RevocationFallback.Verify(certificates, ChainElements.Select(e => e.Status).ToList());
+            if (FallbackResult.Status == CrlStatus.Good)
+                return true;
+            if (FallbackResult.Status == CrlStatus.Revoked)
+                ChainStatus |= X509ChainStatusFlags.Revoked;
+        }
+        return false;
     }
 
     public string DescribeCertificate()

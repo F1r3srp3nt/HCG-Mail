@@ -41,6 +41,8 @@ public sealed class TlsDiagnostics(IMailClientFactory clientFactory, HttpClient 
             await client.ConnectAsync(host, port, SecurityOptions.ToSecureSocketOptions(security), cancellationToken).ConfigureAwait(false);
             ok = client.IsSecure;
             output.WriteLine($"1. HCG Mail connection check: PASSED in {sw.ElapsedMilliseconds} ms ({(client as MailService)?.SslProtocol}).");
+            if (recorder.VerifiedByFallback)
+                output.WriteLine($"   The platform could not determine revocation status; {recorder.FallbackResult!.Detail}.");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -84,6 +86,7 @@ public sealed class TlsDiagnostics(IMailClientFactory clientFactory, HttpClient 
         output.WriteLine("3. Revocation information in the server certificate:");
         output.WriteLine($"   OCSP responders: {(recorder.OcspUrls.Count == 0 ? "none" : string.Join(", ", recorder.OcspUrls))}");
         output.WriteLine($"   CRL locations:   {(recorder.CrlUrls.Count == 0 ? "none" : string.Join(", ", recorder.CrlUrls))}");
+        output.WriteLine($"   HCG Mail CRL check: {(recorder.RevocationFallback is null ? "not used on this platform (it checks CRLs natively)" : recorder.FallbackResult is null ? "enabled, not needed" : $"{recorder.FallbackResult.Status} — {recorder.FallbackResult.Detail}")}");
         output.WriteLine();
 
         // 4. Comparison chain builds on this platform (diagnosis only).
@@ -105,7 +108,9 @@ public sealed class TlsDiagnostics(IMailClientFactory clientFactory, HttpClient 
 
         // 6. Interpretation.
         output.WriteLine("6. Interpretation:");
-        if (ok)
+        if (ok && recorder.VerifiedByFallback)
+            output.WriteLine("   The certificate passed every check. Revocation was verified by HCG Mail's own CRL check. HCG Mail can connect.");
+        else if (ok)
             output.WriteLine("   The certificate passed every check, including revocation. HCG Mail can connect.");
         else if (recorder.IsValidApartFromRevocation)
         {

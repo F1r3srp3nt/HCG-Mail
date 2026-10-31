@@ -127,6 +127,15 @@ internal sealed class TestPki : IDisposable
         return (chain, errors);
     }
 
+    /// <summary>A different key pair that claims the same name as the real root (forgery attempt).</summary>
+    public X509Certificate2 CreateImpostorIssuer()
+    {
+        using var key = RSA.Create(2048);
+        var request = new CertificateRequest(Root.SubjectName, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        request.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
+        return request.CreateSelfSigned(DateTimeOffset.UtcNow.AddYears(-1), DateTimeOffset.UtcNow.AddYears(5));
+    }
+
     public static int FreePort()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
