@@ -4,8 +4,8 @@
 
 | Suite | Command | Needs | Count |
 |---|---|---|---|
-| Unit tests (`tests/HCG.Mail.Tests`) | `dotnet test tests/HCG.Mail.Tests` | nothing | 197 |
-| Headless UI tests (`tests/HCG.Mail.App.Tests`) | `dotnet test tests/HCG.Mail.App.Tests` | nothing (Skia renders off-screen) | 19 |
+| Unit tests (`tests/HCG.Mail.Tests`) | `dotnet test tests/HCG.Mail.Tests` | nothing | 198 |
+| Headless UI tests (`tests/HCG.Mail.App.Tests`) | `dotnet test tests/HCG.Mail.App.Tests` | nothing (Skia renders off-screen) | 25 |
 | End-to-end tests (opt-in) | `HCG_MAIL_E2E=1 dotnet test` | local test server (`tests/integration-server`) | 13 + 2 UI |
 
 Plain `dotnet test` runs everything except the end-to-end tests, which report as *skipped*. They never
@@ -26,6 +26,7 @@ run against a real mailbox.
 | Error handling | `Email/ErrorTranslatorTests`, `Email/ConnectionTesterTests` (mocked DNS/TCP/TLS/auth failures) |
 | HTML safety | `Email/HtmlSanitizerTests` (scripts, handlers, frames, forms, SVG, `javascript:`, remote images/CSS, `@import`, renderer colour compatibility) |
 | Security policy | `SecurityOptionsTests` (never plaintext/auto modes, strict certificate callback, TLS ≥ 1.2) |
+| Real-account mode | `RealAccountModeTests` (normal start has no preview/sample data, existing `accounts.json`/`settings.json` loaded and left untouched, preview cannot be enabled implicitly, no periodic timer, refresh is single-flight, cancellable and reports success, official logo embedded with original proportions) |
 | UI behaviour | `MainWindowTests` (load, read + mark read, sanitized HTML + remote images, search, delete/flag/read, skins), `ComposeViewModelTests`, `AccountSetupViewModelTests` |
 
 ### End-to-end tests (real Dovecot + Postfix, disposable)
@@ -38,7 +39,7 @@ security/port mismatch; send → receive → read → attachment bytes → singl
 threading and `\Answered`; flags; Trash and permanent delete; Archive; unread counts; server drafts
 (save, replace, load, send removes draft); reconnection after the server kills the session
 (`doveadm kick`); SMTP recipient rejection reported as a failed send; and the full application UI
-loading the inbox and rendering an HTML message with an inline image and a blocked tracking pixel;
+loading the inbox, showing newly arrived mail only after a manual Refresh, and rendering an HTML message with an inline image and a blocked tracking pixel;
 and the full application recovering from a simulated **network interruption** (IMAP traffic routed
 through a relay that the test cuts and restores): error state while offline, list kept visible,
 automatic recovery on refresh using the new connection. That test caught — and now guards against — a
@@ -47,11 +48,12 @@ bug where the message list kept using the closed connection after a reconnect.
 ## Last recorded run (development container, Ubuntu 24.04, .NET SDK 10.0.114)
 
 ```
-dotnet build                       → 0 warnings, 0 errors (Debug and Release)
-dotnet test                        → HCG.Mail.Tests 197 passed, 13 skipped · HCG.Mail.App.Tests 19 passed, 2 skipped
-HCG_MAIL_E2E=1 dotnet test
-  HCG.Mail.Tests       Passed 210 / Failed 0   (197 unit + 13 end-to-end)
-  HCG.Mail.App.Tests   Passed  21 / Failed 0   (19 UI + 2 end-to-end UI)
+dotnet build -c Release            → 0 warnings, 0 errors
+dotnet publish -r osx-arm64 / osx-x64 / win-x64 → Mach-O arm64, Mach-O x86_64, PE32+ x64 GUI
+dotnet test                        → HCG.Mail.Tests 198 passed, 13 skipped · HCG.Mail.App.Tests 25 passed, 2 skipped
+HCG_MAIL_E2E=1 dotnet test (Debug and Release)
+  HCG.Mail.Tests       Passed 211 / Failed 0   (198 unit + 13 end-to-end)
+  HCG.Mail.App.Tests   Passed  27 / Failed 0   (25 UI + 2 end-to-end UI)
 ```
 
 Additional manual verification performed in the container:

@@ -6,18 +6,17 @@ public enum ThemeKind
     HcgClassic,
 }
 
+/// <remarks>
+/// There is deliberately no refresh-interval setting: HCG Mail never polls the mail server in the
+/// background. Settings files from older builds that contain "refreshIntervalMinutes" or
+/// "notifyOnNewMail" still load; those fields are simply ignored.
+/// </remarks>
 public sealed record AppSettings
 {
     public const int CurrentVersion = 1;
 
     public int Version { get; init; } = CurrentVersion;
     public ThemeKind Theme { get; init; } = ThemeKind.HcgFuture;
-
-    /// <summary>Minutes between automatic refreshes of the open folder; 0 means manual refresh only.</summary>
-    public int RefreshIntervalMinutes { get; init; } = 5;
-
-    /// <summary>Show an in-app notification when a refresh finds new messages.</summary>
-    public bool NotifyOnNewMail { get; init; } = true;
 
     /// <summary>Where attachments are saved when the user chooses "Save" without picking a location; null means the user's Downloads folder.</summary>
     public string? DownloadDirectory { get; init; }
@@ -31,13 +30,10 @@ public sealed record AppSettings
     public bool ConfirmBeforeOpeningLinks { get; init; } = true;
     public string? LastAccountId { get; init; }
 
-    public static readonly int[] AllowedRefreshIntervals = [0, 1, 2, 5, 10, 15, 30, 60];
-
     public AppSettings Normalize() => this with
     {
         Version = CurrentVersion,
         Theme = Enum.IsDefined(Theme) ? Theme : ThemeKind.HcgFuture,
-        RefreshIntervalMinutes = AllowedRefreshIntervals.Contains(RefreshIntervalMinutes) ? RefreshIntervalMinutes : 5,
         DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirectory) ? null : DownloadDirectory,
     };
 }

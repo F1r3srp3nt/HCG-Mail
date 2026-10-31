@@ -74,7 +74,18 @@ public sealed class MailKitMailSession : IMailSession
     public Task<FolderPage> GetMessagesAsync(string folderFullName, int skip, int count, CancellationToken cancellationToken = default) =>
         RunAsync(async (client, ct) =>
         {
-            var folder = await OpenFolderAsync(client, folderFullName, ct).ConfigureAwait(false);
+            var folder = await GetFolderAsync(client, folderFullName, ct).ConfigureAwait(false);
+            if (folder.IsOpen)
+            {
+                // The folder is already selected, so its message count only changes when the server
+                // reports new mail in reply to a command. NOOP asks for those pending updates; it is
+                // sent only as part of this user-initiated load/refresh, never on a timer.
+                await client.NoOpAsync(ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await folder.OpenAsync(FolderAccess.ReadWrite, ct).ConfigureAwait(false);
+            }
             var total = folder.Count;
             var end = total - 1 - skip;
             IList<IMessageSummary> fetched = [];

@@ -75,6 +75,9 @@ CNF
   openssl ca -batch -config ca.cnf -in server.csr -out server.crt -notext 2>/dev/null
   openssl ca -config ca.cnf -gencrl -out ../crl/test-ca.crl.pem 2>/dev/null
   openssl crl -in ../crl/test-ca.crl.pem -outform DER -out ../crl/test-ca.crl
+  # A new CA was created: drop CRLs that .NET cached for the previous test CA (same URL, old signer),
+  # otherwise revocation checks fail with "revocation status unknown". Cached CRLs are re-downloaded.
+  rm -f "$HOME"/.dotnet/corefx/cryptography/crls/*.crl
 fi
 cp ca.crt "/usr/local/share/ca-certificates/$CA_NAME.crt"
 update-ca-certificates >/dev/null

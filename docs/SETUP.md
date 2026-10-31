@@ -22,7 +22,7 @@ dotnet restore                                        # download NuGet packages
 dotnet build                                          # build all projects (Debug)
 dotnet test                                           # unit + headless UI tests (no network)
 dotnet run --project src/HCG.Mail.App                 # start HCG Mail
-dotnet run --project src/HCG.Mail.App -- --preview    # development preview: labelled sample data, no network
+dotnet run --project src/HCG.Mail.App -- --developer-preview   # Debug builds only: labelled sample data, no network
 dotnet build -c Release                               # release build
 ```
 
@@ -30,7 +30,7 @@ Useful switches and variables:
 
 | Switch / variable | Effect |
 |---|---|
-| `--preview` or `HCG_MAIL_PREVIEW=1` | Development preview mode with sample messages. Nothing is persisted, nothing is sent, a banner says so. |
+| `--developer-preview` | **Debug builds only** (ignored in Release builds): development preview with labelled sample messages. Nothing is persisted, nothing is sent, a banner says so. A normal start never loads sample data, and no environment variable enables preview. |
 | `HCG_MAIL_DATA_DIR=/some/folder` | Use another settings folder (handy for testing a clean first run). |
 | `--software-rendering` or `HCG_MAIL_SOFTWARE_RENDERING=1` | Force CPU rendering (troubleshooting for VMs/RDP/broken GPU drivers). |
 | `--check-credential-store` | Verifies the OS credential store with a throwaway entry, writes `credential-store-check.txt` to the settings folder, exit code 0 = OK. |

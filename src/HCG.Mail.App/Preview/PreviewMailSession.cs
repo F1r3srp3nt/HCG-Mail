@@ -11,7 +11,7 @@ namespace HCG.Mail.App.Preview;
 /// <summary>
 /// DEVELOPMENT PREVIEW ONLY. An in-memory mailbox with clearly labelled sample messages so the
 /// interface can be reviewed without a mail account. It is only used when HCG Mail is started
-/// with <c>--preview</c>; it never touches the network and nothing is ever sent.
+/// with <c>--developer-preview</c> in a Debug build; it never touches the network and nothing is ever sent.
 /// </summary>
 public sealed class PreviewMailSession : IMailSession
 {

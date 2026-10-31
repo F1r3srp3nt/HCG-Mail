@@ -47,13 +47,17 @@
           <TextBlock Classes="h2" Text="{Binding MessageList.FolderTitle}" TextTrimming="CharacterEllipsis" />
           <TextBlock Classes="caption" Text="{Binding MessageList.CountText}" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <Button Grid.Column="1" Classes="icon" Command="{Binding RefreshCommand}" ToolTip.Tip="Refresh (F5)" VerticalAlignment="Top">
-          <controls:IconView Data="{StaticResource Icon.Refresh}" Classes.spin="{Binding IsBusy}">
-            <controls:IconView.RenderTransform>
-              <RotateTransform />
-            </controls:IconView.RenderTransform>
-          </controls:IconView>
-        </Button>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+          <Button Classes="link" FontSize="12" Margin="0,0,4,0" VerticalAlignment="Center" Content="Cancel"
+                  Command="{Binding RefreshCancelCommand}" IsVisible="{Binding IsRefreshing}" ToolTip.Tip="Stop refreshing" />
+          <Button Classes="icon" Command="{Binding RefreshCommand}" ToolTip.Tip="Refresh this mailbox (F5)">
+            <controls:IconView Data="{StaticResource Icon.Refresh}" Classes.spin="{Binding IsBusy}">
+              <controls:IconView.RenderTransform>
+                <RotateTransform />
+              </controls:IconView.RenderTransform>
+            </controls:IconView>
+          </Button>
+        </StackPanel>
       </Grid>
 
       <!-- Search -->

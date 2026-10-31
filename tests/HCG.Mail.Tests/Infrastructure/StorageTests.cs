@@ -31,12 +31,11 @@ public sealed class StorageTests : IDisposable
         var store = new JsonAppSettingsStore(Paths, NullLogger<JsonAppSettingsStore>.Instance);
         Assert.Equal(ThemeKind.HcgFuture, store.Load().Theme);
 
-        store.Save(new AppSettings { Theme = ThemeKind.HcgClassic, RefreshIntervalMinutes = 15, NotifyOnNewMail = false, DownloadDirectory = "/tmp/x" });
+        store.Save(new AppSettings { Theme = ThemeKind.HcgClassic, MarkAsReadWhenOpened = false, DownloadDirectory = "/tmp/x" });
 
         var reloaded = new JsonAppSettingsStore(Paths, NullLogger<JsonAppSettingsStore>.Instance).Load();
         Assert.Equal(ThemeKind.HcgClassic, reloaded.Theme);
-        Assert.Equal(15, reloaded.RefreshIntervalMinutes);
-        Assert.False(reloaded.NotifyOnNewMail);
+        Assert.False(reloaded.MarkAsReadWhenOpened);
         Assert.Equal("/tmp/x", reloaded.DownloadDirectory);
         Assert.Contains("\"HcgClassic\"", File.ReadAllText(Paths.SettingsFile));
     }
@@ -55,10 +54,34 @@ public sealed class StorageTests : IDisposable
     public void Out_of_range_values_are_normalized()
     {
         var store = new JsonAppSettingsStore(Paths, NullLogger<JsonAppSettingsStore>.Instance);
-        store.Save(new AppSettings { RefreshIntervalMinutes = 7, Theme = (ThemeKind)42 });
+        store.Save(new AppSettings { Theme = (ThemeKind)42, DownloadDirectory = "  " });
         var loaded = store.Load();
-        Assert.Equal(5, loaded.RefreshIntervalMinutes);
         Assert.Equal(ThemeKind.HcgFuture, loaded.Theme);
+        Assert.Null(loaded.DownloadDirectory);
+    }
+
+    [Fact]
+    public void Settings_from_the_previous_build_still_load_and_ignore_the_removed_refresh_options()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(Paths.SettingsFile, """
+            { "version": 1, "theme": "HcgClassic", "refreshIntervalMinutes": 5, "notifyOnNewMail": true,
+              "downloadDirectory": "/home/ola/Mail", "askWhereToSaveAttachments": true, "connectOnStartup": false,
+              "markAsReadWhenOpened": false, "saveCopyToSentFolder": true, "confirmBeforeOpeningLinks": true,
+              "lastAccountId": "acc1" }
+            """);
+        var store = new JsonAppSettingsStore(Paths, NullLogger<JsonAppSettingsStore>.Instance);
+        var loaded = store.Load();
+        Assert.Equal(ThemeKind.HcgClassic, loaded.Theme);
+        Assert.Equal("/home/ola/Mail", loaded.DownloadDirectory);
+        Assert.True(loaded.AskWhereToSaveAttachments);
+        Assert.False(loaded.ConnectOnStartup);
+        Assert.False(loaded.MarkAsReadWhenOpened);
+        Assert.Equal("acc1", loaded.LastAccountId);
+        Assert.Empty(Directory.GetFiles(_dir, "settings.json.corrupt-*"));
+
+        store.Save(loaded);
+        Assert.DoesNotContain("refreshInterval", File.ReadAllText(Paths.SettingsFile));
     }
 
     [Fact]

@@ -45,7 +45,7 @@ dotnet restore
 dotnet build
 dotnet test
 dotnet run --project src/HCG.Mail.App                 # real mode
-dotnet run --project src/HCG.Mail.App -- --preview    # labelled sample data, no network
+dotnet run --project src/HCG.Mail.App -- --developer-preview   # Debug builds only: labelled sample data, no network
 ```
 
 Windows test build (from the Mac): `scripts/publish-windows.sh` → `artifacts/HCGMail-0.1.0-mvp-win-x64.zip`.
@@ -64,7 +64,7 @@ tests/
   HCG.Mail.Tests/           unit tests + opt-in end-to-end tests against a local test server
   HCG.Mail.App.Tests/       headless UI tests (real views rendered with Skia)
   integration-server/       script that creates a disposable Dovecot/Postfix server for end-to-end tests
-assets/branding, assets/icons   application icon (supplied) and brand asset slots
+assets/branding, assets/icons   official HCG logo and application icon (supplied)
 docs/                       ARCHITECTURE, SETUP, SECURITY, WINDOWS_BUILD, ROADMAP, TESTING, MANUAL_TEST_CHECKLIST
 scripts/                    publish-windows.sh / publish-windows.ps1
 ```
@@ -81,10 +81,6 @@ suite fast and free of UI dependencies.
 
 ## Branding
 
-The **application icon** (exe, taskbar, window title bars) is the official HCG Mail artwork supplied by
-the founder — see [assets/branding/README.md](assets/branding/README.md).
-
-The in-app logo mark (sidebar, welcome card, About page) is still a **clearly marked temporary
-placeholder** (text "HCG" in a tile, labelled as a placeholder in its tooltip and on the About page).
-Drop the official logo into `src/HCG.Mail.App/Assets/Branding/hcg-logo.png` and it replaces the
-placeholder automatically.
+Official Hakmi Capital Group artwork supplied by the founder: the **HCG logo** in the sidebar header,
+welcome card and About page, and the **HCG Mail application icon** for the executable, taskbar and
+window title bars — see [assets/branding/README.md](assets/branding/README.md).

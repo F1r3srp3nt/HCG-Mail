@@ -36,9 +36,9 @@ Do not send test mail to people outside the test. Nothing in this checklist is a
 | 21 | Close with unsaved changes | Type in a new compose window and close it | Asks *Save draft / Discard / Cancel* | |
 | 22 | Delete | Delete a test message (Delete key) → open Trash → delete again | First moves to Trash; second asks for confirmation and deletes permanently | |
 | 23 | Archive | Archive a message (if the account has an Archive folder) | Moved to Archive; button disabled if no Archive folder exists | |
-| 24 | **Reconnection after network interruption** | With HCG Mail open: disconnect Wi-Fi/Ethernet → press F5 → reconnect network → press F5 (or wait for auto-refresh) | While offline: clear "could not connect / connection lost" message, app stays responsive, no crash; after reconnecting: list refreshes and status returns to *Connected* without restarting | |
+| 24 | **Reconnection after network interruption** | With HCG Mail open: disconnect Wi-Fi/Ethernet → press F5 → reconnect network → press F5 | While offline: clear "could not connect / connection lost" message, app stays responsive, no crash; after reconnecting: list refreshes and status returns to *Connected* without restarting | |
 | 25 | Sleep / resume | Put the computer to sleep for > 10 min, wake, open a message | Reconnects automatically on the next action | |
-| 26 | Auto-refresh | Settings → Mail → *Every minute*; send yourself a message | New message appears within ~1 minute; in-app notification shown; status bar shows "Last checked" | |
+| 26 | **Manual refresh only** | Send yourself a message from the second mailbox and wait 10 minutes without touching HCG Mail; then press Refresh (F5) | Nothing changes while you wait (no background checking). After Refresh: spinner + *Cancel* while running, the new message appears, a notification says "1 new message", status bar shows "Last refreshed HH:mm". Pressing F5 repeatedly never starts a second refresh at the same time | |
 | 27 | Skins | Settings → Appearance → HCG Classic / HCG Future | Switches instantly; connection stays up; choice remembered after restart | |
 | 28 | Remove account | Account settings → Remove account | Confirmation; account and stored password removed; no mail deleted on the server | |
 

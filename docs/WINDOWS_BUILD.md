@@ -47,13 +47,13 @@ Run these before the Domene.no checklist:
 | # | Check | Expected |
 |---|---|---|
 | W1 | `HCGMail.exe --check-credential-store` then open `%LOCALAPPDATA%\HCG\HCG Mail\credential-store-check.txt` | All four steps PASS, `RESULT: OK` |
-| W2 | `HCGMail.exe --preview` | Window opens with the yellow DEVELOPMENT PREVIEW banner and sample messages |
+| W2 | Start `HCGMail.exe` normally | No yellow preview banner, no sample accounts or messages; welcome screen if no account is configured (the developer preview does not exist in this Release build) |
 | W3 | Title bar | HCG title strip with native minimise / maximise / close at the top right; window can be dragged by the strip, double-click maximises, Aero Snap works |
 | W4 | Display scaling 125 % / 150 % (Settings → Display) | Text crisp, nothing clipped |
 | W5 | Switch skin (Application settings → Appearance) | HCG Future ↔ HCG Classic switch instantly |
-| W6 | Open the sample HTML message | Renders on a white "paper" card; remote image blocked banner shown |
+| W6 | After adding your account, open an HTML newsletter | Renders on a white "paper" card; remote image blocked banner shown |
 | W7 | If the window is black (VM / RDP / old GPU driver) | Start with `HCGMail.exe --software-rendering` and report it |
-| W8 | Start normally (without `--preview`) and continue with [MANUAL_TEST_CHECKLIST.md](MANUAL_TEST_CHECKLIST.md) | Welcome screen with *Add email account* |
+| W8 | Continue with [MANUAL_TEST_CHECKLIST.md](MANUAL_TEST_CHECKLIST.md) | Welcome screen with *Add email account* |
 
 ## What has and has not been verified for Windows
 

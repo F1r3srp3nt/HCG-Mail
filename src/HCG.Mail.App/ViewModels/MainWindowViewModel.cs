@@ -35,9 +35,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private readonly AppPaths _paths;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
-    private readonly DispatcherTimer _refreshTimer = new();
+    // UI debounce for opening the clicked message — not a network timer. HCG Mail has no background
+    // polling, IMAP IDLE or keep-alive: the server is only contacted for user actions.
     private readonly DispatcherTimer _selectionDelay = new() { Interval = TimeSpan.FromMilliseconds(120) };
-    private bool _isRefreshing;
     private DateTimeOffset? _lastChecked;
 
     [ObservableProperty]
@@ -50,6 +50,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private bool _isBusy;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RefreshCommand))]
+    private bool _isRefreshing;
 
     public MainWindowViewModel(
         AppSettingsService settings,
@@ -96,14 +100,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             OnPropertyChanged(nameof(HasMultipleAccounts));
         };
 
-        _refreshTimer.Tick += async (_, _) => await RefreshCoreAsync(automatic: true);
         _selectionDelay.Tick += async (_, _) =>
         {
             _selectionDelay.Stop();
             await LoadSelectedMessageAsync();
         };
-        _settings.Changed += (_, _) => ConfigureRefreshTimer();
-        ConfigureRefreshTimer();
         UpdateStatusText();
     }
 
@@ -277,77 +278,81 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     // ---- refresh ------------------------------------------------------------------------------
 
-    private bool CanRefresh() => SelectedAccount is not null && !SelectedAccount.IsConnecting;
+    private bool CanRefresh() => SelectedAccount is not null && !SelectedAccount.IsConnecting && !IsRefreshing;
 
-    [RelayCommand(CanExecute = nameof(CanRefresh))]
-    private Task RefreshAsync() => RefreshCoreAsync(automatic: false);
-
-    private async Task RefreshCoreAsync(bool automatic)
+    /// <summary>
+    /// Manual synchronisation of the selected account: folder list and unread counts, then the open
+    /// folder. This is the only way HCG Mail checks for new mail — there is no periodic refresh.
+    /// Only one refresh runs at a time; cancelling stops the remaining steps (an IMAP command that
+    /// is already running finishes first, because aborting it would drop the connection).
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRefresh), IncludeCancelCommand = true)]
+    private async Task RefreshAsync(CancellationToken cancellationToken)
     {
         var account = SelectedAccount;
-        if (account is null || _isRefreshing)
-            return;
-        if (automatic && !account.IsConnected && account.Status != AccountStatus.Error)
+        if (account is null || IsRefreshing)
             return;
 
-        _isRefreshing = true;
+        IsRefreshing = true;
         IsBusy = true;
+        StatusText = "Refreshing…";
         try
         {
             if (!account.IsConnected || account.Session is null)
             {
                 await ConnectAccountAsync(account);
+                if (account.IsConnected)
+                    ReportRefreshed(account, newMessages: 0);
+                else if (account.HasError)
+                    _notifications.Error("Refresh failed", account.StatusText);
                 return;
             }
 
-            await account.RefreshFoldersAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            await account.RefreshFoldersAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var newMessages = 0;
             if (MessageList.Folder is null && SelectedFolder is not null)
-            {
                 await LoadFolderAsync(SelectedFolder);
-                return;
-            }
-            var newMessages = await MessageList.RefreshAsync();
-            _lastChecked = DateTimeOffset.Now;
-            if (newMessages > 0 && automatic && _settings.Current.NotifyOnNewMail)
-            {
-                _notifications.Info(
-                    newMessages == 1 ? "1 new message" : $"{newMessages} new messages",
-                    $"In {MessageList.FolderTitle} · {account.EmailAddress}");
-            }
+            else
+                newMessages = await MessageList.RefreshAsync(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!MessageList.LastFetchFailed)
+                ReportRefreshed(account, newMessages);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException || ex is MailOperationException { Kind: MailErrorKind.Cancelled })
+        {
+            _notifications.Info("Refresh cancelled", "The mailbox was not fully refreshed.");
         }
         catch (MailOperationException ex)
         {
             account.ReportError(ex);
-            if (!automatic)
-                HandleError("Refresh failed", ex);
+            HandleError("Refresh failed", ex);
         }
         finally
         {
-            _isRefreshing = false;
+            IsRefreshing = false;
             IsBusy = false;
             UpdateStatusText();
             RefreshCommandStates();
         }
     }
 
-    private void ConfigureRefreshTimer()
+    private void ReportRefreshed(AccountViewModel account, int newMessages)
     {
-        _refreshTimer.Stop();
-        var minutes = _settings.Current.RefreshIntervalMinutes;
-        if (minutes > 0)
-        {
-            _refreshTimer.Interval = TimeSpan.FromMinutes(minutes);
-            _refreshTimer.Start();
-        }
-        UpdateStatusText();
+        _lastChecked = DateTimeOffset.Now;
+        var folder = string.IsNullOrEmpty(MessageList.FolderTitle) ? "Mailbox" : MessageList.FolderTitle;
+        _notifications.Success(
+            newMessages switch { 0 => $"{folder} is up to date", 1 => "1 new message", _ => $"{newMessages} new messages" },
+            $"Refreshed {account.EmailAddress} at {_lastChecked.Value.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)}.");
     }
 
     private void UpdateStatusText()
     {
-        var minutes = _settings.Current.RefreshIntervalMinutes;
-        var mode = minutes == 0 ? "Manual refresh" : minutes == 1 ? "Auto-refresh every minute" : $"Auto-refresh every {minutes} min";
-        var checkedText = _lastChecked is { } t ? $" · Last checked {t.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)}" : "";
-        StatusText = mode + checkedText;
+        var checkedText = _lastChecked is { } t ? $"Last refreshed {t.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)} · " : "";
+        StatusText = checkedText + "Manual refresh (F5) — no automatic checking";
     }
 
     // ---- message actions ----------------------------------------------------------------------
@@ -712,7 +717,6 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     public async ValueTask DisposeAsync()
     {
-        _refreshTimer.Stop();
         foreach (var account in Accounts)
             await account.DisposeAsync();
     }

@@ -242,14 +242,12 @@ public class SettingsTests
                 ui.ViewModel);
 
             vm.SelectedTheme = vm.Themes.Single(t => t.Kind == ThemeKind.HcgClassic);
-            vm.SelectedRefresh = vm.RefreshOptions.Single(r => r.Minutes == 0);
-            vm.NotifyOnNewMail = false;
+            vm.MarkAsReadWhenOpened = false;
 
             var persisted = store.Load();
             Assert.Equal(ThemeKind.HcgClassic, persisted.Theme);
-            Assert.Equal(0, persisted.RefreshIntervalMinutes);
-            Assert.False(persisted.NotifyOnNewMail);
-            Assert.StartsWith("Manual refresh", ui.ViewModel.StatusText);
+            Assert.False(persisted.MarkAsReadWhenOpened);
+            Assert.Contains("Manual refresh", ui.ViewModel.StatusText);
 
             UiHarness.Capture(await new SettingsWindow { DataContext = vm, Width = 900, Height = 660 }.ShowAndSettleAsync(), "07-settings-classic");
             vm.SelectedTheme = vm.Themes.Single(t => t.Kind == ThemeKind.HcgFuture);

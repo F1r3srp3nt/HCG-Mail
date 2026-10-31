@@ -148,6 +148,14 @@ public class RealServerUiTests
             Assert.True(item.IsRead); // marked read on the server after opening
             UiHarness.Capture(window, "09-real-server-html");
 
+            // New mail arrives on the server: nothing changes until the user presses Refresh.
+            var later = await AppendHtmlMessageAsync();
+            await UiHarness.Settle(1500);
+            Assert.DoesNotContain(vm.MessageList.Items, i => i.Summary.Subject == later);
+            await vm.RefreshCommand.ExecuteAsync(null);
+            Assert.Contains(vm.MessageList.Items, i => i.Summary.Subject == later);
+            Assert.Contains("Last refreshed", vm.StatusText);
+
             window.Close();
             await vm.DisposeAsync();
         }

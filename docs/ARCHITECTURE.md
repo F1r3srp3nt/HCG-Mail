@@ -36,7 +36,7 @@ replaced without touching view models.
 
 * **Normal mode:** OS vault from `CredentialVaultFactory`, JSON stores in the per-user settings folder,
   `MailKitMailSessionFactory`, real `ConnectionTester`, file logging.
-* **Preview mode (`--preview`):** in-memory stores, `PreviewMailSession` with labelled sample data,
+* **Developer preview (`--developer-preview`, Debug builds only):** in-memory stores, `PreviewMailSession` with labelled sample data,
   a connection tester that makes no network calls, no file logging. A permanent banner states that
   nothing is connected or sent.
 
@@ -86,7 +86,14 @@ replaced without touching view models.
   `MessageReaderViewModel` owns the reader; `ComposeViewModel` runs in its own non-modal window.
 * Commands are disabled when they cannot run (no "decorative" buttons): e.g. Archive is disabled when
   the server has no Archive folder; missing standard folders appear dimmed with an explanation.
-* Auto-refresh is a visible `DispatcherTimer` (interval shown in the status bar, "Manual" possible).
+* **No background synchronisation.** The mail server is contacted only for user actions: start-up
+  connect (if enabled), opening a folder or message, Refresh (F5), sending, saving drafts and message
+  actions. There is no refresh timer, no IMAP IDLE, no NOOP keep-alive and no push mechanism; the only
+  timer in the UI is a 120 ms debounce before opening the clicked message. Refresh is a single
+  cancellable command (`RefreshCommand` / `RefreshCancelCommand`) that cannot run twice at once; cancel
+  stops the remaining steps, while an IMAP command already in progress completes first (aborting it
+  would drop the connection). Refreshing a folder that is already open sends one IMAP `NOOP` so the
+  server reports newly arrived mail — only as part of that user action, never on a timer.
 
 ### Skins (design system)
 

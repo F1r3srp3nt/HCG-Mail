@@ -134,16 +134,9 @@
             <TextBlock Classes="h1" Text="Mail" />
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
               <StackPanel Spacing="8">
-                <TextBlock Classes="h3" Text="Check for new messages" />
-                <ComboBox ItemsSource="{Binding RefreshOptions}" SelectedItem="{Binding SelectedRefresh}" MinWidth="220" />
-                <TextBlock Classes="caption" Text="{Binding RefreshExplanation}" TextWrapping="Wrap" />
-              </StackPanel>
-            </Border>
-            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
-              <StackPanel Spacing="10">
-                <TextBlock Classes="h3" Text="Notifications" />
-                <ToggleSwitch IsChecked="{Binding NotifyOnNewMail}" OnContent="Show a notification inside HCG Mail when new messages arrive" OffContent="Show a notification inside HCG Mail when new messages arrive" />
-                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Notifications appear in the HCG Mail window. Windows/macOS system notifications are not supported yet." />
+                <TextBlock Classes="h3" Text="Checking for new messages" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="HCG Mail checks for new mail only when you click Refresh (F5), open a folder or start the app. It never polls your mail server in the background, which keeps server requests to a minimum." />
               </StackPanel>
             </Border>
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
@@ -221,7 +214,7 @@
             </Border>
             <Border Classes="banner">
               <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource Hcg.Text.Secondary}"
-                         Text="Branding note: the logo mark shown is a temporary placeholder. The official HCG logo and application icon will replace it when supplied (see assets/branding/README.md)." />
+                         Text="The HCG logo and the HCG Mail application icon are official Hakmi Capital Group artwork." />
             </Border>
             <TextBlock Classes="caption" TextWrapping="Wrap" Text="Built with .NET, Avalonia UI, MailKit/MimeKit (MIT), HtmlSanitizer (MIT), HtmlRenderer (BSD-3) and the Inter typeface (OFL)." />
           </StackPanel>

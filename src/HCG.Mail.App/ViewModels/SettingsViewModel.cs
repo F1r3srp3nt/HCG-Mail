@@ -10,21 +10,6 @@ using HCG.Mail.Infrastructure;
 
 namespace HCG.Mail.App.ViewModels;
 
-public sealed record RefreshOption(int Minutes, string Label)
-{
-    public static IReadOnlyList<RefreshOption> All { get; } = AppSettings.AllowedRefreshIntervals
-        .Select(m => new RefreshOption(m, m switch
-        {
-            0 => "Manually only",
-            1 => "Every minute",
-            60 => "Every hour",
-            _ => $"Every {m} minutes",
-        }))
-        .ToList();
-
-    public override string ToString() => Label;
-}
-
 public sealed record ThemeOption(ThemeKind Kind, string Name, string Description);
 
 public sealed partial class SettingsViewModel : ObservableObject
@@ -37,8 +22,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly MainWindowViewModel _main;
 
     [ObservableProperty] private ThemeOption _selectedTheme;
-    [ObservableProperty] private RefreshOption _selectedRefresh;
-    [ObservableProperty] private bool _notifyOnNewMail;
     [ObservableProperty] private bool _markAsReadWhenOpened;
     [ObservableProperty] private bool _saveCopyToSentFolder;
     [ObservableProperty] private bool _confirmBeforeOpeningLinks;
@@ -57,8 +40,6 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         var s = settings.Current;
         _selectedTheme = Themes.First(t => t.Kind == s.Theme);
-        _selectedRefresh = RefreshOption.All.First(o => o.Minutes == s.RefreshIntervalMinutes);
-        _notifyOnNewMail = s.NotifyOnNewMail;
         _markAsReadWhenOpened = s.MarkAsReadWhenOpened;
         _saveCopyToSentFolder = s.SaveCopyToSentFolder;
         _confirmBeforeOpeningLinks = s.ConfirmBeforeOpeningLinks;
@@ -73,7 +54,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         new(ThemeKind.HcgClassic, "HCG Classic", "A clean, restrained light design for bright offices and long reading sessions."),
     ];
 
-    public IReadOnlyList<RefreshOption> RefreshOptions => RefreshOption.All;
     public ObservableCollection<AccountViewModel> Accounts => _main.Accounts;
 
     public string Version { get; } =
@@ -83,19 +63,8 @@ public sealed partial class SettingsViewModel : ObservableObject
     public string CredentialStorage => _vault.IsPersistent ? _vault.StorageDescription : "Session only — " + _vault.StorageDescription;
     public bool IsPreviewMode => _main.IsPreviewMode;
 
-    public string RefreshExplanation => SelectedRefresh.Minutes == 0
-        ? "HCG Mail only contacts your mail server when you open a folder or click Refresh."
-        : $"While HCG Mail is open it checks the selected folder {SelectedRefresh.Label.ToLowerInvariant()}. The status bar shows when the last check happened.";
-
     partial void OnSelectedThemeChanged(ThemeOption value) => _themes.SetTheme(value.Kind);
 
-    partial void OnSelectedRefreshChanged(RefreshOption value)
-    {
-        _settings.Update(s => s with { RefreshIntervalMinutes = value.Minutes });
-        OnPropertyChanged(nameof(RefreshExplanation));
-    }
-
-    partial void OnNotifyOnNewMailChanged(bool value) => _settings.Update(s => s with { NotifyOnNewMail = value });
     partial void OnMarkAsReadWhenOpenedChanged(bool value) => _settings.Update(s => s with { MarkAsReadWhenOpened = value });
     partial void OnSaveCopyToSentFolderChanged(bool value) => _settings.Update(s => s with { SaveCopyToSentFolder = value });
     partial void OnConfirmBeforeOpeningLinksChanged(bool value) => _settings.Update(s => s with { ConfirmBeforeOpeningLinks = value });

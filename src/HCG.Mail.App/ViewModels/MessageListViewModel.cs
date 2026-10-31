@@ -110,8 +110,11 @@ public sealed partial class MessageListViewModel : ObservableObject
     public void UseSession(IMailSession session) => _session = session;
 
     /// <summary>Reloads the loaded window of messages, keeping selection. Returns the number of new unread messages.</summary>
-    public Task<int> RefreshAsync() =>
-        _session is null || Folder is null ? Task.FromResult(0) : FetchAsync(Math.Max(PageSize, _all.Count), notifyNew: true);
+    public Task<int> RefreshAsync(CancellationToken cancellationToken = default) =>
+        _session is null || Folder is null ? Task.FromResult(0) : FetchAsync(Math.Max(PageSize, _all.Count), notifyNew: true, cancellationToken);
+
+    /// <summary>True when the last load/refresh of the folder failed (the error has already been reported).</summary>
+    public bool LastFetchFailed { get; private set; }
 
     public void Clear()
     {
@@ -187,7 +190,7 @@ public sealed partial class MessageListViewModel : ObservableObject
 
     private bool ShowRecipients => Folder?.Role is FolderRole.Sent or FolderRole.Drafts;
 
-    private async Task<int> FetchAsync(int count, bool notifyNew)
+    private async Task<int> FetchAsync(int count, bool notifyNew, CancellationToken cancellationToken = default)
     {
         if (_session is null || Folder is null)
             return 0;
@@ -196,7 +199,8 @@ public sealed partial class MessageListViewModel : ObservableObject
         IsLoading = true;
         try
         {
-            var page = await _session.GetMessagesAsync(folder.FullName, 0, count);
+            LastFetchFailed = false;
+            var page = await _session.GetMessagesAsync(folder.FullName, 0, count, cancellationToken);
             if (version != _version)
                 return 0;
 
@@ -235,6 +239,7 @@ public sealed partial class MessageListViewModel : ObservableObject
         {
             if (version == _version)
             {
+                LastFetchFailed = ex.Kind != MailErrorKind.Cancelled;
                 if (_all.Count == 0)
                     ErrorMessage = ex.UserMessage;
                 LoadFailed?.Invoke(this, ex);

@@ -103,11 +103,11 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         }
     }
 
-    public async Task RefreshFoldersAsync()
+    public async Task RefreshFoldersAsync(CancellationToken cancellationToken = default)
     {
         if (Session is null)
             return;
-        var folders = await Session.GetFoldersAsync();
+        var folders = await Session.GetFoldersAsync(cancellationToken);
 
         var standard = new List<FolderViewModel>();
         foreach (var role in FolderRoleMapper.StandardRoles)

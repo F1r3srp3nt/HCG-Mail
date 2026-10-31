@@ -14,14 +14,14 @@ Windows hardware is pending.
 - [ ] Run `--check-credential-store` on macOS (Keychain implementation not yet executed on a Mac).
 - [ ] Fix any Windows-specific issues found (title bar, DPI, GPU rendering).
 - [x] Application icon supplied and integrated.
-- [ ] Supply the official HCG logo mark for the in-app sidebar ([assets/branding](../assets/branding/README.md)).
+- [x] Official HCG logo supplied and shown in the sidebar header.
 
 ## Short term
 
 - Multi-select in the message list (bulk read/flag/delete/move).
 - *Move to folder…* and drag-and-drop to folders; folder create/rename/delete.
 - Server-side search (IMAP `SEARCH`) in addition to searching loaded messages.
-- IMAP IDLE for instant new-mail notification (visible, opt-in like auto-refresh).
+- Optional IMAP IDLE for instant new-mail notification — only as an explicit, visible opt-in (HCG Mail currently has no background synchronisation of any kind).
 - Windows/macOS system notifications (toast / Notification Center).
 - HTML (rich-text) composer and signatures; quote HTML originals in replies.
 - Attachment preview for images/PDF inside a sandboxed viewer (never executing content).
