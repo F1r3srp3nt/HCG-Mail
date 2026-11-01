@@ -14,6 +14,7 @@ public sealed class AppPaths
     public string LogDirectory => Path.Combine(DataDirectory, "logs");
     public string SettingsFile => Path.Combine(DataDirectory, "settings.json");
     public string AccountsFile => Path.Combine(DataDirectory, "accounts.json");
+    public string DeliveryHistoryFile => Path.Combine(DataDirectory, "delivery-history.json");
 
     public static AppPaths ForCurrentUser()
     {

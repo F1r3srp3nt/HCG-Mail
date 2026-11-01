@@ -10,6 +10,7 @@
     <PackageReference Include="MailKit" />
     <PackageReference Include="MimeKit" />
     <PackageReference Include="HtmlSanitizer" />
+    <PackageReference Include="DnsClient" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
   <ItemGroup>

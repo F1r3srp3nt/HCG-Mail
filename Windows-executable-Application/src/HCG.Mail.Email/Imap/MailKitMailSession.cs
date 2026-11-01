@@ -1,16 +1,19 @@
 using System.Net;
 using HCG.Mail.Core.Accounts;
 using HCG.Mail.Core.Compose;
+using HCG.Mail.Core.Delivery;
 using HCG.Mail.Core.Errors;
 using HCG.Mail.Core.Mail;
 using HCG.Mail.Core.Services;
 using HCG.Mail.Email.Mime;
+using HCG.Mail.Email.Smtp;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Net.Smtp;
 using MailKit.Search;
 using Microsoft.Extensions.Logging;
 using MimeKit;
+using MessagePriority = HCG.Mail.Core.Compose.MessagePriority;
 using CoreFlags = HCG.Mail.Core.Mail.MessageFlags;
 using MessageSummary = HCG.Mail.Core.Mail.MessageSummary;
 using MailFolder = HCG.Mail.Core.Mail.MailFolder;
@@ -41,6 +44,7 @@ public sealed class MailKitMailSession : IMailSession
     private readonly IMailClientFactory _clientFactory;
     private readonly IHtmlToTextConverter _htmlToText;
     private readonly ILogger _logger;
+    private readonly IDeliveryLog? _deliveryLog;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly LinkedList<(MessageRef Ref, MimeMessage Message)> _messageCache = new();
 
@@ -50,9 +54,10 @@ public sealed class MailKitMailSession : IMailSession
     private MailConnectionState _state = MailConnectionState.Disconnected;
     private bool _disposed;
 
-    public MailKitMailSession(MailAccount account, string password, IMailClientFactory clientFactory, IHtmlToTextConverter htmlToText, ILogger<MailKitMailSession> logger)
+    public MailKitMailSession(MailAccount account, string password, IMailClientFactory clientFactory, IHtmlToTextConverter htmlToText, ILogger<MailKitMailSession> logger, IDeliveryLog? deliveryLog = null)
     {
         Account = account;
+        _deliveryLog = deliveryLog;
         _password = password;
         _clientFactory = clientFactory;
         _htmlToText = htmlToText;
@@ -190,11 +195,12 @@ public sealed class MailKitMailSession : IMailSession
             throw new MailOperationException(MailErrorKind.ServerRejected, "Add at least one recipient.");
 
         var mime = MimeConverter.ToMimeMessage(message, Account);
-        await SendViaSmtpAsync(mime, cancellationToken).ConfigureAwait(false);
-        _logger.LogInformation("Message sent for account {AccountId} to {RecipientCount} recipient(s)", Account.Id, message.To.Count + message.Cc.Count + message.Bcc.Count);
+        var recipients = message.To.Count + message.Cc.Count + message.Bcc.Count;
+        var delivery = await SendViaSmtpAsync(mime, message.Priority, recipients, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Message accepted by the outgoing server for account {AccountId}, {RecipientCount} recipient(s)", Account.Id, recipients);
 
-        // The message has been delivered to the SMTP server at this point. Anything that fails
-        // from here on is reported as a warning, never as a failed send.
+        // The outgoing server has accepted the message at this point (not delivered to the recipient —
+        // SMTP cannot tell). Anything that fails from here on is reported as a warning, never as a failed send.
         var warnings = new List<string>();
         var saved = false;
         if (saveCopyToSent)
@@ -237,7 +243,7 @@ public sealed class MailKitMailSession : IMailSession
             }
         }
 
-        return new SendResult(saved, warnings.Count == 0 ? null : string.Join(" ", warnings));
+        return new SendResult(saved, warnings.Count == 0 ? null : string.Join(" ", warnings), delivery);
     }
 
     public Task<DraftSaveResult> SaveDraftAsync(OutgoingMessage message, CancellationToken cancellationToken = default) =>
@@ -587,21 +593,37 @@ public sealed class MailKitMailSession : IMailSession
 
     // ---- sending ------------------------------------------------------------------------------
 
-    private async Task SendViaSmtpAsync(MimeMessage mime, CancellationToken cancellationToken)
+    private async Task<DeliveryRecord> SendViaSmtpAsync(MimeMessage mime, MessagePriority priority, int recipientCount, CancellationToken cancellationToken)
     {
         var recorder = new TlsValidationRecorder();
         using var smtp = _clientFactory.CreateSmtpClient(recorder);
         var endpoint = Account.Smtp;
+        var record = new DeliveryRecord
+        {
+            Timestamp = DateTimeOffset.Now,
+            AccountId = Account.Id,
+            AccountAddress = Account.EmailAddress,
+            SmtpServer = $"{endpoint.Host}:{endpoint.Port}",
+            State = DeliveryState.NotSent,
+            MessageId = mime.MessageId,
+            RecipientCount = recipientCount,
+            Priority = priority,
+        };
+        var transactionStarted = false;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await smtp.ConnectAsync(endpoint.Host, endpoint.Port, SecurityOptions.ToSecureSocketOptions(endpoint.Security)).ConfigureAwait(false);
+            await SmtpConnector.ConnectAsync(smtp, endpoint, cancellationToken).ConfigureAwait(false);
             if (!smtp.IsSecure)
                 throw new MailOperationException(MailErrorKind.Tls, "The connection to the outgoing server is not encrypted. HCG Mail will not send over it.");
             if (!smtp.Capabilities.HasFlag(SmtpCapabilities.Authentication))
                 throw new MailOperationException(MailErrorKind.Authentication, "The outgoing server does not offer authentication. Check the outgoing server name and port.");
             await smtp.AuthenticateAsync(new NetworkCredential(Account.Username, _password)).ConfigureAwait(false);
-            await smtp.SendAsync(mime).ConfigureAwait(false);
+            transactionStarted = true;
+            var reply = await smtp.SendAsync(mime).ConfigureAwait(false);
+            // MailKit returns only after a 250 reply to the end of the message data.
+            record = record with { State = DeliveryState.Accepted, SmtpStatusCode = 250, ServerReply = Truncate(reply) };
+            Record(record);
             try
             {
                 await smtp.DisconnectAsync(true).ConfigureAwait(false);
@@ -610,13 +632,62 @@ public sealed class MailKitMailSession : IMailSession
             {
                 _logger.LogDebug(ex, "Ignoring error during SMTP disconnect");
             }
+            return record;
         }
-        catch (Exception ex) when (ex is not MailOperationException)
+        catch (MailOperationException moe)
+        {
+            Record(record with { ErrorMessage = moe.UserMessage });
+            throw;
+        }
+        catch (Exception ex)
         {
             var translated = MailErrorTranslator.Translate(ex, MailProtocol.Smtp, endpoint, recorder);
+            Record(ClassifyFailure(record, ex, transactionStarted) with { ErrorMessage = translated.UserMessage });
             _logger.LogWarning("SMTP send failed for account {AccountId}: {Kind} ({Error})", Account.Id, translated.Kind, ex.GetType().Name);
             throw translated;
         }
+    }
+
+    /// <summary>
+    /// Maps a failed SMTP transaction to what is actually known: an SMTP reply code decides between deferred (4xx)
+    /// and rejected (5xx); a connection lost during the transaction leaves the outcome unknown.
+    /// </summary>
+    internal static DeliveryRecord ClassifyFailure(DeliveryRecord record, Exception ex, bool transactionStarted)
+    {
+        if (ex is SmtpCommandException sce)
+        {
+            var code = (int)sce.StatusCode;
+            return record with
+            {
+                State = code is >= 400 and < 500 ? DeliveryState.Deferred : DeliveryState.Rejected,
+                SmtpStatusCode = code,
+                ServerReply = Truncate(sce.Message),
+            };
+        }
+        if (transactionStarted && ex is not OperationCanceledException and not MailKit.Security.AuthenticationException)
+            return record with { State = DeliveryState.Submitted };
+        return record with { State = DeliveryState.NotSent };
+    }
+
+    private void Record(DeliveryRecord record)
+    {
+        try
+        {
+            _deliveryLog?.Add(record);
+        }
+        catch (Exception ex)
+        {
+            // The delivery history is diagnostic only; failing to store it must never affect sending.
+            _logger.LogWarning(ex, "Could not record delivery history for account {AccountId}", Account.Id);
+        }
+    }
+
+    private static string? Truncate(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return null;
+        text = text.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return text.Length > 300 ? text[..300] + "…" : text;
     }
 
     /// <returns>True when a copy exists in Sent afterwards (saved by us or by the server).</returns>
@@ -646,8 +717,8 @@ public sealed class MailKitMailSession : IMailSession
     private static string Describe(Exception ex) => ex is MailOperationException moe ? moe.UserMessage : ex.GetType().Name;
 }
 
-public sealed class MailKitMailSessionFactory(IMailClientFactory clientFactory, IHtmlToTextConverter htmlToText, ILoggerFactory loggerFactory) : IMailSessionFactory
+public sealed class MailKitMailSessionFactory(IMailClientFactory clientFactory, IHtmlToTextConverter htmlToText, ILoggerFactory loggerFactory, IDeliveryLog? deliveryLog = null) : IMailSessionFactory
 {
     public IMailSession Create(MailAccount account, string password) =>
-        new MailKitMailSession(account, password, clientFactory, htmlToText, loggerFactory.CreateLogger<MailKitMailSession>());
+        new MailKitMailSession(account, password, clientFactory, htmlToText, loggerFactory.CreateLogger<MailKitMailSession>(), deliveryLog);
 }

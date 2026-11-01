@@ -10,6 +10,11 @@ using HCG.Mail.Core.Mail;
 
 namespace HCG.Mail.App.ViewModels;
 
+public sealed record PriorityOption(MessagePriority Value, string Label)
+{
+    public override string ToString() => Label;
+}
+
 public sealed class ComposeAttachmentViewModel(OutgoingAttachment attachment)
 {
     public OutgoingAttachment Attachment { get; } = attachment;
@@ -42,6 +47,7 @@ public sealed partial class ComposeViewModel : ObservableObject
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(WindowTitle))] private string _subject = "";
     [ObservableProperty] private string _body = "";
     [ObservableProperty] private bool _showCcBcc;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(IsHighPriority), nameof(IsLowPriority))] private PriorityOption _selectedPriority;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(SaveDraftCommand), nameof(AddAttachmentsCommand))]
@@ -75,11 +81,26 @@ public sealed partial class ComposeViewModel : ObservableObject
         _showCcBcc = initial.Cc.Count > 0 || initial.Bcc.Count > 0;
         _subject = initial.Subject;
         _body = initial.TextBody;
+        _selectedPriority = PriorityOptions.First(o => o.Value == initial.Priority);
         foreach (var attachment in initial.Attachments)
             Attachments.Add(new ComposeAttachmentViewModel(attachment));
         Attachments.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasAttachments));
         _savedSnapshot = initial.Kind == ComposeKind.EditDraft ? Snapshot() : "";
     }
+
+    public static IReadOnlyList<PriorityOption> PriorityOptions { get; } =
+    [
+        new(MessagePriority.Low, "Low"),
+        new(MessagePriority.Normal, "Normal"),
+        new(MessagePriority.High, "High"),
+    ];
+
+    public const string PriorityExplanation =
+        "Priority is a request to the recipient's mail program. Each mail system decides whether and how to show it (Outlook and Apple Mail mark it; " +
+        "Gmail does not show it). It does not affect spam filtering and does not make delivery faster or guaranteed.";
+
+    public bool IsHighPriority => SelectedPriority.Value == MessagePriority.High;
+    public bool IsLowPriority => SelectedPriority.Value == MessagePriority.Low;
 
     public ObservableCollection<AccountViewModel> FromAccounts { get; }
     public ObservableCollection<ComposeAttachmentViewModel> Attachments { get; } = [];
@@ -130,10 +151,11 @@ public sealed partial class ComposeViewModel : ObservableObject
         try
         {
             var result = await session.SendAsync(message, _settings.Current.SaveCopyToSentFolder);
+            var accepted = DescribeAcceptance(result);
             if (result.Warning is not null)
-                _notifications.Warning("Message sent", result.Warning);
+                _notifications.Warning("Message sent", accepted + " " + result.Warning);
             else
-                _notifications.Success("Message sent", result.SavedToSent ? "A copy was saved to your Sent folder." : "Your message was sent.");
+                _notifications.Success("Message sent", accepted + (result.SavedToSent ? " A copy was saved to your Sent folder." : ""));
             _onStored?.Invoke(account, FolderRole.Sent);
             if (_draftRef is not null)
                 _onStored?.Invoke(account, FolderRole.Drafts);
@@ -254,6 +276,7 @@ public sealed partial class ComposeViewModel : ObservableObject
             Bcc = bcc.Addresses,
             Subject = Subject.Replace('\r', ' ').Replace('\n', ' ').Trim(),
             TextBody = Body,
+            Priority = SelectedPriority.Value,
             Attachments = Attachments.Select(a => a.Attachment).ToList(),
             MessageId = _messageId,
             DraftRef = _draftRef,
@@ -261,7 +284,16 @@ public sealed partial class ComposeViewModel : ObservableObject
     }
 
     private string Snapshot() =>
-        string.Join("\u001F", To, Cc, Bcc, Subject, Body, string.Join("|", Attachments.Select(a => a.Name + a.Attachment.Size)));
+        string.Join("\u001F", To, Cc, Bcc, Subject, Body, SelectedPriority.Value, string.Join("|", Attachments.Select(a => a.Name + a.Attachment.Size)));
+
+    /// <summary>States what the server's reply means — accepted for delivery, not delivered.</summary>
+    internal static string DescribeAcceptance(Core.Services.SendResult result)
+    {
+        if (result.Delivery is not { State: Core.Delivery.DeliveryState.Accepted } d)
+            return "Your message was sent.";
+        var reply = d.ServerReply is null ? "" : $" ({d.ServerReply})";
+        return $"Accepted by your outgoing server {d.SmtpServer}{reply}. Delivery to the recipient is not confirmed and inbox placement is unknown.";
+    }
 
     private void SetStatus(string message, bool error)
     {

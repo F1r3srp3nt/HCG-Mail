@@ -4,9 +4,9 @@
 
 | Suite | Command | Needs | Count |
 |---|---|---|---|
-| Unit tests (`tests/HCG.Mail.Tests`) | `dotnet test tests/HCG.Mail.Tests` | nothing | 198 |
-| Headless UI tests (`tests/HCG.Mail.App.Tests`) | `dotnet test tests/HCG.Mail.App.Tests` | nothing (Skia renders off-screen) | 25 |
-| End-to-end tests (opt-in) | `HCG_MAIL_E2E=1 dotnet test` | local test server (`tests/integration-server`) | 13 + 2 UI |
+| Unit tests (`tests/HCG.Mail.Tests`) | `dotnet test tests/HCG.Mail.Tests` | nothing | 338 |
+| Headless UI tests (`tests/HCG.Mail.App.Tests`) | `dotnet test tests/HCG.Mail.App.Tests` | nothing (Skia renders off-screen) | 45 |
+| End-to-end tests (opt-in) | `HCG_MAIL_E2E=1 dotnet test` | local test server (`tests/integration-server`) | 16 + 2 UI |
 
 Plain `dotnet test` runs everything except the end-to-end tests, which report as *skipped*. They never
 run against a real mailbox.
@@ -26,6 +26,7 @@ run against a real mailbox.
 | Error handling | `Email/ErrorTranslatorTests`, `Email/ConnectionTesterTests` (mocked DNS/TCP/TLS/auth failures) |
 | HTML safety | `Email/HtmlSanitizerTests` (scripts, handlers, frames, forms, SVG, `javascript:`, remote images/CSS, `@import`, renderer colour compatibility) |
 | Certificate revocation | `Email/CertificateValidationTests` (valid, expired, hostname mismatch, untrusted CA, revoked, unreachable CRL, CRL server error, combined problems, handshake timeout — real .NET chain building with a local CRL server) and `Email/CrlFallbackTests` (macOS CRL fallback: good/revoked CRLs, forged signer with the issuer's name, tampered, wrong issuer, issuer without `cRLSign`, stale/future/no `nextUpdate`, other partition, `onlySomeReasons`, delta, unknown critical extension, malformed/truncated input, caching, size limit, non-HTTP addresses, and that name/trust/date failures never reach the fallback) |
+| Deliverability, priority, delivery states | `Email/SendingTests` (exact priority headers once each, MIME/7-bit/CRLF/Bcc, Message-ID uniqueness, EHLO address literal captured on a socket, SMTP reply → delivered/deferred/rejected/unknown, history file), `Email/DeliverabilityTests` (SPF parser/evaluator incl. 10-lookup limit, DMARC/DKIM records, DNS checks, received-message analysis incl. real DKIM signing and tamper detection, format validator, SMTP history), `MailHealthUiTests`, E2E priority/EHLO/delivery-state tests — see [DELIVERABILITY.md](DELIVERABILITY.md) |
 | Security policy | `SecurityOptionsTests` (never plaintext/auto modes, strict certificate callback, TLS ≥ 1.2) |
 | Real-account mode | `RealAccountModeTests` (normal start has no preview/sample data, existing `accounts.json`/`settings.json` loaded and left untouched, preview cannot be enabled implicitly, no periodic timer, refresh is single-flight, cancellable and reports success, official logo embedded with original proportions) |
 | UI behaviour | `MainWindowTests` (load, read + mark read, sanitized HTML + remote images, search, delete/flag/read, skins), `ComposeViewModelTests`, `AccountSetupViewModelTests` |
@@ -46,13 +47,13 @@ through a relay that the test cuts and restores): error state while offline, lis
 automatic recovery on refresh using the new connection. That test caught — and now guards against — a
 bug where the message list kept using the closed connection after a reconnect.
 
-## Last recorded run (development container, Ubuntu 24.04, .NET SDK 10.0.114, 2026-10-31)
+## Last recorded run (development container, Ubuntu 24.04, .NET SDK 10.0.114, 2026-11-01)
 
 ```
-dotnet test                        → HCG.Mail.Tests 259 passed, 13 skipped · HCG.Mail.App.Tests 41 passed, 2 skipped
+dotnet test                        → HCG.Mail.Tests 338 passed, 16 skipped · HCG.Mail.App.Tests 45 passed, 2 skipped
 HCG_MAIL_E2E=1 dotnet test
-  HCG.Mail.Tests       Passed 272 / Failed 0   (259 unit + 13 end-to-end)
-  HCG.Mail.App.Tests   Passed  43 / Failed 0   (41 UI + 2 end-to-end UI)
+  HCG.Mail.Tests       Passed 354 / Failed 0   (338 unit + 16 end-to-end)
+  HCG.Mail.App.Tests   Passed  47 / Failed 0   (45 UI + 2 end-to-end UI)
 ```
 
 Additional manual verification performed in the container:

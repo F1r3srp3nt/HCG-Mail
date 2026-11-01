@@ -6,6 +6,7 @@ using HCG.Mail.Core.Services;
 using HCG.Mail.Email.Imap;
 using MailKit;
 using MailKit.Net.Imap;
+using HCG.Mail.Email.Smtp;
 using MailKit.Net.Smtp;
 using Microsoft.Extensions.Logging;
 
@@ -86,7 +87,7 @@ public sealed class ConnectionTester(
                 var client = smtp;
                 smtpTls = await TryAsync(async () =>
                 {
-                    await client.ConnectAsync(account.Smtp.Host, account.Smtp.Port, SecurityOptions.ToSecureSocketOptions(account.Smtp.Security), cancellationToken).ConfigureAwait(false);
+                    await SmtpConnector.ConnectAsync(client, account.Smtp, cancellationToken).ConfigureAwait(false);
                     return DescribeTls(client, smtpRecorder);
                 }, MailProtocol.Smtp, account.Smtp, smtpRecorder).ConfigureAwait(false);
             }

@@ -124,6 +124,7 @@ HTML is shown on a light "paper" surface in both skins, because most HTML mail a
 | App settings (skin, refresh, …) | `settings.json` | Normalised on load; corrupt files are moved aside |
 | Passwords | Windows Credential Manager / macOS Keychain | Keyed `account:<id>`; session-memory fallback elsewhere |
 | Logs | `logs/hcg-mail-YYYYMMDD.log` | 7-day retention; no secrets or message content |
+| Send history | `delivery-history.json` | Last 300 SMTP outcomes (state, server reply, Message-ID); no message content — see [DELIVERABILITY.md](DELIVERABILITY.md) |
 | Message bodies, attachments | **not cached** | Fetched on demand, held in memory only |
 
 Settings folder: `%LOCALAPPDATA%\HCG\HCG Mail` (Windows), `~/Library/Application Support/HCG Mail`

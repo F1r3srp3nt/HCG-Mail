@@ -1,0 +1,248 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:HCG.Mail.App.ViewModels"
+        xmlns:dl="using:HCG.Mail.Email.Deliverability"
+        xmlns:controls="using:HCG.Mail.App.Controls"
+        x:Class="HCG.Mail.App.Views.MailHealthWindow"
+        x:DataType="vm:MailHealthViewModel"
+        Title="{Binding WindowTitle}"
+        Icon="/Assets/Icons/hcg-mail.ico"
+        Width="1000" Height="760" MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterOwner">
+  <Window.Styles>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="MinHeight" Value="38" />
+      <Setter Property="Padding" Value="16,0" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+    </Style>
+    <Style Selector="TabItem:selected">
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    </Style>
+    <Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+      <Setter Property="Background" Value="{DynamicResource Hcg.Accent}" />
+    </Style>
+    <!-- Status badges: the four labels used everywhere in Mail Health -->
+    <Style Selector="Border.badge">
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="9,2" />
+      <Setter Property="MinWidth" Value="84" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="Background" Value="{DynamicResource Hcg.Neutral}" />
+    </Style>
+    <Style Selector="Border.badge TextBlock">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Border.badge.verified">
+      <Setter Property="Background" Value="{DynamicResource Hcg.Success}" />
+    </Style>
+    <Style Selector="Border.badge.warning">
+      <Setter Property="Background" Value="{DynamicResource Hcg.Warning}" />
+    </Style>
+    <Style Selector="Border.badge.failed">
+      <Setter Property="Background" Value="{DynamicResource Hcg.Danger}" />
+    </Style>
+    <Style Selector="TextBlock.detail">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+      <Setter Property="FontSize" Value="12.5" />
+    </Style>
+    <Style Selector="TextBlock.action">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Accent}" />
+      <Setter Property="FontSize" Value="12.5" />
+    </Style>
+  </Window.Styles>
+
+  <Window.DataTemplates>
+    <DataTemplate DataType="vm:CheckItemViewModel">
+      <Grid ColumnDefinitions="96,*" Margin="0,6">
+        <Border Classes="badge" Classes.verified="{Binding IsVerified}" Classes.warning="{Binding IsWarning}" Classes.failed="{Binding IsFailed}">
+          <TextBlock Text="{Binding StatusLabel}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2">
+          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12.5" Foreground="{DynamicResource Hcg.Text.Secondary}" />
+          <TextBlock Classes="action" IsVisible="{Binding HasAction}" Text="{Binding Action, StringFormat='What to do: {0}'}" />
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+  </Window.DataTemplates>
+
+  <Grid RowDefinitions="Auto,*,Auto" Background="{DynamicResource Hcg.Bg.Reader}">
+    <!-- Header -->
+    <Border Background="{DynamicResource Hcg.Bg.TitleBar}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,0,0,1" Padding="20,12">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <controls:IconView Data="{StaticResource Icon.Shield}" Width="22" Height="22" Margin="0,0,12,0" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+          <TextBlock Text="Mail Health" FontSize="17" FontWeight="SemiBold" />
+          <TextBlock Classes="caption" Text="{Binding AccountAddress}" />
+        </StackPanel>
+        <Button x:Name="CopyReportButton" Grid.Column="2" Classes="toolbar" Margin="0,0,10,0" ToolTip.Tip="Copy all results as text, e.g. for your mail provider's support" Click="OnCopyReport">
+          <TextBlock Text="Copy report" />
+        </Button>
+        <Border Grid.Column="3" CornerRadius="10" BoxShadow="{DynamicResource Hcg.Shadow.Glow}">
+          <Button Classes="primary" Command="{Binding RunChecksCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <controls:IconView Data="{StaticResource Icon.Refresh}" Width="16" Height="16" />
+              <TextBlock Text="Run checks" />
+            </StackPanel>
+          </Button>
+        </Border>
+      </Grid>
+    </Border>
+
+    <TabControl x:Name="Tabs" Grid.Row="1" Margin="12,6,12,0">
+      <!-- Checks -->
+      <TabItem Header="Domain &amp; sending checks">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="10,12,10,20" Spacing="14">
+            <Border Classes="card" Padding="16,12">
+              <StackPanel Spacing="8">
+                <TextBlock TextWrapping="Wrap" Classes="detail"
+                           Text="These checks read your domain's public DNS records and this computer's send history. HCG Mail cannot change DNS records or your provider's sending servers, and it does not estimate deliverability scores or inbox placement. Each result is Verified, Warning, Failed or Not tested." />
+                <Grid ColumnDefinitions="Auto,*">
+                  <TextBlock Text="DKIM selector(s)" VerticalAlignment="Center" Margin="0,0,12,0" />
+                  <TextBox Grid.Column="1" Text="{Binding DkimSelectors}" Watermark="Found automatically when you analyze a received message, or enter the selector from your provider" />
+                </Grid>
+              </StackPanel>
+            </Border>
+            <ItemsControl ItemsSource="{Binding Sections}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CheckSectionViewModel">
+                  <Border Classes="card" Padding="16,12" Margin="0,0,0,12">
+                    <StackPanel Spacing="4">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding Description}" Classes="detail" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="badge" Classes.verified="{Binding IsVerified}" Classes.warning="{Binding IsWarning}" Classes.failed="{Binding IsFailed}">
+                          <TextBlock Text="{Binding StatusLabel}" />
+                        </Border>
+                      </Grid>
+                      <Rectangle Height="1" Fill="{DynamicResource Hcg.Border.Subtle}" Margin="0,6" />
+                      <ItemsControl ItemsSource="{Binding Checks}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Received message analysis -->
+      <TabItem Header="Analyze a received message">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="10,12,10,20" Spacing="12">
+            <Border Classes="card" Padding="16,12">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="detail"
+                           Text="Send a message from HCG Mail to a Gmail or Outlook.com address you own. Open it there and copy the original message — Gmail: ⋮ → Show original → Copy to clipboard (or Download original); Outlook.com: … → View → View message source; Apple Mail: View → Message → Raw Source. Paste it below or open the saved .eml file. The recipient's own SPF, DKIM and DMARC results are shown as recorded; nothing is uploaded anywhere." />
+                <TextBox x:Name="RawMessageBox" Text="{Binding RawMessage}" AcceptsReturn="True" TextWrapping="NoWrap" Height="180"
+                         FontFamily="Menlo, Consolas, monospace" FontSize="12" Watermark="Paste the original message (headers) here" />
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <Button Classes="primary" Content="Analyze" Command="{Binding AnalyzeCommand}" />
+                  <Button Classes="toolbar" Content="Open .eml file…" Command="{Binding OpenMessageFileCommand}" />
+                  <Button Classes="subtle" Content="Clear" Command="{Binding ClearAnalysisCommand}" />
+                </StackPanel>
+                <TextBlock Text="{Binding AnalysisSummary}" Classes="detail" IsVisible="{Binding AnalysisSummary, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </Border>
+            <Border Classes="card" Padding="16,12" IsVisible="{Binding HasAnalysis}">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Results" FontSize="15" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding AnalysisChecks}" />
+                <TextBlock Text="Route (first hop first)" FontWeight="SemiBold" Margin="0,10,0,2" />
+                <ItemsControl ItemsSource="{Binding AnalysisHops}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <SelectableTextBlock Text="{Binding}" FontFamily="Menlo, Consolas, monospace" FontSize="12" Foreground="{DynamicResource Hcg.Text.Secondary}" TextWrapping="Wrap" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Send history -->
+      <TabItem Header="Send history">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="10,12,10,20" Spacing="12">
+            <Border Classes="card" Padding="16,12">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="detail"
+                           Text="What your outgoing server replied to each message sent from this computer. 'Accepted' means the server took the message for delivery — not that it reached the recipient." />
+                <TextBlock Classes="detail" Text="{Binding DeliveryConfirmationText, StringFormat='Delivery confirmation: {0}'}" />
+                <TextBlock Classes="detail" Text="{Binding InboxPlacementText, StringFormat='Inbox placement: {0}'}" />
+                <Button Classes="subtle" Content="Clear history" Command="{Binding ClearHistoryCommand}" HorizontalAlignment="Left" IsVisible="{Binding HasHistory}" />
+              </StackPanel>
+            </Border>
+            <TextBlock Classes="detail" Text="No messages have been sent from this account on this computer yet." IsVisible="{Binding !HasHistory}" Margin="6,0" />
+            <ItemsControl ItemsSource="{Binding History}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DeliveryRecordViewModel">
+                  <Border Classes="card" Padding="14,10" Margin="0,0,0,8">
+                    <StackPanel Spacing="2">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding State}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="{Binding Time}" Classes="caption" />
+                      </Grid>
+                      <SelectableTextBlock Text="{Binding Reply}" FontFamily="Menlo, Consolas, monospace" FontSize="12" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Explanation}" Classes="detail" />
+                      <TextBlock Text="{Binding Details}" Classes="caption" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- Reputation -->
+      <TabItem Header="Reputation">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="10,12,10,20" Spacing="12">
+            <Border Classes="card" Padding="16,12">
+              <TextBlock Classes="detail"
+                         Text="Reputation is measured separately by each receiving mail system and by blocklist operators. HCG Mail has no access to that data, does not query these services and does not estimate a score. These are the services receivers and providers use; most require you or your provider (who owns the sending servers) to register." />
+            </Border>
+            <ItemsControl ItemsSource="{Binding ReputationLinks}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="dl:ReputationLink">
+                  <Border Classes="card" Padding="14,10" Margin="0,0,0,8">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Spacing="2">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Description}" Classes="detail" />
+                        <TextBlock Text="{Binding Url}" Classes="caption" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="toolbar" Content="Open" VerticalAlignment="Center" Margin="12,0,0,0"
+                              Command="{Binding $parent[Window].((vm:MailHealthViewModel)DataContext).OpenLinkCommand}" CommandParameter="{Binding}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <!-- Status -->
+    <Border Grid.Row="2" Background="{DynamicResource Hcg.Bg.TitleBar}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,1,0,0" Padding="20,7">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="{DynamicResource Hcg.Text.Secondary}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>

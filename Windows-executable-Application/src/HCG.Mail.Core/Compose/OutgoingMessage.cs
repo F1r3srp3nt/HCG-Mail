@@ -59,6 +59,7 @@ public sealed record OutgoingMessage
     public string Subject { get; init; } = "";
     public string TextBody { get; init; } = "";
     public IReadOnlyList<OutgoingAttachment> Attachments { get; init; } = [];
+    public MessagePriority Priority { get; init; } = MessagePriority.Normal;
 
     public ComposeKind Kind { get; init; } = ComposeKind.New;
     public string? InReplyTo { get; init; }

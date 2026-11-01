@@ -43,6 +43,12 @@ Do not send test mail to people outside the test. Nothing in this checklist is a
 | 28 | Remove account | Account settings → Remove account | Warning-style confirmation explaining what is removed; after *Remove account*: success notification, account gone from the sidebar immediately, still gone after restarting HCG Mail; password removed from Keychain Access / Credential Manager; no mail deleted on the server | |
 | 29 | Remove an account that cannot connect | With the network off (or an account showing a TLS / password error), Account settings → Remove account | Removal works exactly as in 28 — it never needs the server | |
 | 30 | Remove one of two accounts | Add a second account, remove the first | The second account stays connected and unchanged | |
+| 31 | **Mail Health checks** | Sidebar → *Mail Health* → *Run checks* | All eight sections appear; every row is Verified, Warning, Failed or Not tested; no scores or percentages anywhere; the status bar says when it was checked | |
+| 32 | **Received-message analysis** | Send a message to a Gmail address you own → in Gmail ⋮ → *Show original* → *Copy to clipboard* → paste in *Analyze a received message* → *Analyze*. Repeat with *Download original* and *Open .eml file…* | Recipient's spf/dkim/dmarc shown as reported by `mx.google.com`; Conclusion row; first hop EHLO is an address literal `[…]`; with the .eml file the DKIM signature is verified by HCG Mail (if the message is signed) | |
+| 33 | Send history | After tests 16 and 17, *Mail Health* → *Send history* | Successful sends show *Accepted by outgoing server* with the server reply (e.g. `queued as …`); rejected/invalid attempts show the server reason; the page says delivery confirmation is not available and inbox placement is unknown | |
+| 34 | **Priority — Outlook** | Send High, Normal and Low messages to an Outlook.com / Outlook desktop mailbox | High shows Outlook's importance marker; Low shows the low-importance marker; Normal shows none. Record the client version | |
+| 35 | **Priority — Apple Mail and Gmail** | Same three messages to Apple Mail (macOS/iOS) and to Gmail web | Apple Mail marks High (and Low) priority; Gmail shows no priority (expected — Gmail ignores it). In Gmail *Show original*: exactly one `Importance`, one `X-Priority`, and `Priority: urgent` only on the High message | |
+| 36 | Priority on drafts | Compose with Priority High → *Save draft* → close → *Edit draft* | Priority is still High | |
 
 **Sign-off**
 

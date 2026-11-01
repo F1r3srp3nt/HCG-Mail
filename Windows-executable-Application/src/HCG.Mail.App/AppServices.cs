@@ -1,10 +1,12 @@
 using HCG.Mail.App.Preview;
 using HCG.Mail.App.Services;
 using HCG.Mail.App.ViewModels;
+using HCG.Mail.Core.Delivery;
 using HCG.Mail.Core.Security;
 using HCG.Mail.Core.Services;
 using HCG.Mail.Core.Settings;
 using HCG.Mail.Email;
+using HCG.Mail.Email.Deliverability;
 using HCG.Mail.Email.Diagnostics;
 using HCG.Mail.Email.Html;
 using HCG.Mail.Email.Imap;
@@ -56,6 +58,8 @@ public static class AppServices
             services.AddSingleton<IAppSettingsStore>(new InMemoryAppSettingsStore());
             services.AddSingleton<IMailSessionFactory, PreviewMailSessionFactory>();
             services.AddSingleton<IConnectionTester, PreviewConnectionTester>();
+            services.AddSingleton<IDeliveryLog, InMemoryDeliveryLog>();
+            services.AddSingleton<IMailDns, OfflineMailDns>();
         }
         else
         {
@@ -64,6 +68,8 @@ public static class AppServices
             services.AddSingleton<IAppSettingsStore, JsonAppSettingsStore>();
             services.AddSingleton<IMailSessionFactory, MailKitMailSessionFactory>();
             services.AddSingleton<IConnectionTester, ConnectionTester>();
+            services.AddSingleton<IDeliveryLog, JsonDeliveryLog>();
+            services.AddSingleton<IMailDns, SystemMailDns>();
         }
 
         services.AddSingleton<IMailClientFactory, MailClientFactory>();
@@ -80,6 +86,7 @@ public static class AppServices
         services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
         services.AddSingleton<ILinkOpener, LinkOpener>();
         services.AddSingleton<RemoteImageLoader>();
+        services.AddSingleton<MailHealthViewModelFactory>();
         services.AddSingleton<MainWindowViewModel>();
 
         configure?.Invoke(services);
