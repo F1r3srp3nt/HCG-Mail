@@ -27,4 +27,6 @@ public interface IDialogService
     Task ShowSettingsAsync(SettingsViewModel viewModel);
 
     void ShowCompose(ComposeViewModel viewModel);
+
+    void ShowMailHealth(MailHealthViewModel viewModel);
 }

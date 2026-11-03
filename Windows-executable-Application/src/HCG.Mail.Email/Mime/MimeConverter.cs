@@ -4,6 +4,7 @@ using HCG.Mail.Core.Compose;
 using HCG.Mail.Core.Mail;
 using HCG.Mail.Core.Services;
 using MimeKit;
+using MessagePriority = HCG.Mail.Core.Compose.MessagePriority;
 using MimeKit.Utils;
 using CoreFlags = HCG.Mail.Core.Mail.MessageFlags;
 
@@ -80,7 +81,9 @@ public static class MimeConverter
         foreach (var reference in outgoing.References)
             message.References.Add(reference);
 
-        var builder = new BodyBuilder { TextBody = outgoing.TextBody };
+        ApplyPriority(message, outgoing.Priority);
+
+        var builder = new BodyBuilder { TextBody = NormalizeLineBreaks(outgoing.TextBody) };
         foreach (var attachment in outgoing.Attachments)
         {
             using var stream = attachment.OpenRead();
@@ -88,8 +91,59 @@ public static class MimeConverter
             builder.Attachments.Add(attachment.FileName, stream, contentType);
         }
         message.Body = builder.ToMessageBody();
+
+        // 7-bit transfer encodings (quoted-printable/base64) for every part, even when the server supports 8BITMIME.
+        // The provider DKIM-signs the message after submission; if any later relay has to downgrade raw 8-bit
+        // content, the signed body changes and DKIM fails. RFC 6376 §5.3 recommends 7-bit content for signing.
+        message.Prepare(EncodingConstraint.SevenBit);
         return message;
     }
+
+    /// <summary>
+    /// Writes the importance headers understood by Outlook (Importance, X-Priority), Apple Mail and Thunderbird
+    /// (X-Priority) and RFC 2156 gateways (Priority). Each header is set exactly once; recipients decide how,
+    /// or whether, to show it. Importance has no effect on spam filtering or delivery.
+    /// </summary>
+    public static void ApplyPriority(MimeMessage message, MessagePriority priority)
+    {
+        var (importance, xPriority, rfc2156) = priority switch
+        {
+            MessagePriority.High => ("high", "1", "urgent"),
+            MessagePriority.Low => ("low", "5", null),
+            _ => ("normal", "3", null),
+        };
+        message.Headers.Replace(HeaderId.Importance, importance);
+        message.Headers.Replace(HeaderId.XPriority, xPriority);
+        if (rfc2156 is null)
+            message.Headers.RemoveAll(HeaderId.Priority);
+        else
+            message.Headers.Replace(HeaderId.Priority, rfc2156);
+    }
+
+    /// <summary>Reads importance back from a message (drafts), accepting the common spellings other clients use.</summary>
+    public static MessagePriority ReadPriority(MimeMessage message)
+    {
+        var importance = message.Headers[HeaderId.Importance]?.Trim().ToLowerInvariant();
+        if (importance is "high")
+            return MessagePriority.High;
+        if (importance is "low")
+            return MessagePriority.Low;
+        if (importance is "normal")
+            return MessagePriority.Normal;
+
+        var x = message.Headers[HeaderId.XPriority]?.Trim();
+        if (!string.IsNullOrEmpty(x) && char.IsDigit(x[0]))
+            return x[0] switch { '1' or '2' => MessagePriority.High, '4' or '5' => MessagePriority.Low, _ => MessagePriority.Normal };
+
+        var p = message.Headers[HeaderId.Priority]?.Trim().ToLowerInvariant();
+        return p switch { "urgent" => MessagePriority.High, "non-urgent" => MessagePriority.Low, _ => MessagePriority.Normal };
+    }
+
+    /// <summary>
+    /// Converts any mix of CRLF, CR and LF to LF. MimeKit then writes canonical CRLF line endings; a lone CR would
+    /// otherwise survive as an encoded "=0D" in the middle of a line.
+    /// </summary>
+    internal static string NormalizeLineBreaks(string text) => text.Replace("\r\n", "\n").Replace('\r', '\n');
 
     public static async Task<OutgoingMessage> ToOutgoingAsync(MimeMessage message, MessageRef draftRef, IHtmlToTextConverter htmlToText, CancellationToken cancellationToken)
     {
@@ -116,6 +170,7 @@ public static class MimeConverter
             Subject = message.Subject ?? "",
             TextBody = text ?? "",
             Attachments = attachments,
+            Priority = ReadPriority(message),
             InReplyTo = message.InReplyTo,
             References = message.References.ToList(),
             MessageId = message.MessageId,

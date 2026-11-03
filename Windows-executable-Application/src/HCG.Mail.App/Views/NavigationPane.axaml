@@ -124,6 +124,12 @@
       <!-- Settings -->
       <StackPanel Grid.Row="4" Spacing="1" Margin="0,10,0,0">
         <Rectangle Height="1" Fill="{DynamicResource Hcg.Brush.AccentLine}" Margin="6,0,6,8" />
+        <Button Classes="nav" Command="{Binding OpenMailHealthCommand}" ToolTip.Tip="Check SPF, DKIM, DMARC and sending history for this account">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <controls:IconView Data="{StaticResource Icon.Shield}" Width="17" Height="17" />
+            <TextBlock Text="Mail Health" />
+          </StackPanel>
+        </Button>
         <Button Classes="nav" Command="{Binding OpenAccountSettingsCommand}" ToolTip.Tip="Server settings for this account">
           <StackPanel Orientation="Horizontal" Spacing="10">
             <controls:IconView Data="{StaticResource Icon.Account}" Width="17" Height="17" />

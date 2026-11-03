@@ -65,6 +65,15 @@ public sealed class DialogService : IDialogService
         return window.ShowDialog(Owner);
     }
 
+    public void ShowMailHealth(MailHealthViewModel viewModel)
+    {
+        var window = new MailHealthWindow { DataContext = viewModel };
+        if (_owner is not null)
+            window.Show(_owner);
+        else
+            window.Show();
+    }
+
     public void ShowCompose(ComposeViewModel viewModel)
     {
         var window = new ComposeWindow { DataContext = viewModel };

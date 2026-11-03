@@ -16,7 +16,7 @@ they are enforced in code, and the known limitations.
 | Malicious attachments | Never opened or executed; file names sanitized; dangerous types flagged and confirmed before saving |
 | Path traversal via attachment names | Last path segment only, invalid/control/bidi characters removed, reserved Windows names prefixed, final path verified to be inside the download folder |
 | Header injection | CR/LF rejected in display name, username, password; subjects are flattened to one line |
-| Telemetry / data leaving the device | No telemetry, analytics or HCG endpoints. Avalonia *build* telemetry is disabled in `Directory.Build.targets` |
+| Telemetry / data leaving the device | No telemetry, analytics or HCG endpoints. Avalonia *build* telemetry is disabled in `Directory.Build.targets`. Mail Health makes DNS queries (SPF/DKIM/DMARC/MX/PTR) through the computer's resolver only when the user runs checks or analyzes a message; nothing is uploaded |
 
 ## Transport security
 
@@ -81,6 +81,12 @@ macro-capable types (`.exe .js .vbs .ps1 .lnk .docm …`) show a warning and req
   of 6).
 * Logs contain operation names, hosts, account ids, counts and error types — never passwords,
   subjects, bodies or recipient lists. Retention: 7 days.
+* `delivery-history.json` (last 300 sends, `0600`) records time, account, outgoing server, delivery state,
+  SMTP reply code and text, Message-ID, recipient count and priority — no subject, body, attachments or
+  password. A rejection reply can quote the refused recipient address. Clearable in Mail Health.
+* Outgoing messages carry no tracking pixels and request no read or return receipts. The SMTP EHLO
+  greeting uses the connection's address literal, so the computer's name is not written into
+  `Received:` headers.
 
 ### Future encrypted cache — key management (not implemented)
 If an offline cache is added it must be encrypted: a random 256-bit data key per installation, wrapped

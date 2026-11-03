@@ -24,6 +24,7 @@ public sealed record AppMode(bool IsPreview);
 public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDisposable
 {
     private readonly AppSettingsService _settings;
+    private readonly MailHealthViewModelFactory? _mailHealth;
     private readonly ThemeService _themes;
     private readonly IAccountStore _accountStore;
     private readonly ICredentialVault _vault;
@@ -68,8 +69,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         ILinkOpener links,
         AppPaths paths,
         AppMode mode,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        MailHealthViewModelFactory? mailHealth = null)
     {
+        _mailHealth = mailHealth;
         _settings = settings;
         _themes = themes;
         _accountStore = accountStore;
@@ -622,6 +625,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             await ConnectAccountAsync(avm);
         });
         await _dialogs.ShowAccountSetupAsync(vm);
+    }
+
+    [RelayCommand]
+    private void OpenMailHealth()
+    {
+        if (SelectedAccount is null || _mailHealth is null)
+        {
+            _notifications.Info("Mail Health", "Add an account first.");
+            return;
+        }
+        _dialogs.ShowMailHealth(_mailHealth.Create(SelectedAccount.Account));
     }
 
     [RelayCommand]

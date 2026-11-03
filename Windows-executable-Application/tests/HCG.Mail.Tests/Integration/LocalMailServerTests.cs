@@ -333,4 +333,117 @@ public class LocalMailServerTests
         var sent = await FolderAsync(ola, FolderRole.Sent);
         Assert.DoesNotContain((await ola.GetMessagesAsync(sent, 0, 200)).Messages, m => m.Subject.Contains(token));
     }
+
+    // ---- deliverability: what actually arrives ------------------------------------------------
+
+    private static async Task<byte[]> RawMessageAsync(string user, string token)
+    {
+        var recorder = new TlsValidationRecorder();
+        using var imap = new MailClientFactory().CreateImapClient(recorder);
+        await imap.ConnectAsync(Host, 993, MailKit.Security.SecureSocketOptions.SslOnConnect);
+        await imap.AuthenticateAsync($"{user}@hcgmail.test", Password(user));
+        var until = DateTime.UtcNow.AddSeconds(20);
+        while (true)
+        {
+            await imap.Inbox.OpenAsync(MailKit.FolderAccess.ReadOnly);
+            var uids = await imap.Inbox.SearchAsync(MailKit.Search.SearchQuery.SubjectContains(token));
+            if (uids.Count > 0)
+            {
+                using var stream = new MemoryStream();
+                var message = await imap.Inbox.GetStreamAsync(uids[0]);
+                await message.CopyToAsync(stream);
+                await imap.DisconnectAsync(true);
+                return stream.ToArray();
+            }
+            if (DateTime.UtcNow > until)
+                throw new TimeoutException("Message did not arrive");
+            await imap.Inbox.CloseAsync();
+            await Task.Delay(500);
+        }
+    }
+
+    [LocalMailServerFact]
+    public async Task High_priority_message_arrives_with_exact_headers_7bit_body_and_address_literal_ehlo()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        var log = new HCG.Mail.Core.Delivery.InMemoryDeliveryLog();
+        var factory = new MailKitMailSessionFactory(new MailClientFactory(), new HtmlToTextConverter(), NullLoggerFactory.Instance, log);
+        await using var ola = factory.Create(Account("ola"), Password("ola"));
+
+        var result = await ola.SendAsync(new OutgoingMessage
+        {
+            To = [new EmailAddress("Kari Test", "kari@hcgmail.test")],
+            Subject = $"Prioritet {token} — møte",
+            TextBody = "Hei Kari,\r\nmøtet er flyttet til fredag.\rMvh Ola",
+            Priority = MessagePriority.High,
+        }, saveCopyToSent: false);
+
+        // Delivery state: accepted by the server, with its real reply; never "delivered".
+        var delivery = Assert.IsType<HCG.Mail.Core.Delivery.DeliveryRecord>(result.Delivery);
+        Assert.Equal(HCG.Mail.Core.Delivery.DeliveryState.Accepted, delivery.State);
+        Assert.Equal(250, delivery.SmtpStatusCode);
+        Assert.Contains("queued as", delivery.ServerReply);
+        Assert.Equal(MessagePriority.High, delivery.Priority);
+        Assert.Equal(delivery, Assert.Single(log.GetRecent("e2e-ola")));
+
+        var raw = await RawMessageAsync("kari", token);
+        var text = Encoding.ASCII.GetString(raw);
+        var headerBlock = text[..text.IndexOf("\r\n\r\n", StringComparison.Ordinal)];
+        string[] Lines(string name) => headerBlock.Split("\r\n").Where(l => l.StartsWith(name + ":", StringComparison.OrdinalIgnoreCase)).ToArray();
+
+        Assert.Equal(["Importance: high"], Lines("Importance"));
+        Assert.Equal(["X-Priority: 1"], Lines("X-Priority"));
+        Assert.Equal(["Priority: urgent"], Lines("Priority"));
+        Assert.All(raw, b => Assert.True(b < 128, "8-bit byte in the delivered message"));
+        Assert.Contains($"Message-Id: <{delivery.MessageId}>", headerBlock, StringComparison.OrdinalIgnoreCase);
+
+        // Postfix records the EHLO name in its Received header: an address literal, never the computer's name.
+        var received = Lines("Received").Last(); // the bottom Received header is the first hop: Postfix receiving from HCG Mail
+        Assert.True(System.Text.RegularExpressions.Regex.IsMatch(received, @"^Received: from \[[0-9a-fA-F.:IPv6]+\]"), headerBlock);
+        Assert.DoesNotContain("from " + Environment.MachineName + " ", received, StringComparison.OrdinalIgnoreCase);
+
+        // The analyzer reads the delivered message: format verified, first hop verified.
+        var analysis = await new HCG.Mail.Email.Deliverability.ReceivedMessageAnalyzer(new HCG.Mail.Email.Deliverability.SystemMailDns()).AnalyzeAsync(raw);
+        Assert.Equal(HCG.Mail.Email.Deliverability.CheckStatus.Verified, analysis.Result("First hop EHLO name"));
+        Assert.Equal(HCG.Mail.Email.Deliverability.CheckStatus.Verified, analysis.Result("Header fields"));
+        Assert.Equal(HCG.Mail.Email.Deliverability.CheckStatus.Verified, analysis.Result("Priority headers"));
+    }
+
+    [LocalMailServerFact]
+    public async Task Rejected_send_is_recorded_as_rejected_with_the_server_reply()
+    {
+        var log = new HCG.Mail.Core.Delivery.InMemoryDeliveryLog();
+        var factory = new MailKitMailSessionFactory(new MailClientFactory(), new HtmlToTextConverter(), NullLoggerFactory.Instance, log);
+        await using var ola = factory.Create(Account("ola"), Password("ola"));
+        await Assert.ThrowsAsync<MailOperationException>(() => ola.SendAsync(new OutgoingMessage
+        {
+            To = [new EmailAddress(null, "someone@example.com")],
+            Subject = "External",
+            TextBody = "x",
+        }, saveCopyToSent: false));
+
+        var record = Assert.Single(log.GetRecent("e2e-ola"));
+        Assert.Equal(HCG.Mail.Core.Delivery.DeliveryState.Rejected, record.State);
+        Assert.InRange(record.SmtpStatusCode!.Value, 500, 599);
+        Assert.Contains("Recipient address rejected", record.ServerReply);
+        Assert.Contains("someone@example.com", record.ErrorMessage);
+    }
+
+    [LocalMailServerFact]
+    public async Task Wrong_password_is_recorded_as_not_sent()
+    {
+        var log = new HCG.Mail.Core.Delivery.InMemoryDeliveryLog();
+        var factory = new MailKitMailSessionFactory(new MailClientFactory(), new HtmlToTextConverter(), NullLoggerFactory.Instance, log);
+        await using var ola = factory.Create(Account("ola"), "wrong-password");
+        await Assert.ThrowsAsync<MailOperationException>(() => ola.SendAsync(new OutgoingMessage
+        {
+            To = [new EmailAddress(null, "kari@hcgmail.test")],
+            Subject = "x",
+            TextBody = "x",
+        }, saveCopyToSent: false));
+
+        var record = Assert.Single(log.GetRecent("e2e-ola"));
+        Assert.Equal(HCG.Mail.Core.Delivery.DeliveryState.NotSent, record.State);
+        Assert.DoesNotContain("wrong-password", System.Text.Json.JsonSerializer.Serialize(record));
+    }
 }

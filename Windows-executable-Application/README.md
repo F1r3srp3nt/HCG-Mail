@@ -29,6 +29,9 @@ and it never contacts HCG infrastructure.
 | Sent folder copy without duplicates (Gmail detection + Message-ID check) | ✅ |
 | Server-side drafts (save, re-save replaces, edit, send removes draft) | ✅ |
 | Six-step connection test (DNS, TCP, TLS, IMAP login, folders, SMTP login — no mail sent) | ✅ |
+| Mail Health: SPF/DKIM/DMARC DNS checks, received-message analysis with independent DKIM verification, SMTP send history, format validation — labelled Verified/Warning/Failed/Not tested, no invented scores | ✅ |
+| Message priority (Low / Normal / High) with standard `Importance` / `X-Priority` / `Priority` headers | ✅ |
+| Delivery states: accepted / deferred / rejected / unknown, from the outgoing server's real reply — never reported as "delivered" | ✅ |
 | Safe HTML: sanitizer + script-less renderer, remote images blocked by default, link confirmation | ✅ |
 | Password storage: Windows Credential Manager / macOS Keychain | ✅ Windows code verified under Wine; ⚠️ macOS Keychain not yet run on a Mac |
 | HCG Future / HCG Classic skins, live switching, persisted | ✅ |
@@ -83,7 +86,7 @@ suite fast and free of UI dependencies.
 
 - [Architecture](docs/ARCHITECTURE.md) · [Setup](docs/SETUP.md) · [Security](docs/SECURITY.md)
 - [Windows build](docs/WINDOWS_BUILD.md) · [Roadmap](docs/ROADMAP.md) · [Testing](docs/TESTING.md)
-- [Manual Domene.no checklist](docs/MANUAL_TEST_CHECKLIST.md) · [Branding assets](assets/branding/README.md)
+- [Manual Domene.no checklist](docs/MANUAL_TEST_CHECKLIST.md) · [Deliverability](docs/DELIVERABILITY.md) · [Branding assets](assets/branding/README.md)
 
 ## Branding
 

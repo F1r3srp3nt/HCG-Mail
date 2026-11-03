@@ -91,6 +91,14 @@
         <TextBlock Classes="fieldLabel" Text="Subject" />
         <TextBox Grid.Column="1" Text="{Binding Subject}" FontWeight="SemiBold" />
       </Grid>
+      <Grid ColumnDefinitions="Auto,Auto,*">
+        <TextBlock Classes="fieldLabel" Text="Priority" />
+        <ComboBox x:Name="PriorityBox" Grid.Column="1" MinWidth="120" ItemsSource="{x:Static vm:ComposeViewModel.PriorityOptions}"
+                  SelectedItem="{Binding SelectedPriority}" ToolTip.Tip="{x:Static vm:ComposeViewModel.PriorityExplanation}"
+                  AutomationProperties.Name="Priority" />
+        <TextBlock Grid.Column="2" Classes="caption" Margin="12,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap"
+                   Text="Recipients' mail programs decide how priority is shown. It does not affect spam filtering or delivery." />
+      </Grid>
     </StackPanel>
 
     <!-- Body -->

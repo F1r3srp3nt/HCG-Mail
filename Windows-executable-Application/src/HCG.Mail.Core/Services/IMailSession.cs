@@ -12,7 +12,8 @@ public enum MailConnectionState
     Failed,
 }
 
-public sealed record SendResult(bool SavedToSent, string? Warning);
+/// <param name="Delivery">What the outgoing server replied. Accepted means the server took the message, not that it was delivered.</param>
+public sealed record SendResult(bool SavedToSent, string? Warning, Delivery.DeliveryRecord? Delivery = null);
 
 public sealed record DraftSaveResult(MessageRef? DraftRef);
 
