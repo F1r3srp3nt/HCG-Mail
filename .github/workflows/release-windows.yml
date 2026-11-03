@@ -1,0 +1,55 @@
+# Publishes the Windows build of HCG Mail as a GitHub release.
+# Runs only when a version tag (v*) is pushed — creating that tag is the founder's release decision.
+# Builds Windows only; other platforms are produced separately with HCG Executable Maker.
+name: Release Windows build
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Windows-executable-Application
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Run tests
+        run: dotnet test HCG.Mail.sln -c Release
+
+      - name: Build HCGMail.exe (win-x64, self-contained)
+        run: bash scripts/publish-windows.sh
+
+      - name: Checksums
+        run: |
+          cd artifacts
+          sha256sum HCGMail-*-win-x64.zip publish/win-x64/HCGMail.exe | sed 's#publish/win-x64/##' > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo "Windows x64 build of HCG Mail ${TAG}, built by GitHub Actions from commit ${GITHUB_SHA}."
+            echo
+            echo "Download HCGMail-*-win-x64.zip, unzip and run HCGMail.exe (no .NET installation needed)."
+            echo "The build is not code-signed: Windows SmartScreen shows \"Windows protected your PC\" → More info → Run anyway."
+            echo
+            echo "SHA-256:"
+            echo '```'
+            cat artifacts/SHA256SUMS.txt
+            echo '```'
+          } > release-notes.md
+          gh release create "$TAG" artifacts/HCGMail-*-win-x64.zip artifacts/SHA256SUMS.txt \
+            --title "HCG Mail ${TAG} (Windows)" --notes-file release-notes.md --prerelease
