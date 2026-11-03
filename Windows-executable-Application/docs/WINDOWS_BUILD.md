@@ -73,12 +73,10 @@ Run these before the Domene.no checklist:
 
 ## Publishing a GitHub release
 
-`.github/workflows/release-windows.yml` builds and publishes the Windows build when a version tag is
-pushed (tagging is the founder's release decision):
-
-```bash
-git tag v0.1.0-mvp && git push origin v0.1.0-mvp
-```
+`.github/workflows/release-windows.yml` builds and publishes the Windows build when started by hand on
+GitHub (Actions → *Release Windows build* → *Run workflow*, enter a version such as `v0.1.0-mvp`) or
+when a version tag is pushed (`git tag v0.1.0-mvp && git push origin v0.1.0-mvp`). Releasing is the
+founder's decision.
 
 The workflow runs the test suite, runs `scripts/publish-windows.sh` on a GitHub-hosted runner and
 creates a pre-release with `HCGMail-<version>-win-x64.zip` and `SHA256SUMS.txt`. It builds Windows only;
