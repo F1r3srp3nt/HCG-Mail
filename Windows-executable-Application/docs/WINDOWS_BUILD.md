@@ -70,3 +70,17 @@ Run these before the Domene.no checklist:
 2. *Next (needs approval):* Authenticode signing certificate; MSIX or Inno Setup installer with Start
    menu entry and uninstaller; optional auto-update channel (would be a visible, opt-in network
    feature).
+
+## Publishing a GitHub release
+
+`.github/workflows/release-windows.yml` builds and publishes the Windows build when a version tag is
+pushed (tagging is the founder's release decision):
+
+```bash
+git tag v0.1.0-mvp && git push origin v0.1.0-mvp
+```
+
+The workflow runs the test suite, runs `scripts/publish-windows.sh` on a GitHub-hosted runner and
+creates a pre-release with `HCGMail-<version>-win-x64.zip` and `SHA256SUMS.txt`. It builds Windows only;
+other operating-system versions are produced from the Windows build with HCG Executable Maker. The
+build is unsigned.
