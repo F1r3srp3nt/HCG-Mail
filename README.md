@@ -36,6 +36,8 @@ Inside `Windows-executable-Application/` (details in its [README](Windows-execut
 * Compose, reply, reply all, forward with attachments and server-side drafts over SMTP/IMAP
 * Six-step connection test, Domene.no preset, secure credential storage (Windows Credential Manager, macOS Keychain)
 * Mail Health deliverability diagnostics (SPF, DKIM, DMARC, send history) and message priority (Low / Normal / High)
+* Microsoft accounts (Outlook.com, Hotmail, Microsoft 365) through Microsoft Graph — requires HCG's Microsoft app registration
+* Original / Readable / Plain-text message views with clean inbox previews
 * Safe HTML rendering with remote content blocked by default
 * HCG Future and HCG Classic skins with the official HCG logo and HCG Mail application icon
 * Unit, headless UI and opt-in end-to-end tests against a disposable local mail server
@@ -73,6 +75,8 @@ More: [setup](Windows-executable-Application/docs/SETUP.md) ·
 [Windows build](Windows-executable-Application/docs/WINDOWS_BUILD.md) ·
 [testing](Windows-executable-Application/docs/TESTING.md) ·
 [deliverability](Windows-executable-Application/docs/DELIVERABILITY.md) ·
+[Microsoft accounts](Windows-executable-Application/docs/MICROSOFT_ACCOUNTS.md) ·
+[message rendering](Windows-executable-Application/docs/MESSAGE_RENDERING.md) ·
 [manual Domene.no checklist](Windows-executable-Application/docs/MANUAL_TEST_CHECKLIST.md)
 
 ## Repository rules

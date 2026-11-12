@@ -7,9 +7,9 @@ public enum ThemeKind
 }
 
 /// <remarks>
-/// There is deliberately no refresh-interval setting: HCG Mail never polls the mail server in the
-/// background. Settings files from older builds that contain "refreshIntervalMinutes" or
-/// "notifyOnNewMail" still load; those fields are simply ignored.
+/// Refresh is manual unless the user turns on <see cref="AutomaticRefreshMinutes"/>. Settings files from
+/// older builds that contain "refreshIntervalMinutes" or "notifyOnNewMail" still load and those fields stay
+/// ignored, so upgrading never switches background checking on by itself.
 /// </remarks>
 public sealed record AppSettings
 {
@@ -28,6 +28,20 @@ public sealed record AppSettings
     public bool MarkAsReadWhenOpened { get; init; } = true;
     public bool SaveCopyToSentFolder { get; init; } = true;
     public bool ConfirmBeforeOpeningLinks { get; init; } = true;
+
+    /// <summary>How HTML messages open: the sender's layout (default) or Readable view.</summary>
+    public Services.MessageViewMode DefaultMessageView { get; init; } = Services.MessageViewMode.Original;
+
+    /// <summary>
+    /// Load remote images in every message without asking. Off by default: loading them tells the sender that and
+    /// when the message was opened, and reveals the computer's IP address.
+    /// </summary>
+    public bool LoadRemoteImagesAutomatically { get; init; }
+
+    /// <summary>0 = manual refresh only (default). Otherwise the open folder is checked every N minutes while HCG Mail runs.</summary>
+    public int AutomaticRefreshMinutes { get; init; }
+
+    public static readonly IReadOnlyList<int> AutomaticRefreshChoices = [0, 5, 15, 30, 60];
     public string? LastAccountId { get; init; }
 
     /// <summary>
@@ -51,6 +65,8 @@ public sealed record AppSettings
         Version = CurrentVersion,
         Theme = Enum.IsDefined(Theme) ? Theme : ThemeKind.HcgFuture,
         DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirectory) ? null : DownloadDirectory,
+        DefaultMessageView = Enum.IsDefined(DefaultMessageView) ? DefaultMessageView : Services.MessageViewMode.Original,
+        AutomaticRefreshMinutes = AutomaticRefreshChoices.Contains(AutomaticRefreshMinutes) ? AutomaticRefreshMinutes : 0,
         PendingCredentialDeletions = NormalizeKeys(PendingCredentialDeletions),
     };
 }

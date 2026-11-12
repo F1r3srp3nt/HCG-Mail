@@ -65,6 +65,12 @@ public sealed class DialogService : IDialogService
         return window.ShowDialog(Owner);
     }
 
+    public async Task<bool> ShowMicrosoftAccountAsync(MicrosoftAccountViewModel viewModel)
+    {
+        var window = new MicrosoftAccountWindow { DataContext = viewModel };
+        return await window.ShowDialog<bool>(Owner);
+    }
+
     public void ShowMailHealth(MailHealthViewModel viewModel)
     {
         var window = new MailHealthWindow { DataContext = viewModel };

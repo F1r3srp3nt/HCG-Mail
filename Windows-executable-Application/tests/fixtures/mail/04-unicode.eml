@@ -1,0 +1,21 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: =?utf-8?b?VW5pY29kZTogw6bDuMOlIOKAkyDZhdix2K3YqNinIOKAkyDkuK3mlocg4pyF?=
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <2365657728@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="U4"
+
+--U4
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+QmzDpWLDpnJzeWx0ZXTDuHkgZnJhIMOFbGVzdW5kIOKAkyBwcmlzIDQ5IGtyLgrZhdix2K3YqNin
+INio2KfZhNi52KfZhNmFCuS4reaWh+a1i+ivlSDinIUg8J+OiQpTZcOxb3IgTcO8bGxlcgo=
+--U4
+Content-Type: text/html; charset=iso-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+<html><body><p>Bl=E5b=E6rsyltet=F8y fra =C5lesund - pris 49 kr.</p><p>Se=F1=
+or M=FCller sagt =ABgr=FC=DF Gott=BB.</p></body></html>
+--U4--

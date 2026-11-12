@@ -49,10 +49,8 @@ Do not send test mail to people outside the test. Nothing in this checklist is a
 | 34 | **Priority — Outlook** | Send High, Normal and Low messages to an Outlook.com / Outlook desktop mailbox | High shows Outlook's importance marker; Low shows the low-importance marker; Normal shows none. Record the client version | |
 | 35 | **Priority — Apple Mail and Gmail** | Same three messages to Apple Mail (macOS/iOS) and to Gmail web | Apple Mail marks High (and Low) priority; Gmail shows no priority (expected — Gmail ignores it). In Gmail *Show original*: exactly one `Importance`, one `X-Priority`, and `Priority: urgent` only on the High message | |
 | 36 | Priority on drafts | Compose with Priority High → *Save draft* → close → *Edit draft* | Priority is still High | |
-
-**Sign-off**
-
-Tester: ______________ Date: __________ Overall: ☐ Pass ☐ Pass with issues ☐ Fail
-
-Attach `logs/hcg-mail-*.log` from the settings folder when reporting problems (logs contain no
-passwords or message content).
+| 37 | **Message display** | Open an HTML newsletter, a plain-text message and an image-heavy promotion | Content always visible (or a clear "no content" / error state); Original / Readable / Plain text switch works; blocked images show labelled placeholders; *Load remote images* explains the privacy effect | |
+| 38 | Inbox previews | Look at the previews of newsletters in the list | No raw links, `[image: …]`, markup or invisible characters | |
+| 39 | Search | Type a word → *Search the whole folder* (or Enter) | The list says whether it shows loaded messages or server results; editing the text returns to the loaded list | |
+| 40 | Automatic checking | Settings → Mail → Checking for new messages → every 5 minutes | New mail appears without pressing Refresh; switching back to Manually stops it | |
+| 41 | **Microsoft account** | Follow "Testing with real accounts" in [MICROSOFT_ACCOUNTS.md](MICROSOFT_ACCOUNTS.md) (needs the app registration) | All steps pass | |

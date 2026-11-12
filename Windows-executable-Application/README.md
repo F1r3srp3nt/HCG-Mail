@@ -31,6 +31,9 @@ and it never contacts HCG infrastructure.
 | Six-step connection test (DNS, TCP, TLS, IMAP login, folders, SMTP login — no mail sent) | ✅ |
 | Mail Health: SPF/DKIM/DMARC DNS checks, received-message analysis with independent DKIM verification, SMTP send history, format validation — labelled Verified/Warning/Failed/Not tested, no invented scores | ✅ |
 | Message priority (Low / Normal / High) with standard `Importance` / `X-Priority` / `Priority` headers | ✅ |
+| Microsoft accounts (Outlook.com, Hotmail, Microsoft 365) via Microsoft Graph and system-browser sign-in — needs the app registration in [MICROSOFT_ACCOUNTS.md](docs/MICROSOFT_ACCOUNTS.md) | ✅ implemented, not yet tested with real accounts |
+| Reliable message display: Original / Readable / Plain text, explicit empty/error states with Retry, clean previews | ✅ |
+| Search the whole folder on the server (distinct from filtering loaded messages); optional automatic checking (off by default) | ✅ |
 | Delivery states: accepted / deferred / rejected / unknown, from the outgoing server's real reply — never reported as "delivered" | ✅ |
 | Safe HTML: sanitizer + script-less renderer, remote images blocked by default, link confirmation | ✅ |
 | Password storage: Windows Credential Manager / macOS Keychain | ✅ Windows code verified under Wine; ⚠️ macOS Keychain not yet run on a Mac |
@@ -86,7 +89,7 @@ suite fast and free of UI dependencies.
 
 - [Architecture](docs/ARCHITECTURE.md) · [Setup](docs/SETUP.md) · [Security](docs/SECURITY.md)
 - [Windows build](docs/WINDOWS_BUILD.md) · [Roadmap](docs/ROADMAP.md) · [Testing](docs/TESTING.md)
-- [Manual Domene.no checklist](docs/MANUAL_TEST_CHECKLIST.md) · [Deliverability](docs/DELIVERABILITY.md) · [Branding assets](assets/branding/README.md)
+- [Manual Domene.no checklist](docs/MANUAL_TEST_CHECKLIST.md) · [Deliverability](docs/DELIVERABILITY.md) · [Message rendering](docs/MESSAGE_RENDERING.md) · [Microsoft accounts](docs/MICROSOFT_ACCOUNTS.md) · [Branding assets](assets/branding/README.md)
 
 ## Branding
 

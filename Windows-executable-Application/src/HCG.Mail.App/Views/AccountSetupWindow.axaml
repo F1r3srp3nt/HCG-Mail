@@ -34,6 +34,13 @@
           <TextBlock Classes="h1" Text="{Binding Title}" />
           <TextBlock Classes="muted" Margin="0,6,0,0" TextWrapping="Wrap"
                      Text="Connect an existing mailbox with IMAP (incoming) and SMTP (outgoing). Your provider gives you these details." />
+          <Border Classes="banner" Margin="0,14,0,0" IsVisible="{Binding CanUseMicrosoft}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
+                         Text="Outlook.com, Hotmail or Microsoft 365? Use Microsoft sign-in instead — no password is stored in HCG Mail." />
+              <Button x:Name="UseMicrosoftButton" Grid.Column="1" Margin="12,0,0,0" Classes="subtle" Content="Add Microsoft account" Command="{Binding UseMicrosoftCommand}" />
+            </Grid>
+          </Border>
           <Border Classes="banner" Margin="0,14,0,0" IsVisible="{Binding HasIntroMessage}">
             <TextBlock Text="{Binding IntroMessage}" TextWrapping="Wrap" Foreground="{DynamicResource Hcg.Text.Accent}" />
           </Border>

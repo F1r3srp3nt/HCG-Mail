@@ -393,6 +393,7 @@ public sealed class AccountRemovalTests : IDisposable
         public Task<FolderPage> GetMessagesAsync(string folder, int skip, int count, CancellationToken ct = default) =>
             Task.FromResult(new FolderPage(folder, [], 0, 0, 1, false));
 
+        public Task<IReadOnlyList<MessageSummary>> SearchAsync(string f, string q, int n, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<MessageSummary>>([]);
         public Task<MessageContent> GetMessageAsync(MessageRef message, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SetFlagsAsync(IReadOnlyList<MessageRef> m, MessageFlags f, bool add, CancellationToken ct = default) { ServerWritesAfterConnect++; return Task.CompletedTask; }
         public Task DeleteAsync(MessageRef m, bool permanent, CancellationToken ct = default) { ServerWritesAfterConnect++; return Task.CompletedTask; }

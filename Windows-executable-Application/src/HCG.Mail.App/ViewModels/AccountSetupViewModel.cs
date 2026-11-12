@@ -43,6 +43,7 @@ public sealed partial class AccountSetupViewModel : ObservableObject
     private readonly ICredentialVault _vault;
     private readonly Func<MailAccount, Task> _onSaved;
     private readonly Func<MailAccount, Task<bool>>? _onRemove;
+    private readonly Func<Task>? _onUseMicrosoft;
     private readonly MailAccount? _existing;
     private bool _usernameEdited;
     private bool _validated;
@@ -88,8 +89,10 @@ public sealed partial class AccountSetupViewModel : ObservableObject
         Func<MailAccount, Task> onSaved,
         MailAccount? existing = null,
         Func<MailAccount, Task<bool>>? onRemove = null,
-        string? message = null)
+        string? message = null,
+        Func<Task>? onUseMicrosoft = null)
     {
+        _onUseMicrosoft = onUseMicrosoft;
         _tester = tester;
         _vault = vault;
         _onSaved = onSaved;
@@ -291,6 +294,17 @@ public sealed partial class AccountSetupViewModel : ObservableObject
         _testCts?.Cancel();
         Password = "";
         CloseRequested?.Invoke(this, false);
+    }
+
+    /// <summary>Outlook.com / Hotmail / Microsoft 365 use Microsoft sign-in instead of an IMAP password.</summary>
+    public bool CanUseMicrosoft => _existing is null && _onUseMicrosoft is not null;
+
+    [RelayCommand]
+    private async Task UseMicrosoftAsync()
+    {
+        CloseRequested?.Invoke(this, false);
+        if (_onUseMicrosoft is not null)
+            await _onUseMicrosoft();
     }
 
     [RelayCommand]

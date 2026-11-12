@@ -1,0 +1,173 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: HTML-only receipt with large style block
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <1357063790@example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<html><head><meta charset=3D"utf-8"><title>Receipt</title><style type=3D"te=
+xt/css">.c0 { padding:0px; margin:0; color:#333333; font-family:Helvetica,A=
+rial,sans-serif; }
+.c1 { padding:1px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c2 { padding:2px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c3 { padding:3px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c4 { padding:4px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c5 { padding:5px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c6 { padding:6px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c7 { padding:7px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c8 { padding:8px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c9 { padding:9px; margin:0; color:#333333; font-family:Helvetica,Arial,san=
+s-serif; }
+.c10 { padding:10px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c11 { padding:11px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c12 { padding:12px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c13 { padding:13px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c14 { padding:14px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c15 { padding:15px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c16 { padding:16px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c17 { padding:17px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c18 { padding:18px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c19 { padding:19px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c20 { padding:20px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c21 { padding:21px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c22 { padding:22px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c23 { padding:23px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c24 { padding:24px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c25 { padding:25px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c26 { padding:26px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c27 { padding:27px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c28 { padding:28px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c29 { padding:29px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c30 { padding:30px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c31 { padding:31px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c32 { padding:32px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c33 { padding:33px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c34 { padding:34px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c35 { padding:35px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c36 { padding:36px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c37 { padding:37px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c38 { padding:38px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c39 { padding:39px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c40 { padding:40px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c41 { padding:41px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c42 { padding:42px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c43 { padding:43px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c44 { padding:44px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c45 { padding:45px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c46 { padding:46px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c47 { padding:47px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c48 { padding:48px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c49 { padding:49px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c50 { padding:50px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c51 { padding:51px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c52 { padding:52px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c53 { padding:53px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c54 { padding:54px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c55 { padding:55px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c56 { padding:56px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c57 { padding:57px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c58 { padding:58px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c59 { padding:59px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c60 { padding:60px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c61 { padding:61px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c62 { padding:62px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c63 { padding:63px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c64 { padding:64px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c65 { padding:65px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c66 { padding:66px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c67 { padding:67px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c68 { padding:68px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c69 { padding:69px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c70 { padding:70px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c71 { padding:71px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c72 { padding:72px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c73 { padding:73px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c74 { padding:74px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c75 { padding:75px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c76 { padding:76px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c77 { padding:77px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c78 { padding:78px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }
+.c79 { padding:79px; margin:0; color:#333333; font-family:Helvetica,Arial,s=
+ans-serif; }</style>
+<!--[if mso]><style>.x{font-family:Arial}</style><![endif]--></head>
+<body><table><tr><td class=3D"c1"><p>Thanks for your order #10042.</p><p>To=
+tal: 499,00 kr</p></td></tr></table></body></html>

@@ -8,6 +8,7 @@ using HCG.Mail.App.Services;
 using HCG.Mail.Core.Accounts;
 using HCG.Mail.Core.Addresses;
 using HCG.Mail.Core.Compose;
+using HCG.Mail.Core.Delivery;
 using HCG.Mail.Core.Errors;
 using HCG.Mail.Core.Mail;
 using HCG.Mail.Core.Security;
@@ -25,6 +26,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 {
     private readonly AppSettingsService _settings;
     private readonly MailHealthViewModelFactory? _mailHealth;
+    private DispatcherTimer? _autoRefresh;
+    private readonly IMicrosoftAuth _microsoftAuth;
+    private readonly IDeliveryLog? _deliveryLog;
     private readonly ThemeService _themes;
     private readonly IAccountStore _accountStore;
     private readonly ICredentialVault _vault;
@@ -42,7 +46,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private DateTimeOffset? _lastChecked;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelectedAccount), nameof(ShowNeedsPassword), nameof(ShowAccountError), nameof(ShowConnecting))]
+    [NotifyPropertyChangedFor(nameof(HasSelectedAccount), nameof(ShowNeedsPassword), nameof(ShowNeedsSignIn), nameof(ShowAccountError), nameof(ShowConnecting))]
     private AccountViewModel? _selectedAccount;
 
     [ObservableProperty]
@@ -70,9 +74,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         AppPaths paths,
         AppMode mode,
         ILoggerFactory loggerFactory,
-        MailHealthViewModelFactory? mailHealth = null)
+        MailHealthViewModelFactory? mailHealth = null,
+        IMicrosoftAuth? microsoftAuth = null,
+        IDeliveryLog? deliveryLog = null)
     {
         _mailHealth = mailHealth;
+        _microsoftAuth = microsoftAuth ?? new UnconfiguredMicrosoftAuth("Microsoft sign-in is not available in this mode.");
+        _deliveryLog = deliveryLog;
         _settings = settings;
         _themes = themes;
         _accountStore = accountStore;
@@ -121,6 +129,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     public bool ShowWelcome => Accounts.Count == 0;
     public bool HasSelectedAccount => SelectedAccount is not null;
     public bool ShowNeedsPassword => SelectedAccount?.NeedsPassword == true;
+    public bool ShowNeedsSignIn => SelectedAccount?.NeedsSignIn == true;
+
+    public string MicrosoftSignInStatus => _microsoftAuth.IsConfigured
+        ? "Microsoft sign-in is available for Outlook.com, Hotmail and Microsoft 365 accounts."
+        : _microsoftAuth.ConfigurationProblem ?? "Microsoft sign-in is not available.";
     public bool ShowAccountError => SelectedAccount?.HasError == true && MessageList.Folder is null;
     public bool ShowConnecting => SelectedAccount?.IsConnecting == true && MessageList.Folder is null;
     public bool IsDraftsFolder => SelectedFolder?.Role == FolderRole.Drafts;
@@ -168,7 +181,34 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         {
             StatusText = "Automatic connection is off. Click Refresh to connect.";
         }
+        ApplyRefreshSchedule();
     }
+
+    /// <summary>
+    /// Manual refresh is the default: no timer exists. Only when the user chooses automatic checking in Settings does
+    /// a timer refresh the open folder every N minutes (skipped while a refresh is already running).
+    /// </summary>
+    public void ApplyRefreshSchedule()
+    {
+        _autoRefresh?.Stop();
+        _autoRefresh = null;
+        if (_lastChecked is not null)
+            UpdateStatusText();
+        var minutes = _settings.Current.AutomaticRefreshMinutes;
+        if (minutes <= 0)
+            return;
+        _autoRefresh = new DispatcherTimer { Interval = TimeSpan.FromMinutes(minutes) };
+        _autoRefresh.Tick += async (_, _) =>
+        {
+            if (RefreshCommand.CanExecute(null))
+                await RefreshCommand.ExecuteAsync(null);
+        };
+        _autoRefresh.Start();
+    }
+
+    /// <summary>Reconnects one account: Microsoft accounts sign in again; IMAP accounts reconnect with the stored password.</summary>
+    public Task ReconnectAccountAsync(AccountViewModel account) =>
+        account.IsMicrosoft && account.NeedsSignIn ? ReconnectMicrosoftAccountAsync(account) : ConnectAccountAsync(account);
 
     private AccountViewModel CreateAccountViewModel(MailAccount account)
     {
@@ -265,6 +305,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         var account = SelectedAccount;
         if (item is null || account?.Session is not { } session)
             return;
+        Reader.DefaultViewMode = _settings.Current.DefaultMessageView;
+        Reader.LoadRemoteImagesAutomatically = _settings.Current.LoadRemoteImagesAutomatically;
         await Reader.LoadAsync(session, item, SaveAttachmentAsync);
         RefreshCommandStates();
         if (Reader.Content is not null && Reader.Item == item && !item.IsRead && _settings.Current.MarkAsReadWhenOpened)
@@ -276,6 +318,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         if (sender != SelectedAccount || e.PropertyName != nameof(AccountViewModel.Status))
             return;
         OnPropertyChanged(nameof(ShowNeedsPassword));
+        OnPropertyChanged(nameof(ShowNeedsSignIn));
         OnPropertyChanged(nameof(ShowAccountError));
         OnPropertyChanged(nameof(ShowConnecting));
         RefreshCommandStates();
@@ -357,7 +400,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private void UpdateStatusText()
     {
         var checkedText = _lastChecked is { } t ? $"Last refreshed {t.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)} · " : "";
-        StatusText = checkedText + "Manual refresh (F5) — no automatic checking";
+        StatusText = checkedText + (_settings.Current.AutomaticRefreshMinutes > 0
+            ? $"Checked automatically every {_settings.Current.AutomaticRefreshMinutes} minutes · Refresh (F5) any time"
+            : "Manual refresh (F5) — no automatic checking");
     }
 
     // ---- message actions ----------------------------------------------------------------------
@@ -623,8 +668,43 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             Accounts.Add(avm);
             SelectedAccount = avm;
             await ConnectAccountAsync(avm);
-        });
+        }, onUseMicrosoft: AddMicrosoftAccountAsync);
         await _dialogs.ShowAccountSetupAsync(vm);
+    }
+
+    /// <summary>Outlook.com / Hotmail / Microsoft 365 through Microsoft sign-in in the system browser.</summary>
+    [RelayCommand]
+    private async Task AddMicrosoftAccountAsync()
+    {
+        var vm = new MicrosoftAccountViewModel(_microsoftAuth, _sessionFactory, async account =>
+        {
+            _accountStore.Save(Accounts.Select(a => a.Account).Append(account).ToList());
+            var avm = CreateAccountViewModel(account);
+            Accounts.Add(avm);
+            SelectedAccount = avm;
+            await ConnectAccountAsync(avm);
+        }, IsMicrosoftKeyInUse);
+        await _dialogs.ShowMicrosoftAccountAsync(vm);
+    }
+
+    private bool IsMicrosoftKeyInUse(string key) =>
+        Accounts.Any(a => a.Account.IsMicrosoft && string.Equals(a.Account.MicrosoftAccountId, key, StringComparison.Ordinal));
+
+    private async Task ReconnectMicrosoftAccountAsync(AccountViewModel account)
+    {
+        var vm = new MicrosoftAccountViewModel(_microsoftAuth, _sessionFactory, async updated =>
+        {
+            _accountStore.Save(Accounts.Select(a => a.Account.Id == updated.Id ? updated : a.Account).ToList());
+            if (account == SelectedAccount)
+            {
+                MessageList.Clear();
+                Reader.Clear();
+                SelectedFolder = null;
+            }
+            await account.UpdateAccountAsync(updated);
+            await ConnectAccountAsync(account);
+        }, IsMicrosoftKeyInUse, account.Account, RemoveAccountAsync);
+        await _dialogs.ShowMicrosoftAccountAsync(vm);
     }
 
     [RelayCommand]
@@ -644,10 +724,17 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     [RelayCommand]
     private Task EnterPasswordAsync() =>
-        SelectedAccount is null ? Task.CompletedTask : EditAccountAsync(SelectedAccount, $"Enter the password for {SelectedAccount.EmailAddress} to connect.");
+        SelectedAccount is null ? Task.CompletedTask
+        : SelectedAccount.IsMicrosoft ? ReconnectMicrosoftAccountAsync(SelectedAccount)
+        : EditAccountAsync(SelectedAccount, $"Enter the password for {SelectedAccount.EmailAddress} to connect.");
 
     public async Task EditAccountAsync(AccountViewModel account, string? message = null)
     {
+        if (account.IsMicrosoft)
+        {
+            await ReconnectMicrosoftAccountAsync(account);
+            return;
+        }
         var vm = new AccountSetupViewModel(_tester, _vault, async updated =>
         {
             _accountStore.Save(Accounts.Select(a => a.Account.Id == updated.Id ? updated : a.Account).ToList());
@@ -674,10 +761,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     /// </summary>
     public async Task<bool> RemoveAccountAsync(MailAccount account)
     {
+        var secretText = account.IsMicrosoft
+            ? "its Microsoft sign-in (the tokens HCG Mail keeps in your computer's protected storage) will be deleted"
+            : $"its saved password will be deleted from {_vault.StorageDescription}";
         if (!await _dialogs.ConfirmAsync(
                 "Remove this account?",
-                $"{account.EmailAddress} will be removed from HCG Mail on this computer, and its saved password will be deleted from {_vault.StorageDescription}.\n\n" +
-                "No email is deleted from the mail server — you can add the account again at any time. HCG Mail does not store message contents on this computer, so there are no local messages to delete. Your other accounts are not affected.",
+                $"{account.EmailAddress} will be removed from HCG Mail on this computer, {secretText}, and its send history on this computer will be cleared.\n\n" +
+                "No email is deleted from the mail server — you can add the account again at any time. HCG Mail does not store message contents on this computer, so there are no local messages to delete. Your other accounts are not affected." +
+                (account.IsMicrosoft ? " To also withdraw HCG Mail's access on Microsoft's side, remove it at account.microsoft.com (personal) or myapps.microsoft.com (work or school)." : ""),
                 "Remove account",
                 destructive: true))
             return false;
@@ -707,7 +798,33 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             await ShutDownAccountAsync(vm);
         }
 
-        // 3. Delete the stored password. A failure is reported honestly and retried at the next start.
+        // 3. Local data of the account: its send history, and (Microsoft) its tokens.
+        try
+        {
+            _deliveryLog?.Clear(account.Id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning(ex, "Could not clear send history of removed account {AccountId}", account.Id);
+        }
+        if (account.IsMicrosoft)
+        {
+            try
+            {
+                if (account.MicrosoftAccountId is { } key && !IsMicrosoftKeyInUse(key))
+                    await _microsoftAuth.SignOutAsync(key);
+                _notifications.Success("Account removed", $"{account.EmailAddress} and its Microsoft sign-in were removed from this computer. No email was deleted from the server.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not remove Microsoft tokens of account {AccountId}", account.Id);
+                _notifications.Warning("Account removed — sign-in not deleted",
+                    $"{account.EmailAddress} was removed, but its Microsoft sign-in could not be deleted from the protected token store ({ex.GetType().Name}).");
+            }
+            return true;
+        }
+
+        // 4. Delete the stored password. A failure is reported honestly and retried at the next start.
         var credentialsDeleted = await TryDeleteCredentialAsync(account.CredentialKey, account.Id);
         if (credentialsDeleted)
         {
@@ -825,6 +942,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     public async ValueTask DisposeAsync()
     {
+        _autoRefresh?.Stop();
         foreach (var account in Accounts)
             await account.DisposeAsync();
     }

@@ -1,0 +1,36 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: CID inline images
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <338085750@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/related; boundary="R2"
+
+--R2
+Content-Type: text/html; charset=us-ascii
+
+<html><body><p>Two inline images:</p>
+<img src="cid:Chart.A@example.com" alt="Chart A"> <img src="CID:chart.b@example.com" alt="Chart B">
+<p>End of message.</p></body></html>
+--R2
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-ID: <chart.a@example.com>
+
+iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAJElEQVR4nGM4oaExIIhh1OJRi0ct
+HrV41OJRi0ctHrV45FgMAK3qay69l+VGAAAAAElFTkSuQmCC
+--R2
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-ID: <chart.b@example.com>
+
+iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAJElEQVR4nGPQWGAzIIhh1OJRi0ct
+HrV41OJRi0ctHrV45FgMAAEDLK4uPVv7AAAAAElFTkSuQmCC
+--R2
+Content-Type: image/png; name="unused.png"
+Content-Transfer-Encoding: base64
+Content-ID: <unused@example.com>
+
+iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAADElEQVR4nGNgGB4AAADIAAGtQHYi
+AAAAAElFTkSuQmCC
+--R2--

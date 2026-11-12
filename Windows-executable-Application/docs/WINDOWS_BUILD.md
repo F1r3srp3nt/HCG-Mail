@@ -82,3 +82,10 @@ The workflow runs the test suite, runs `scripts/publish-windows.sh` on a GitHub-
 creates a pre-release with `HCGMail-<version>-win-x64.zip` and `SHA256SUMS.txt`. It builds Windows only;
 other operating-system versions are produced from the Windows build with HCG Executable Maker. The
 build is unsigned.
+
+## Microsoft sign-in client ID
+
+Builds include Microsoft sign-in only when a Microsoft application (client) ID is supplied:
+`HCG_MICROSOFT_CLIENT_ID=<GUID> scripts/publish-windows.sh`, or the repository variable `HCG_MICROSOFT_CLIENT_ID` for
+the release workflow. Without it, the app explains that Microsoft sign-in is not set up. See
+[MICROSOFT_ACCOUNTS.md](MICROSOFT_ACCOUNTS.md).

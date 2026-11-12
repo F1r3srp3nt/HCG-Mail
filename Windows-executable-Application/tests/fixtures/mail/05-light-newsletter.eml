@@ -1,0 +1,69 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: Light newsletter layout
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <3161166315@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="L5"
+
+--L5
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+View this email in your browser (https://example.com/view?u=3DTRACKINGTOKEN=
+&id=3D123)
+=CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=
+=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=
+=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=
+=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=
+=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =
+=CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=
+=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=
+=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=
+=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C=20
+
+** Weekly summary
+------------------------------------------------------------
+You had 3 meetings and 12 new messages this week.
+
+Unsubscribe: https://example.com/unsubscribe?u=3DTRACKINGTOKEN
+
+--L5
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<!DOCTYPE html><html><head><meta name=3D"viewport" content=3D"width=3Ddevic=
+e-width">
+<style>
+  body { margin:0; padding:0; background-color:#f4f4f4; font-family: Arial,=
+ sans-serif; }
+  .wrapper { width:100%; background-color:#f4f4f4; }
+  .content { width:600px; background-color:#ffffff; }
+  .muted { color:#6b7280; font-size:12px; }
+  @media only screen and (max-width: 620px) { .content { width:100% !import=
+ant; } }
+</style></head>
+<body style=3D"margin:0;padding:0;background-color:#f4f4f4;">
+<div style=3D"display:none;max-height:0;overflow:hidden;mso-hide:all;">Your=
+ weekly summary is ready=CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=
+=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=
+=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=
+=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =
+=CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=
+=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=
+=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=
+=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=
+=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C =CD=8F=E2=80=8C <=
+/div>
+<table class=3D"wrapper" width=3D"100%" cellpadding=3D"0" cellspacing=3D"0"=
+ role=3D"presentation"><tr><td align=3D"center">
+<table class=3D"content" width=3D"600" cellpadding=3D"24" cellspacing=3D"0"=
+ bgcolor=3D"#ffffff"><tr><td>
+<h1 style=3D"color:#111827;font-size:24px;margin:0 0 12px 0;">Weekly summar=
+y</h1>
+<p style=3D"color:#374151;font-size:15px;line-height:22px;">You had 3 meeti=
+ngs and 12 new messages this week.</p>
+<p class=3D"muted">You receive this because you subscribed. <a href=3D"http=
+s://example.com/unsubscribe?u=3DTRACKINGTOKEN">Unsubscribe</a></p>
+</td></tr></table></td></tr></table></body></html>
+--L5--

@@ -1,0 +1,34 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: Image-only promotion
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <472473594@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="P7"
+
+--P7
+Content-Type: text/plain; charset=utf-8
+
+[image: Autumn sale] <https://shop.example.com/?utm_source=mail&uid=TRACKINGTOKEN>
+Autumn sale – 30 % off everything this week.
+https://shop.example.com/?utm_source=mail&uid=TRACKINGTOKEN
+--P7
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGhlYWQ+PGxpbmsgcmVsPSJzdHlsZXNoZWV0IiBocmVmPSJodHRwczovL2Nkbi5leGFt
+cGxlLmNvbS9tYWlsLmNzcyI+CjxzdHlsZT5AaW1wb3J0IHVybCgiaHR0cHM6Ly9jZG4uZXhhbXBs
+ZS5jb20vZm9udHMuY3NzIik7IEBmb250LWZhY2UgeyBmb250LWZhbWlseTogWDsgc3JjOiB1cmwo
+aHR0cHM6Ly9jZG4uZXhhbXBsZS5jb20veC53b2ZmKTsgfQouaGVybyB7IGJhY2tncm91bmQtaW1h
+Z2U6IHVybCgnaHR0cHM6Ly9jZG4uZXhhbXBsZS5jb20vaGVyby1iZy5qcGcnKTsgfTwvc3R5bGU+
+PC9oZWFkPgo8Ym9keT48dGFibGUgd2lkdGg9IjYwMCIgYWxpZ249ImNlbnRlciI+PHRyPjx0ZCBj
+bGFzcz0iaGVybyIgc3R5bGU9ImJhY2tncm91bmQ6dXJsKGh0dHBzOi8vY2RuLmV4YW1wbGUuY29t
+L2JnMi5qcGcpICNmZmZmZmYiPgo8YSBocmVmPSJodHRwczovL3Nob3AuZXhhbXBsZS5jb20vP3V0
+bV9zb3VyY2U9bWFpbCZ1aWQ9VFJBQ0tJTkdUT0tFTiI+PGltZyBzcmM9Imh0dHBzOi8vY2RuLmV4
+YW1wbGUuY29tL2Jhbm5lci5qcGciIGFsdD0iQXV0dW1uIHNhbGUg4oCTIDMwICUgb2ZmIiB3aWR0
+aD0iNjAwIiBoZWlnaHQ9IjMwMCI+PC9hPgo8aW1nIHNyYz0iaHR0cHM6Ly90cmFjay5leGFtcGxl
+LmNvbS9vcGVuLmdpZj91PVRSQUNLSU5HVE9LRU4iIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGFsdD0i
+Ij4KPGltZyBzcmNzZXQ9Imh0dHBzOi8vY2RuLmV4YW1wbGUuY29tL2EuanBnIDF4LCBodHRwczov
+L2Nkbi5leGFtcGxlLmNvbS9hMi5qcGcgMngiIGFsdD0iU2Vjb25kIGJhbm5lciI+CjwvdGQ+PC90
+cj48L3RhYmxlPjwvYm9keT48L2h0bWw+
+--P7--

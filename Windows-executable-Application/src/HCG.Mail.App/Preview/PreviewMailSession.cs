@@ -79,6 +79,15 @@ public sealed class PreviewMailSession : IMailSession
         return new FolderPage(folderFullName, page, list.Count, list.Count(m => !m.Flags.HasFlag(MessageFlags.Seen)), UidValidity, skip + count < list.Count);
     }
 
+    public async Task<IReadOnlyList<MessageSummary>> SearchAsync(string folderFullName, string query, int maxResults, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(80, cancellationToken);
+        bool Match(string? s) => s?.Contains(query, StringComparison.CurrentCultureIgnoreCase) == true;
+        return Messages(folderFullName)
+            .Where(m => Match(m.Content.Subject) || Match(m.Content.From?.Address) || Match(m.Content.From?.Name) || Match(m.Content.TextBody))
+            .OrderByDescending(m => m.Content.Date).Take(maxResults).Select(ToSummary).ToList();
+    }
+
     public async Task<MessageContent> GetMessageAsync(MessageRef message, CancellationToken cancellationToken = default)
     {
         await Task.Delay(80, cancellationToken);

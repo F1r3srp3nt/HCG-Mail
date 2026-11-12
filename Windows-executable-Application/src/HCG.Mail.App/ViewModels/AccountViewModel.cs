@@ -14,6 +14,9 @@ public enum AccountStatus
 {
     Offline,
     NeedsPassword,
+
+    /// <summary>Microsoft account whose sign-in expired or was revoked: Reconnect signs in again.</summary>
+    NeedsSignIn,
     Connecting,
     Connected,
     Error,
@@ -27,7 +30,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
     private readonly ILogger _logger;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsConnected), nameof(IsConnecting), nameof(NeedsPassword), nameof(HasError), nameof(CanReconnect))]
+    [NotifyPropertyChangedFor(nameof(IsConnected), nameof(IsConnecting), nameof(NeedsPassword), nameof(NeedsSignIn), nameof(HasError), nameof(CanReconnect))]
     private AccountStatus _status = AccountStatus.Offline;
 
     [ObservableProperty] private string _statusText = "Not connected";
@@ -52,6 +55,11 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
     public bool IsConnected => Status == AccountStatus.Connected;
     public bool IsConnecting => Status == AccountStatus.Connecting;
     public bool NeedsPassword => Status == AccountStatus.NeedsPassword;
+    public bool NeedsSignIn => Status == AccountStatus.NeedsSignIn;
+    public bool IsMicrosoft => Account.IsMicrosoft;
+
+    /// <summary>How the account connects, shown in settings and the sending-account picker.</summary>
+    public string ProviderLabel => Account.IsMicrosoft ? "Microsoft account (Outlook.com / Microsoft 365)" : "IMAP / SMTP";
     public bool HasError => Status == AccountStatus.Error;
     public bool CanReconnect => Status is AccountStatus.Error or AccountStatus.Offline;
     public bool HasOtherFolders => OtherFolders.Count > 0;
@@ -65,6 +73,9 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
     /// <summary>Connects using the stored password. Returns false (and sets <see cref="NeedsPassword"/>) when none is stored.</summary>
     public async Task<bool> ConnectAsync()
     {
+        if (Account.IsMicrosoft)
+            return await ConnectWithAsync(""); // no password: delegated Microsoft tokens from the protected cache
+
         string? password;
         try
         {
@@ -83,6 +94,11 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
             return false;
         }
 
+        return await ConnectWithAsync(password);
+    }
+
+    private async Task<bool> ConnectWithAsync(string password)
+    {
         await DisposeSessionAsync();
         var session = _sessionFactory.Create(Account, password);
         session.StateChanged += OnSessionStateChanged;
@@ -98,7 +114,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         }
         catch (MailOperationException ex)
         {
-            SetStatus(AccountStatus.Error, ex.UserMessage);
+            SetStatus(ex.Kind == MailErrorKind.ReconnectRequired ? AccountStatus.NeedsSignIn : AccountStatus.Error, ex.UserMessage);
             return false;
         }
     }
@@ -150,6 +166,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(EmailAddress));
         OnPropertyChanged(nameof(Initials));
+        OnPropertyChanged(nameof(ProviderLabel));
         await DisposeSessionAsync();
         StandardFolders.Clear();
         OtherFolders.Clear();
@@ -158,6 +175,11 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
 
     public void ReportError(MailOperationException ex)
     {
+        if (ex.Kind == MailErrorKind.ReconnectRequired)
+        {
+            SetStatus(AccountStatus.NeedsSignIn, ex.UserMessage);
+            return;
+        }
         if (ex.IsTransient || ex.Kind is MailErrorKind.Authentication or MailErrorKind.Certificate or MailErrorKind.RevocationUnavailable or MailErrorKind.Tls)
             SetStatus(AccountStatus.Error, ex.UserMessage);
     }

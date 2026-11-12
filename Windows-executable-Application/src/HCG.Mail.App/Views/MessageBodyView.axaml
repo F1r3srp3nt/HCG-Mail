@@ -5,18 +5,25 @@
              x:Class="HCG.Mail.App.Views.MessageBodyView"
              x:DataType="vm:MessageReaderViewModel">
   <Panel>
-    <!-- Sanitized HTML on a light "paper" surface: most HTML email assumes a white background. -->
-    <Border Classes="paper" IsVisible="{Binding ShowHtmlView}">
-      <html:HtmlPanel x:Name="Html" Text="{Binding SanitizedHtml}" Background="{DynamicResource Hcg.Bg.Paper}"
+    <!-- Sanitized HTML on the email's own page colour (white unless the email sets one): the app theme never
+         leaks into message content, and message styles never reach the app. -->
+    <Border Classes="paper" IsVisible="{Binding ShowHtmlView}" Background="{Binding HtmlBackground}">
+      <html:HtmlPanel x:Name="Html" Text="{Binding SanitizedHtml}" Background="{Binding HtmlBackground}"
                       IsContextMenuEnabled="False" IsSelectionEnabled="True"
-                      BaseStylesheet="body { margin: 18px 22px; color: #1a1f24; font-size: 10.5pt; } a { color: #0b63a8; }" />
+                      BaseStylesheet="{Binding HtmlStylesheet}" />
     </Border>
 
     <!-- Plain text -->
     <ScrollViewer IsVisible="{Binding ShowTextView}" HorizontalScrollBarVisibility="Disabled">
-      <SelectableTextBlock Text="{Binding TextBody}" TextWrapping="Wrap" FontSize="14" LineHeight="22"
+      <SelectableTextBlock x:Name="PlainText" Text="{Binding TextBody}" TextWrapping="Wrap" FontSize="14" LineHeight="22"
                            Foreground="{DynamicResource Hcg.Text.Primary}" Margin="2,4,12,24"
                            SelectionBrush="{DynamicResource Hcg.Bg.Selected}" />
     </ScrollViewer>
+
+    <!-- A message that genuinely has no content -->
+    <StackPanel IsVisible="{Binding IsEmptyMessage}" Margin="2,10" Spacing="6">
+      <TextBlock x:Name="EmptyMessage" Text="{Binding EmptyMessageText}" Classes="muted" FontSize="13.5" />
+      <TextBlock Text="The sender's message contains no text or images." Classes="caption" />
+    </StackPanel>
   </Panel>
 </UserControl>

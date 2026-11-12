@@ -98,7 +98,13 @@
                 </StackPanel>
               </Button>
             </Grid>
-            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding CredentialStorage, StringFormat='Passwords are stored in: {0}'}" />
+            <TextBlock Classes="muted" TextWrapping="Wrap" Text="{Binding CredentialStorage, StringFormat='Passwords of IMAP accounts are stored in: {0}'}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding MicrosoftSignInStatus}" />
+              <Button Grid.Column="1" Classes="subtle" Margin="12,0,0,0" Content="Add Microsoft account" Command="{Binding AddMicrosoftAccountCommand}" />
+            </Grid>
+            <TextBlock Classes="caption" TextWrapping="Wrap"
+                       Text="Removing an account disconnects it and deletes its password or Microsoft sign-in and its send history from this computer. Mail on the server is never deleted, and HCG Mail keeps no copies of messages on this computer." />
             <ItemsControl ItemsSource="{Binding Accounts}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AccountViewModel">
@@ -110,14 +116,20 @@
                       <StackPanel Grid.Column="1" Margin="12,0" Spacing="2">
                         <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
                         <TextBlock Text="{Binding EmailAddress}" Classes="caption" />
-                        <TextBlock Classes="caption">
-                          <Run Text="{Binding Account.Imap.Host}" />
+                        <TextBlock Classes="caption" TextWrapping="Wrap">
+                          <Run Text="{Binding ProviderLabel}" />
                           <Run Text="·" />
                           <Run Text="{Binding StatusText}" />
                         </TextBlock>
                       </StackPanel>
-                      <Button Grid.Column="2" Classes="subtle" Content="Edit" VerticalAlignment="Center"
-                              Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).EditAccountCommand}" CommandParameter="{Binding}" />
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button Classes="subtle" Content="Reconnect" ToolTip.Tip="Connect again (Microsoft accounts: sign in again)"
+                                Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).ReconnectAccountCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="subtle" Content="Edit" IsVisible="{Binding !IsMicrosoft}"
+                                Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).EditAccountCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="subtle danger" Content="Remove"
+                                Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).RemoveAccountCommand}" CommandParameter="{Binding}" />
+                      </StackPanel>
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -135,8 +147,20 @@
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
               <StackPanel Spacing="8">
                 <TextBlock Classes="h3" Text="Checking for new messages" />
+                <ComboBox x:Name="RefreshChoice" ItemsSource="{Binding RefreshOptions}" SelectedItem="{Binding SelectedRefresh}" MinWidth="320" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="HCG Mail checks for new mail only when you click Refresh (F5), open a folder or start the app. It never polls your mail server in the background, which keeps server requests to a minimum." />
+                           Text="Manually (the default): HCG Mail checks for new mail only when you click Refresh (F5), open a folder or start the app, and never contacts the server in the background. Automatic: the open folder is also checked at the chosen interval while HCG Mail is running." />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Message display" />
+                <ComboBox x:Name="ViewModeChoice" ItemsSource="{Binding ViewModeOptions}" SelectedItem="{Binding SelectedViewMode}" MinWidth="320" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding SelectedViewMode.Description}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="You can switch any message between Original, Readable and Plain text above its text. Colours are never inverted." />
+                <ToggleSwitch x:Name="RemoteImagesToggle" IsChecked="{Binding LoadRemoteImagesAutomatically}" OnContent="Load remote images automatically" OffContent="Load remote images automatically" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Off (recommended): remote images are blocked until you choose Load remote images in a message. Loading them contacts the sender's servers, which learn that and when you opened the message and see your IP address. Images included in the message itself are always shown. Remote fonts, stylesheets and backgrounds are never loaded." />
               </StackPanel>
             </Border>
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">

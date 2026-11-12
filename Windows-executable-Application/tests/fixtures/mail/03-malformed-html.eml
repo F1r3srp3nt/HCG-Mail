@@ -1,0 +1,12 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: Malformed HTML
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <1349601991@example.com>
+MIME-Version: 1.0
+Content-Type: text/html
+Content-Transfer-Encoding: 8bit
+
+<meta charset="utf-8"><div><table><tr><td><p>Malformed <b>bold <i>overlap</b> still readable</i>
+<td>Second cell</table></div></span></div><p>Unclosed paragraph with ÆØÅ æøå
+<ul><li>one<li>two</ul>

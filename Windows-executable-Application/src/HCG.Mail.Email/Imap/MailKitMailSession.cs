@@ -109,6 +109,24 @@ public sealed class MailKitMailSession : IMailSession
             return new FolderPage(folder.FullName, messages, total, unseen.Count, folder.UidValidity, HasOlder: start > 0);
         }, retry: true, cancellationToken);
 
+    public Task<IReadOnlyList<MessageSummary>> SearchAsync(string folderFullName, string query, int maxResults, CancellationToken cancellationToken = default) =>
+        RunAsync<IReadOnlyList<MessageSummary>>(async (client, ct) =>
+        {
+            var folder = await GetFolderAsync(client, folderFullName, ct).ConfigureAwait(false);
+            if (!folder.IsOpen)
+                await folder.OpenAsync(FolderAccess.ReadWrite, ct).ConfigureAwait(false);
+            var text = query.Trim();
+            // Server-side search of the whole folder (IMAP SEARCH), not only the loaded page.
+            var search = SearchQuery.SubjectContains(text).Or(SearchQuery.FromContains(text)).Or(SearchQuery.BodyContains(text));
+            var uids = await folder.SearchAsync(search, ct).ConfigureAwait(false);
+            var newest = uids.OrderByDescending(u => u.Id).Take(Math.Max(1, maxResults)).ToList();
+            if (newest.Count == 0)
+                return [];
+            var fetched = await folder.FetchAsync(newest, new FetchRequest(SummaryItems), ct).ConfigureAwait(false);
+            return fetched.Where(s => s.UniqueId.IsValid).Select(s => ToSummary(s, folder))
+                .OrderByDescending(m => m.Date).ThenByDescending(m => m.Ref.Uid).ToList();
+        }, retry: true, cancellationToken);
+
     public Task<MessageContent> GetMessageAsync(MessageRef message, CancellationToken cancellationToken = default) =>
         RunAsync(async (client, ct) =>
         {
@@ -583,13 +601,7 @@ public sealed class MailKitMailSession : IMailSession
         };
     }
 
-    internal static string NormalizePreview(string? preview)
-    {
-        if (string.IsNullOrWhiteSpace(preview))
-            return "";
-        var collapsed = string.Join(' ', preview.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        return collapsed.Length > PreviewLength ? collapsed[..PreviewLength] + "…" : collapsed;
-    }
+    internal static string NormalizePreview(string? preview) => Html.PreviewText.Clean(preview, PreviewLength);
 
     // ---- sending ------------------------------------------------------------------------------
 

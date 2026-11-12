@@ -1,0 +1,9 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: HTML markup in a text/plain part
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <461199006@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+<p>Hello&nbsp;there,</p><p>Your <b>invoice</b> is attached.</p>

@@ -39,6 +39,17 @@ they are enforced in code, and the known limitations.
 * MailKit's protocol logger is **never enabled** — IMAP/SMTP transcripts include authentication data.
 * The connection test never sends a message; it signs in to SMTP and disconnects.
 
+## Microsoft accounts
+
+* Sign-in uses MSAL as a public client: authorization code flow with PKCE in the system browser; no client secret
+  is embedded; HCG Mail never sees the Microsoft password. Delegated scopes only: `User.Read`, `Mail.ReadWrite`,
+  `Mail.Send`. Microsoft access grants no HCG roles or permissions (HCG Connect remains authoritative).
+* Tokens live in MSAL's cache protected by the OS (DPAPI / Keychain / Secret Service); if that is unavailable
+  they stay in memory only — never in a plaintext file. Removing the account deletes them.
+* Graph calls use .NET's standard TLS validation with online revocation checking and no custom certificate
+  callback; the bearer token is only ever sent to `graph.microsoft.com` (absolute links to any other host are refused).
+* Writes (send, draft, move, delete) are never retried automatically. See [MICROSOFT_ACCOUNTS.md](MICROSOFT_ACCOUNTS.md).
+
 ## Credential storage
 
 `ICredentialVault` abstracts the OS store:
@@ -67,7 +78,10 @@ its stored password. Passwords are cleared from the account form after saving.
 4. **Links**: clicks are intercepted; a dialog shows the real host and full URL before the system
    browser is opened (can be turned off in Settings → Links). The renderer's own context menu is
    disabled because it could open links without that confirmation.
-5. A *Show plain text* toggle renders only the text version.
+5. **Original / Readable / Plain text** per message. Readable removes the sender's colours, fonts and styles;
+   nothing is inverted. Message styles are confined to the HTML view, whose page colour is the email's own `<body>`
+   colour or white — the app theme never reaches message content. See [MESSAGE_RENDERING.md](MESSAGE_RENDERING.md).
+6. Loading remote images automatically is an opt-in setting (off by default) with its privacy effect explained.
 
 ### Attachments
 Saved only on explicit request, written to `<name>.hcgpart` then renamed, never opened. Executable or

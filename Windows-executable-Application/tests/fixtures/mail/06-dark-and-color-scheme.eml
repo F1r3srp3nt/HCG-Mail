@@ -1,0 +1,27 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: Dark layout and color-scheme rules
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <1006898015@example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+<html><head><meta name=3D"color-scheme" content=3D"light dark"><meta name=
+=3D"supported-color-schemes" content=3D"light dark">
+<style>
+  :root { color-scheme: light dark; }
+  .card { background-color:#ffffff; color:#1f2937; }
+  .footer { color:#4b5563; }
+  @media (prefers-color-scheme: dark) {
+    .card { background-color:#111827 !important; color:#f9fafb !important; }
+    .footer { color:#e5e7eb !important; }
+    h2 { color:#ffffff !important; }
+  }
+</style></head><body>
+<table width=3D"100%" bgcolor=3D"#0f172a" cellpadding=3D"20"><tr><td style=
+=3D"color:#ffffff;font-size:20px;">Dark header block (white on navy)</td></=
+tr></table>
+<div class=3D"card" style=3D"padding:20px"><h2>Light card</h2><p>Body text =
+that must stay dark on white in the original view.</p></div>
+<p class=3D"footer">Footer text.</p></body></html>
