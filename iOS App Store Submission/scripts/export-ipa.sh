@@ -25,7 +25,7 @@ dotnet publish "$APP_PROJECT" -c Release -f "$TFM" -r ios-arm64 \
   -p:CodesignProvision="$HCG_IOS_PROVISIONING_PROFILE" \
   -p:ApplicationVersion="${HCG_IOS_BUILD_NUMBER:-1}" \
   -p:BuildIpa=true \
-  -o "$OUT" "${extra[@]}"
+  -o "$OUT" ${extra[@]+"${extra[@]}"}
 
 IPA="$(find "$OUT" -maxdepth 1 -name '*.ipa' | head -1)"
 [[ -f "$IPA" ]] || { echo "error: no .ipa produced in $OUT" >&2; exit 1; }
