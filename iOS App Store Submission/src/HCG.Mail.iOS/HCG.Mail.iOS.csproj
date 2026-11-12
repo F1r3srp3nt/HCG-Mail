@@ -22,6 +22,9 @@
     <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">1</ApplicationVersion>
 
     <CodesignEntitlements>Entitlements.plist</CodesignEntitlements>
+    <!-- Simulator builds carry the same entitlements, so they must be signed; ad-hoc signing ("-") needs no
+         certificate. Device builds always need a real identity (CodesignKey), passed by the scripts. -->
+    <CodesignKey Condition="'$(CodesignKey)' == '' And $(RuntimeIdentifier.StartsWith('iossimulator'))">-</CodesignKey>
     <!-- Trim only Apple SDK assemblies: the app uses dependency injection and compiled XAML that must keep its types. -->
     <TrimMode>partial</TrimMode>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
