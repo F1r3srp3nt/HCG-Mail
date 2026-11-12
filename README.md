@@ -53,7 +53,7 @@ code signing, installers and any store submission — see the
 
 ## iPhone and iPad
 
-Built with .NET for iOS and Avalonia using Apple's toolchain (Xcode 26.2, iOS workload 26.2.10233, .NET 10) — not a
+Built with .NET for iOS and Avalonia using Apple's toolchain (Xcode 26.3, iOS workload 26.2.10233, .NET 10) — not a
 SwiftUI/Xcode project. On a Mac:
 
 ```bash

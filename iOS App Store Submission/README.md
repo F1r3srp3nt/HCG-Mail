@@ -56,7 +56,7 @@ iOS App Store Submission/
 |---|---|---|
 | .NET SDK | 10.0 feature band 1xx (`10.0.100`, roll forward to the latest 1xx patch) | `global.json` |
 | .NET iOS workload | `Microsoft.NET.Sdk.iOS` manifest **26.2.10233** (iOS 26.2 SDK bindings) | `scripts/workload-rollback.json`, installed by `scripts/install-workload.sh` |
-| Xcode | **26.2** (required by that workload version) | CI selects `/Applications/Xcode_26.2.app` |
+| Xcode | **26.3** (the workload refuses to build with older Xcode) | CI selects `/Applications/Xcode_26.3.app` |
 | Minimum iOS | 16.0 (iPhone and iPad) | `SupportedOSPlatformVersion` in `HCG.Mail.iOS.csproj` |
 | Avalonia / Avalonia.iOS | 11.3.22 | `../Windows-executable-Application/Directory.Packages.props` + `Directory.Packages.props` here |
 | MailKit / MimeKit, HtmlSanitizer, MSAL.NET | 4.18.2, 9.2.1039, 4.91.1 | `../Windows-executable-Application/Directory.Packages.props` |
@@ -67,8 +67,8 @@ Xcode, update the workload manifest version in `scripts/workload-rollback.json` 
 ## Set up a Mac
 
 ```bash
-# 1. Xcode 26.2 from the App Store or developer.apple.com, then once:
-sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer   # or Xcode.app
+# 1. Xcode 26.3 from the App Store or developer.apple.com, then once:
+sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer   # or Xcode.app
 xcodebuild -runFirstLaunch
 # install an iOS 26 simulator runtime: Xcode → Settings → Components
 

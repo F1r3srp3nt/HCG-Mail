@@ -62,7 +62,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 75
     env:
-      XCODE_VERSION: '26.2'
+      XCODE_VERSION: '26.3'  # required by the pinned iOS workload 26.2.10233
     defaults:
       run:
         # bash -eo pipefail: a failing script must fail the step even when piped into tee.
@@ -72,6 +72,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Select Xcode ${{ env.XCODE_VERSION }}
         run: |
+          echo "Installed:"; ls -d /Applications/Xcode* || true
           app="/Applications/Xcode_${XCODE_VERSION}.app"
           if [ ! -d "$app" ]; then
             echo "Xcode ${XCODE_VERSION} is not installed on this runner. Installed:"; ls -d /Applications/Xcode* ; exit 1
