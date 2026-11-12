@@ -25,7 +25,8 @@ public static class IosMicrosoftAuth
 
     public static IMicrosoftAuth Create(Func<UIViewController?> parentController, ILogger logger)
     {
-        var clientId = MicrosoftAuthOptions.ResolveClientId(typeof(IosMicrosoftAuth).Assembly);
+        // Build-time value (-p:HcgMicrosoftClientId=…), compiled into HcgBuildInfo by HCG.Mail.iOS.csproj.
+        var clientId = HcgBuildInfo.MicrosoftClientId is { Length: > 0 } fromBuild ? fromBuild : null;
         if (!MicrosoftAuthOptions.IsValidClientId(clientId))
             return new UnconfiguredMicrosoftAuth(MicrosoftAuthOptions.NotConfiguredMessage);
 

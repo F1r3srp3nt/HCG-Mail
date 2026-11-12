@@ -46,6 +46,27 @@ public static class SelfTest
             Report("App data directory", true, platform.Paths.DataDirectory);
             Report("Settings never hold secrets", !File.Exists(platform.Paths.SettingsFile) || !File.ReadAllText(platform.Paths.SettingsFile).Contains("password", StringComparison.OrdinalIgnoreCase));
 
+            // JSON persistence under the iOS linker/AOT: settings and the account list round-trip.
+            var jsonDir = Path.Combine(Path.GetTempPath(), "hcg-selftest-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                var paths = new AppPaths(jsonDir);
+                var settingsStore = new HCG.Mail.Infrastructure.Storage.JsonAppSettingsStore(paths, Microsoft.Extensions.Logging.Abstractions.NullLogger<HCG.Mail.Infrastructure.Storage.JsonAppSettingsStore>.Instance);
+                var saved = settingsStore.Load() with { AutomaticRefreshMinutes = 15, MarkAsReadWhenOpened = false };
+                settingsStore.Save(saved);
+                var loaded = settingsStore.Load();
+                var accounts = new HCG.Mail.Infrastructure.Storage.JsonAccountStore(paths, Microsoft.Extensions.Logging.Abstractions.NullLogger<HCG.Mail.Infrastructure.Storage.JsonAccountStore>.Instance);
+                var account = HCG.Mail.App.Preview.PreviewMailSession.SampleAccount;
+                accounts.Save([account]);
+                Report("Settings and account list persist (JSON)", loaded.AutomaticRefreshMinutes == 15 && !loaded.MarkAsReadWhenOpened
+                                                                    && accounts.Load().SingleOrDefault() == account);
+            }
+            finally
+            {
+                if (Directory.Exists(jsonDir))
+                    Directory.Delete(jsonDir, true);
+            }
+
             var sanitized = new MailHtmlSanitizer().Sanitize(
                 "<p>Visible</p><script>alert(1)</script><img src=\"https://tracker.example/p.gif\"><a href=\"javascript:x()\">x</a><img src=\"cid:logo\">",
                 new HtmlSanitizeOptions(false));

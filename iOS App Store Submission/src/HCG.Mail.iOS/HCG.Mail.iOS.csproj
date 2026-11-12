@@ -52,8 +52,18 @@
   </ItemGroup>
 
   <!-- Microsoft application (client) ID for Outlook.com / Microsoft 365 sign-in. Public, not a secret.
-       Empty by default, which shows Microsoft sign-in as "not set up": pass -p:HcgMicrosoftClientId=<GUID>. -->
-  <ItemGroup>
-    <AssemblyMetadata Include="HcgMicrosoftClientId" Value="$(HcgMicrosoftClientId)" />
-  </ItemGroup>
+       Empty by default, which shows Microsoft sign-in as "not set up": pass -p:HcgMicrosoftClientId=<GUID>.
+       The iOS trimmer strips assembly metadata attributes, so the value is compiled into a constant instead. -->
+  <Target Name="HcgWriteBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <_HcgBuildInfoFile>$(IntermediateOutputPath)HcgBuildInfo.g.cs</_HcgBuildInfoFile>
+      <_HcgClientIdLiteral>$(HcgMicrosoftClientId.Trim().Replace('"', '""'))</_HcgClientIdLiteral>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_HcgBuildInfoFile)" Overwrite="true" WriteOnlyWhenDifferent="true"
+                      Lines="namespace HCG.Mail.iOS%3B;internal static class HcgBuildInfo { public const string MicrosoftClientId = @&quot;$(_HcgClientIdLiteral)&quot;%3B }" />
+    <ItemGroup>
+      <Compile Include="$(_HcgBuildInfoFile)" />
+      <FileWrites Include="$(_HcgBuildInfoFile)" />
+    </ItemGroup>
+  </Target>
 </Project>

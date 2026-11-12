@@ -39,23 +39,27 @@ public sealed class IosKeychainCredentialVault : ICredentialVault
 
     public Task SetAsync(string key, string secret, CancellationToken cancellationToken = default)
     {
-        using var value = NSData.FromArray(Encoding.UTF8.GetBytes(secret));
-        var changes = new SecRecord(SecKind.GenericPassword)
+        // SecItemUpdate rejects a dictionary that names the item class (errSecNoSuchAttr), so an existing item is
+        // replaced: add, and on errSecDuplicateItem remove the old item and add again.
+        var status = SecKeyChain.Add(NewItem(key, secret));
+        if (status == SecStatusCode.DuplicateItem)
         {
-            ValueData = value,
-            Accessible = SecAccessible.WhenUnlockedThisDeviceOnly,
-        };
-        var status = SecKeyChain.Update(Query(key), changes);
-        if (status == SecStatusCode.ItemNotFound)
-        {
-            var record = Query(key);
-            record.ValueData = value;
-            record.Accessible = SecAccessible.WhenUnlockedThisDeviceOnly;
-            status = SecKeyChain.Add(record);
+            var removed = SecKeyChain.Remove(Query(key));
+            if (removed is not (SecStatusCode.Success or SecStatusCode.ItemNotFound))
+                throw Fail("replace", removed);
+            status = SecKeyChain.Add(NewItem(key, secret));
         }
         if (status != SecStatusCode.Success)
             throw Fail("save", status);
         return Task.CompletedTask;
+    }
+
+    private static SecRecord NewItem(string key, string secret)
+    {
+        var record = Query(key);
+        record.ValueData = NSData.FromArray(Encoding.UTF8.GetBytes(secret));
+        record.Accessible = SecAccessible.WhenUnlockedThisDeviceOnly;
+        return record;
     }
 
     public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
