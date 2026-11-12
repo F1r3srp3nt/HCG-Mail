@@ -14,10 +14,12 @@
 ## Projects and dependencies
 
 ```
-HCG.Mail.App  ──►  HCG.Mail.Email  ──►  HCG.Mail.Core  ◄──  HCG.Mail.Infrastructure
-   (Avalonia)        (MailKit,           (no packages)        (OS vaults, JSON
-    MVVM, DI)         MimeKit,                                 stores, logging)
-                      HtmlSanitizer)
+HCG.Mail.App (desktop) ──┐
+                         ├──►  HCG.Mail.Presentation  ──►  HCG.Mail.Email  ──►  HCG.Mail.Core  ◄──  HCG.Mail.Infrastructure
+HCG.Mail.Mobile (iOS) ───┘      (Avalonia view models,       (MailKit,           (no packages)        (vaults, JSON
+  └ HCG.Mail.iOS                 theme, safe HTML view)       MimeKit, Graph,                          stores, MSAL,
+    (../iOS App Store                                         HtmlSanitizer)                           logging)
+     Submission/)
 ```
 
 | Project | Responsibility | Key types |
@@ -25,7 +27,9 @@ HCG.Mail.App  ──►  HCG.Mail.Email  ──►  HCG.Mail.Core  ◄──  HC
 | `HCG.Mail.Core` | Domain model and rules, free of UI/network/OS code | `MailAccount`, `AccountValidator`, `ProviderPresets`, `EmailAddressValidator`, `RecipientParser`, `FolderRoleMapper`, `ReplyBuilder`, `AttachmentFileNames`, contracts `IMailSession`, `IConnectionTester`, `ICredentialVault`, `IHtmlSanitizer` |
 | `HCG.Mail.Email` | MailKit/MimeKit implementation | `MailKitMailSession`, `ConnectionTester`, `MailClientFactory`, `TlsValidationRecorder`, `MailErrorTranslator`, `MimeConverter`, `MailHtmlSanitizer`, `HtmlToTextConverter` |
 | `HCG.Mail.Infrastructure` | Platform integration | `WindowsCredentialVault`, `MacKeychainCredentialVault`, `SessionCredentialVault`, `JsonAppSettingsStore`, `JsonAccountStore`, `FileLoggerProvider`, `AppPaths` |
-| `HCG.Mail.App` | Avalonia desktop app | `MainWindowViewModel`, `AccountViewModel`, `MessageListViewModel`, `MessageReaderViewModel`, `ComposeViewModel`, `AccountSetupViewModel`, `SettingsViewModel`, `ThemeService`, `DialogService`, views, `PreviewMailSession` |
+| `HCG.Mail.Presentation` | Platform-neutral UI shared by desktop and iOS (namespaces stay `HCG.Mail.App.*`) | `MainWindowViewModel` (the mailbox coordinator, despite its historical name), `AccountViewModel`, `MessageListViewModel`, `MessageReaderViewModel`, `ComposeViewModel`, `AccountSetupViewModel`, `SettingsViewModel`, `MailHealthViewModel`, `MicrosoftAccountViewModel`, `ThemeService`, `RemoteImageLoader`, `SafeLinkOpener`, `MessageHtmlBridge`, `MessageBodyView`, theme resources, `PreviewMailSession`; interfaces `IUserPrompts`, `IDialogService`, `INotificationService`, `ILinkOpener` |
+| `HCG.Mail.App` | Avalonia desktop app (Windows, macOS) | windows and panes, `DialogService`, `NotificationService`, `LinkOpener`, `AppServices` composition root, `Program` |
+| `HCG.Mail.Mobile`, `HCG.Mail.iOS` | iPhone/iPad app in [`../iOS App Store Submission/`](../../iOS%20App%20Store%20Submission/) | mobile shell and pages; Keychain vault, MSAL iOS adapter, share sheet |
 
 Core contains no MailKit types, so the UI and tests depend only on Core abstractions; MailKit could be
 replaced without touching view models.
@@ -88,7 +92,10 @@ way. Graph message bodies are fetched as MIME and reuse `MimeConverter`. See [MI
 
 * CommunityToolkit.Mvvm source generators (`[ObservableProperty]`, `[RelayCommand]`), compiled
   Avalonia bindings everywhere.
-* `MainWindowViewModel` orchestrates; `MessageListViewModel` owns the centre pane (newest-first list,
+* `MainWindowViewModel` (in `HCG.Mail.Presentation`) orchestrates on every platform; desktop windows and the iOS
+  shell only present it. Platform differences go through `IDialogService`/`IUserPrompts` (windows vs. sheets),
+  `INotificationService`, `ILinkOpener` (`SafeLinkOpener` holds the shared link policy) and the HTML control
+  (`MessageHtmlBridge` attaches the same load interception to the desktop `HtmlPanel` and the mobile `HtmlLabel`); `MessageListViewModel` owns the centre pane (newest-first list,
   client-side search, minimal-diff refresh via `CollectionSync` so selection survives refreshes);
   `MessageReaderViewModel` owns the reader; `ComposeViewModel` runs in its own non-modal window.
 * Commands are disabled when they cannot run (no "decorative" buttons): e.g. Archive is disabled when

@@ -1,0 +1,4 @@
+<Project>
+  <!-- Same build-time privacy rule as the desktop projects (no Avalonia build telemetry). -->
+  <Import Project="$(MSBuildThisFileDirectory)../Windows-executable-Application/Directory.Build.targets" />
+</Project>

@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.Mobile.ViewModels"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.Mobile.Views.WelcomeView"
+             x:DataType="vm:MobileShellViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled" Background="{DynamicResource Hcg.Bg.App}">
+    <StackPanel MaxWidth="520" Margin="24,40,24,24" Spacing="16" VerticalAlignment="Center">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <Border Background="{DynamicResource Hcg.Brush.LogoBacking}" CornerRadius="7" Padding="{DynamicResource Hcg.LogoPadding}" VerticalAlignment="Center">
+          <Image Source="avares://HCG.Mail.Mobile/Assets/hcg-logo.png" Height="{DynamicResource Hcg.LogoHeight}" Stretch="Uniform"
+                 RenderOptions.BitmapInterpolationMode="HighQuality" AutomationProperties.Name="Hakmi Capital Group" />
+        </Border>
+        <StackPanel VerticalAlignment="Center" Spacing="1">
+          <TextBlock Classes="wordmark" Text="HCG MAIL" FontSize="18" />
+          <TextBlock Text="HAKMI CAPITAL GROUP" FontSize="9.5" LetterSpacing="1.6" FontWeight="SemiBold" Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+        </StackPanel>
+      </StackPanel>
+      <Rectangle Height="1" Fill="{DynamicResource Hcg.Brush.AccentLine}" />
+      <TextBlock Classes="largeTitle" Text="Welcome to HCG Mail" TextWrapping="Wrap" />
+      <TextBlock Classes="body" Foreground="{DynamicResource Hcg.Text.Secondary}"
+                 Text="Connect your existing email account with IMAP and SMTP — for example domain email such as Domene.no — or sign in with a Microsoft account (Outlook.com, Hotmail, Microsoft 365). No HCG account is required." />
+      <Grid ColumnDefinitions="Auto,*">
+        <controls:IconView Data="{StaticResource Icon.Shield}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Top" />
+        <TextBlock Grid.Column="1" Classes="caption" FontSize="14" TextWrapping="Wrap" Margin="10,0,0,0"
+                   Text="Encrypted connections only, with full certificate checks. Passwords are kept in the iOS Keychain on this device." />
+      </Grid>
+      <Button x:Name="AddAccountButton" Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding Mail.AddAccountCommand}" Margin="0,8,0,0">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <controls:IconView Data="{StaticResource Icon.Plus}" Width="18" Height="18" StrokeThickness="2" />
+          <TextBlock Text="Add email account" VerticalAlignment="Center" FontSize="16" />
+        </StackPanel>
+      </Button>
+      <Button x:Name="AddMicrosoftAccountButton" Classes="subtle" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+              Command="{Binding Mail.AddMicrosoftAccountCommand}" Content="Add Microsoft account" />
+      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Mail.MicrosoftSignInStatus}" />
+      <Button Classes="link" HorizontalAlignment="Center" Content="Settings" Command="{Binding Mail.OpenSettingsCommand}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

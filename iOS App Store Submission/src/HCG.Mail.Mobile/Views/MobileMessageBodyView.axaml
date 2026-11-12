@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.App.ViewModels"
+             xmlns:html="using:TheArtOfDev.HtmlRenderer.Avalonia"
+             x:Class="HCG.Mail.Mobile.Views.MobileMessageBodyView"
+             x:DataType="vm:MessageReaderViewModel">
+  <Panel>
+    <!-- Sanitized HTML on the email's own page colour. HtmlLabel grows to the content's height so the whole reader
+         scrolls with one finger, like a native mail app. Fixed-width layouts wider than the screen (newsletters) are
+         shrunk to fit, like iOS Mail; very wide ones are shrunk to a readable minimum and can be panned sideways.
+         All loads go through MessageHtmlBridge. -->
+    <Border Classes="paper" IsVisible="{Binding ShowHtmlView}" Background="{Binding HtmlBackground}" CornerRadius="10" ClipToBounds="True">
+      <ScrollViewer x:Name="HtmlScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <LayoutTransformControl x:Name="HtmlZoom" HorizontalAlignment="Left">
+          <html:HtmlLabel x:Name="Html" Text="{Binding SanitizedHtml}" Background="{Binding HtmlBackground}"
+                          AutoSize="False" AutoSizeHeightOnly="True" HorizontalAlignment="Left"
+                          IsContextMenuEnabled="False" IsSelectionEnabled="False"
+                          BaseStylesheet="{Binding HtmlStylesheet}" />
+        </LayoutTransformControl>
+      </ScrollViewer>
+    </Border>
+
+    <!-- Plain text (also the fallback when formatting fails) -->
+    <SelectableTextBlock x:Name="PlainText" IsVisible="{Binding ShowTextView}" Text="{Binding TextBody}" TextWrapping="Wrap"
+                         FontSize="16" LineHeight="24" Foreground="{DynamicResource Hcg.Text.Primary}" Margin="2,4,2,24"
+                         SelectionBrush="{DynamicResource Hcg.Bg.Selected}" />
+
+    <StackPanel IsVisible="{Binding IsEmptyMessage}" Margin="2,10" Spacing="6">
+      <TextBlock x:Name="EmptyMessage" Text="{Binding EmptyMessageText}" Classes="muted" FontSize="15" TextWrapping="Wrap" />
+      <TextBlock Text="The sender's message contains no text or images." Classes="caption" TextWrapping="Wrap" />
+    </StackPanel>
+  </Panel>
+</UserControl>

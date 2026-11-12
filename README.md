@@ -15,18 +15,20 @@ messages by default.
 | [`Windows Store app/`](Windows%20Store%20app/) | Future Microsoft Store distribution (MSIX packaging, Store identity, assets, certification). | 🕓 Reserved — not started |
 | [`Mac OS executable Application/`](Mac%20OS%20executable%20Application/) | Future directly distributed macOS version (`.app` bundle, Apple Silicon, Developer ID signing, notarization, DMG/PKG). | 🕓 Reserved — not started |
 | [`Mac AppStore Submission/`](Mac%20AppStore%20Submission/) | Future Mac App Store distribution (App Sandbox, entitlements, App Store Connect, privacy disclosures). | 🕓 Reserved — not started |
-| [`iOS App Store Submission/`](iOS%20App%20Store%20Submission/) | Future App Store distribution for iPhone/iPad (App Store Connect, review, privacy labels). | 🕓 Reserved — not started |
-| [`iOS Executable/`](iOS%20Executable/) | Future directly installed iOS build (TestFlight / ad-hoc). | 🕓 Reserved — not started |
+| [`iOS App Store Submission/`](iOS%20App%20Store%20Submission/) | **HCG Mail for iPhone and iPad**: the .NET for iOS app (Avalonia), its mobile interface, Keychain/MSAL/share-sheet platform code, app icon catalog, Info.plist, entitlements, tests and build/export scripts. Reuses the mail engine and view models from `Windows-executable-Application/src`. | 🧪 **Implemented, not yet device-tested** — see its README |
+| [`iOS Executable/`](iOS%20Executable/) | Instructions for installing that same iOS app outside the App Store (development, ad-hoc, TestFlight). No source. | 📄 Instructions |
 | [`Google Play Submission/`](Google%20Play%20Submission/) | Future Google Play distribution (Play Console, Data safety, signing). | 🕓 Reserved — not started |
 | [`Android Executable/`](Android%20Executable/) | Future directly installed Android build (APK/AAB). | 🕓 Reserved — not started |
 | [`Linux Store Submission/`](Linux%20Store%20Submission/) | Future Linux store distribution (Flathub / Snap Store). | 🕓 Reserved — not started |
 | [`Linux Terminal Only/`](Linux%20Terminal%20Only/) | Future terminal (text-mode) edition reusing the same mail libraries. | 🕓 Reserved — not started |
 | [`Linux UI/`](Linux%20UI/) | Future graphical Linux desktop build (AppImage / .deb). | 🕓 Reserved — not started |
 
-There is exactly **one** implementation of the email client, in `Windows-executable-Application/`.
-The other folders are reserved for distributions on other platforms and stores. Those builds are
-produced from the Windows application with HCG Executable Maker; the folders hold only
-platform-specific packaging, signing and store configuration, not separate email clients.
+There is exactly **one** implementation of the email client: the mail engine and view models in
+`Windows-executable-Application/src/`. The iOS app in `iOS App Store Submission/` is a second *head* on that same
+code — it adds only the iPhone/iPad screens and the iOS platform code and references everything else. The other
+folders are reserved for distributions on other platforms and stores; those builds are produced from the
+application with HCG Executable Maker, and the folders hold only platform-specific packaging, signing and store
+configuration, not separate email clients.
 
 ## What is implemented today
 
@@ -42,11 +44,29 @@ Inside `Windows-executable-Application/` (details in its [README](Windows-execut
 * HCG Future and HCG Classic skins with the official HCG logo and HCG Mail application icon
 * Unit, headless UI and opt-in end-to-end tests against a disposable local mail server
 
-Not yet done: testing on real Windows hardware and a real Mac, real Domene.no mailbox testing, code
-signing, installers and any store submission — see the
+The iPhone/iPad app (in `iOS App Store Submission/`) offers the same features with touch navigation and adaptive
+iPad layouts.
+
+Not yet done: testing on real Windows hardware, a real Mac and a real iPhone/iPad, real Domene.no mailbox testing,
+code signing, installers and any store submission — see the
 [roadmap](Windows-executable-Application/docs/ROADMAP.md).
 
-## Build and run
+## iPhone and iPad
+
+Built with .NET for iOS and Avalonia using Apple's toolchain (Xcode 26.3, iOS workload 26.2.10233, .NET 10) — not a
+SwiftUI/Xcode project. On a Mac:
+
+```bash
+cd "HCG-Mail/iOS App Store Submission"
+scripts/install-workload.sh && scripts/check-prerequisites.sh
+scripts/run-simulator.sh                  # build and start in the iPhone simulator
+dotnet test tests/HCG.Mail.Mobile.Tests   # headless iPhone/iPad UI tests (any OS)
+```
+
+Device signing, the Release `.ipa` (never uploaded automatically), Microsoft sign-in setup and the current test
+status are in the [iOS README](iOS%20App%20Store%20Submission/README.md).
+
+## Build and run (desktop)
 
 Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (macOS: `brew install --cask dotnet-sdk`).
 

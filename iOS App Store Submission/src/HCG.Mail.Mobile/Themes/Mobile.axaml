@@ -1,0 +1,98 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:HCG.Mail.App.Controls">
+  <!--
+    Touch adjustments on top of the shared HCG styles: every tappable control is at least 44×44 points (Apple's
+    minimum), body text is 16 pt, and text fields use 16 pt so typing is comfortable. Colours come only from the
+    shared palette.
+  -->
+  <Style Selector="Button">
+    <Setter Property="MinHeight" Value="44" />
+  </Style>
+  <Style Selector="Button.icon, Button.nav">
+    <Setter Property="MinWidth" Value="44" />
+    <Setter Property="MinHeight" Value="44" />
+  </Style>
+  <Style Selector="Button.icon controls|IconView, Button.nav controls|IconView">
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+  </Style>
+  <Style Selector="Button.link">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="FontSize" Value="15" />
+  </Style>
+  <Style Selector="TextBox">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBox.multiline">
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="FontSize" Value="16" />
+  </Style>
+  <Style Selector="CheckBox, ToggleSwitch">
+    <Setter Property="MinHeight" Value="44" />
+    <Setter Property="FontSize" Value="16" />
+  </Style>
+  <Style Selector="TextBlock.body">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="LineHeight" Value="23" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="TextBlock.navTitle">
+    <Setter Property="FontSize" Value="17" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.largeTitle">
+    <Setter Property="FontSize" Value="30" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="TextBlock.formLabel">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+    <Setter Property="Margin" Value="2,0,0,6" />
+  </Style>
+
+  <!-- Navigation bar at the top of every screen and sheet -->
+  <Style Selector="Border.navBar">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.TitleBar}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Subtle}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="MinHeight" Value="52" />
+  </Style>
+  <Style Selector="Border.navBar Button">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <!-- Bottom toolbar (reader actions, list actions) -->
+  <Style Selector="Border.bottomBar">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.TitleBar}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Subtle}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="4,2" />
+  </Style>
+  <Style Selector="Border.group">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Card}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Subtle}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="14,10" />
+  </Style>
+  <Style Selector="ListBox.messages ListBoxItem, ListBox.nav ListBoxItem">
+    <Setter Property="MinHeight" Value="48" />
+  </Style>
+
+</Styles>

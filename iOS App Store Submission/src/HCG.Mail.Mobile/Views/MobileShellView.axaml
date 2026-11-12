@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.Mobile.ViewModels"
+             xmlns:app="using:HCG.Mail.App.ViewModels"
+             xmlns:views="using:HCG.Mail.Mobile.Views"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.Mobile.Views.MobileShellView"
+             x:DataType="vm:MobileShellViewModel"
+             Background="{DynamicResource Hcg.Bg.TitleBar}"
+             FontFamily="{DynamicResource Hcg.Font}">
+  <UserControl.Styles>
+    <Style Selector="Border.bannerCard">
+      <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Elevated}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Strong}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="BoxShadow" Value="{DynamicResource Hcg.Shadow.Card}" />
+    </Style>
+    <Style Selector="Border.bannerCard.success">
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Success}" />
+    </Style>
+    <Style Selector="Border.bannerCard.warning">
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Warning}" />
+    </Style>
+    <Style Selector="Border.bannerCard.error">
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Danger}" />
+    </Style>
+    <Style Selector="Border#SheetFrame.card">
+      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="ClipToBounds" Value="True" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Strong}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BoxShadow" Value="{DynamicResource Hcg.Shadow.Card}" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- Text size: the whole interface is scaled by the iOS text-size factor; layout is chosen from the scaled width. -->
+  <LayoutTransformControl x:Name="Zoom">
+    <Panel x:Name="Root">
+
+      <!-- Mail -->
+      <Panel x:Name="MailArea" Margin="{Binding ContentPadding}">
+        <views:WelcomeView x:Name="Welcome" IsVisible="{Binding Mail.ShowWelcome}" />
+        <Grid x:Name="Panes" IsVisible="{Binding Mail.HasAccounts}">
+          <views:MailboxesView x:Name="MailboxesPane" IsVisible="{Binding ShowMailboxesPane}" />
+          <views:MessageListView x:Name="ListPane" IsVisible="{Binding ShowListPane}" />
+          <views:ReaderView x:Name="ReaderPane" IsVisible="{Binding ShowReaderPane}" />
+          <!-- iPad portrait: tap outside the mailboxes slide-over to close it -->
+          <Border x:Name="SidebarScrim" Background="{DynamicResource Hcg.Bg.Overlay}" IsVisible="{Binding IsSidebarOpen}" />
+        </Grid>
+      </Panel>
+
+      <!-- Sheets: compose, account setup, Microsoft sign-in, settings, Mail Health -->
+      <Panel x:Name="SheetLayer" IsVisible="{Binding Overlays.HasSheet}">
+        <Border Background="{DynamicResource Hcg.Bg.Overlay}" IsVisible="{Binding ShowSheetAsCard}" />
+        <Border x:Name="SheetFrame" Classes.card="{Binding ShowSheetAsCard}" Background="{DynamicResource Hcg.Bg.Reader}">
+          <ContentControl x:Name="SheetContent" Content="{Binding Overlays.CurrentSheet}">
+            <ContentControl.DataTemplates>
+              <DataTemplate DataType="app:ComposeViewModel"><views:ComposeView /></DataTemplate>
+              <DataTemplate DataType="app:AccountSetupViewModel"><views:AccountSetupView /></DataTemplate>
+              <DataTemplate DataType="app:MicrosoftAccountViewModel"><views:MicrosoftAccountView /></DataTemplate>
+              <DataTemplate DataType="app:SettingsViewModel"><views:SettingsView /></DataTemplate>
+              <DataTemplate DataType="app:MailHealthViewModel"><views:MailHealthView /></DataTemplate>
+            </ContentControl.DataTemplates>
+          </ContentControl>
+        </Border>
+      </Panel>
+
+      <!-- Alert -->
+      <Panel x:Name="PromptLayer" IsVisible="{Binding Overlays.HasPrompt}">
+        <Border Background="{DynamicResource Hcg.Bg.Overlay}" />
+        <Border x:Name="PromptCard" Classes="card" MaxWidth="400" Margin="28" Padding="20,18" VerticalAlignment="Center" HorizontalAlignment="Stretch"
+                DataContext="{Binding Overlays.Prompt}" x:DataType="vm:PromptViewModel">
+          <StackPanel Spacing="12">
+            <TextBlock x:Name="PromptTitle" Text="{Binding Title}" Classes="h3" FontSize="18" TextWrapping="Wrap" TextAlignment="Center" />
+            <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
+              <TextBlock x:Name="PromptMessage" Text="{Binding Message}" FontSize="15" TextWrapping="Wrap" TextAlignment="Center"
+                         Foreground="{DynamicResource Hcg.Text.Secondary}" />
+            </ScrollViewer>
+            <Button x:Name="PromptPrimary" Classes="primary" Classes.danger="{Binding IsDestructive}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Content="{Binding PrimaryText}" Command="{Binding PrimaryCommand}" />
+            <Button x:Name="PromptSecondary" Classes="subtle" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Content="{Binding SecondaryText}" Command="{Binding SecondaryCommand}" IsVisible="{Binding HasSecondary}" />
+            <Button x:Name="PromptCancel" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Content="{Binding CancelText}" Command="{Binding CancelCommand}" />
+          </StackPanel>
+        </Border>
+      </Panel>
+
+      <!-- Banner -->
+      <Border x:Name="BannerHost" VerticalAlignment="Top" HorizontalAlignment="Stretch" MaxWidth="560" IsVisible="{Binding Overlays.HasBanner}">
+        <Button x:Name="BannerButton" Classes="ghost" Padding="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                Command="{Binding Overlays.ActivateBannerCommand}" AutomationProperties.Name="Notification">
+          <Border Classes="bannerCard" Classes.success="{Binding Overlays.Banner.IsSuccess}" Classes.warning="{Binding Overlays.Banner.IsWarning}"
+                  Classes.error="{Binding Overlays.Banner.IsError}" Padding="14,10">
+            <StackPanel Spacing="2">
+              <TextBlock x:Name="BannerTitle" Text="{Binding Overlays.Banner.Title}" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" />
+              <TextBlock x:Name="BannerMessage" Text="{Binding Overlays.Banner.Message}" FontSize="14" TextWrapping="Wrap" Foreground="{DynamicResource Hcg.Text.Secondary}" />
+            </StackPanel>
+          </Border>
+        </Button>
+      </Border>
+    </Panel>
+  </LayoutTransformControl>
+</UserControl>

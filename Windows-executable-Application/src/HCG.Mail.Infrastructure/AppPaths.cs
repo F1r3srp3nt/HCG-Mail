@@ -26,7 +26,8 @@ public sealed class AppPaths
         string dir;
         if (OperatingSystem.IsWindows())
             dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HCG", "HCG Mail");
-        else if (OperatingSystem.IsMacOS())
+        else if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+            // On iOS the home directory is the app's sandbox container.
             dir = Path.Combine(home, "Library", "Application Support", "HCG Mail");
         else
         {

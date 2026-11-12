@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.Mobile.ViewModels"
+             xmlns:app="using:HCG.Mail.App.ViewModels"
+             xmlns:views="using:HCG.Mail.Mobile.Views"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.Mobile.Views.ReaderView"
+             x:DataType="vm:MobileShellViewModel">
+  <UserControl.Styles>
+    <Style Selector="Border.attachment.dangerous">
+      <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Warning}" />
+    </Style>
+    <Style Selector="Border.bottomBar Button.icon">
+      <Setter Property="MinWidth" Value="46" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource Hcg.Bg.Reader}">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <!-- Navigation bar -->
+      <Border Classes="navBar">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <Button x:Name="BackButton" Classes="nav" Command="{Binding BackToMessagesCommand}" IsVisible="{Binding IsCompact}" AutomationProperties.Name="Back to messages">
+            <TextBlock Text="{Binding Mail.MessageList.FolderTitle, StringFormat='‹ {0}'}" Foreground="{DynamicResource Hcg.Text.Accent}" FontSize="16"
+                       MaxWidth="220" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          </Button>
+          <Button Grid.Column="2" Classes="primary" Command="{Binding Mail.EditDraftCommand}" IsVisible="{Binding Mail.IsDraftsFolder}" Margin="0,0,6,0">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <controls:IconView Data="{StaticResource Icon.Compose}" Width="16" Height="16" />
+              <TextBlock Text="Edit draft" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </Border>
+
+      <Panel Grid.Row="1">
+        <!-- Nothing selected (iPad) -->
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" IsVisible="{Binding Mail.Reader.ShowPlaceholder}">
+          <Border Width="64" Height="64" CornerRadius="32" Background="{DynamicResource Hcg.Bg.AccentSoft}" HorizontalAlignment="Center">
+            <controls:IconView Data="{StaticResource Icon.MailOpen}" Width="28" Height="28" Foreground="{DynamicResource Hcg.Accent}" />
+          </Border>
+          <TextBlock Text="Select a message to read" Classes="h3" HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding Mail.Reader.IsLoading}" VerticalAlignment="Top" Margin="20" Spacing="10">
+          <ProgressBar IsIndeterminate="True" Height="2" MinHeight="2" />
+          <TextBlock Text="Loading message…" Classes="caption" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding Mail.Reader.HasError}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" Margin="24">
+          <controls:IconView Data="{StaticResource Icon.Warning}" Width="32" Height="32" Foreground="{DynamicResource Hcg.Danger}" />
+          <TextBlock Text="The message could not be opened" Classes="h3" HorizontalAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Mail.Reader.ErrorMessage}" Classes="body" TextAlignment="Center" />
+          <Button Classes="subtle" Content="Retry" Command="{Binding Mail.Reader.RetryCommand}" HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <!-- Message: header and body scroll together -->
+        <ScrollViewer x:Name="MessageScroller" IsVisible="{Binding Mail.Reader.HasMessage}" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="16,14,16,24" Spacing="12">
+            <SelectableTextBlock x:Name="SubjectText" Text="{Binding Mail.Reader.Subject}" FontSize="22" FontWeight="SemiBold" TextWrapping="Wrap"
+                                 Foreground="{DynamicResource Hcg.Text.Primary}" />
+            <Grid ColumnDefinitions="Auto,*">
+              <Border Width="42" Height="42" CornerRadius="21" Background="{DynamicResource Hcg.Brush.Avatar}" VerticalAlignment="Top">
+                <TextBlock Text="{Binding Mail.Reader.Initials}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="3">
+                <SelectableTextBlock Text="{Binding Mail.Reader.FromName}" FontWeight="SemiBold" FontSize="16" TextWrapping="Wrap"
+                                     Foreground="{DynamicResource Hcg.Text.Primary}" />
+                <SelectableTextBlock Text="{Binding Mail.Reader.FromAddress}" FontSize="14" TextWrapping="Wrap" Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+                <SelectableTextBlock Text="{Binding Mail.Reader.ToLine, StringFormat='To: {0}'}" FontSize="14" TextWrapping="Wrap"
+                                     Foreground="{DynamicResource Hcg.Text.Secondary}" />
+                <SelectableTextBlock Text="{Binding Mail.Reader.CcLine, StringFormat='Cc: {0}'}" FontSize="14" TextWrapping="Wrap"
+                                     Foreground="{DynamicResource Hcg.Text.Secondary}" IsVisible="{Binding Mail.Reader.HasCc}" />
+                <TextBlock Text="{Binding Mail.Reader.DateText}" Classes="caption" />
+              </StackPanel>
+            </Grid>
+
+            <!-- Original / Readable / Plain text -->
+            <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding Mail.Reader.HasHtml}">
+              <Button x:Name="OriginalModeButton" Classes="segment" Classes.selected="{Binding Mail.Reader.IsOriginalMode}" Content="Original"
+                      Command="{Binding Mail.Reader.SetModeCommand}" CommandParameter="{x:Static app:ReaderBodyMode.Original}" />
+              <Button x:Name="ReadableModeButton" Classes="segment" Classes.selected="{Binding Mail.Reader.IsReadableMode}" Content="Readable"
+                      Command="{Binding Mail.Reader.SetModeCommand}" CommandParameter="{x:Static app:ReaderBodyMode.Readable}" />
+              <Button x:Name="PlainTextModeButton" Classes="segment" Classes.selected="{Binding Mail.Reader.IsPlainTextMode}" Content="Plain text"
+                      Command="{Binding Mail.Reader.SetModeCommand}" CommandParameter="{x:Static app:ReaderBodyMode.PlainText}" />
+            </StackPanel>
+
+            <!-- Notices -->
+            <Border Classes="banner" IsVisible="{Binding Mail.Reader.ShowRemoteBanner}">
+              <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="Auto,*">
+                  <controls:IconView Data="{StaticResource Icon.Shield}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Top" />
+                  <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="2">
+                    <TextBlock Text="{Binding Mail.Reader.RemoteBannerText}" FontSize="14" TextWrapping="Wrap" />
+                    <TextBlock Text="{x:Static app:MessageReaderViewModel.RemoteImagesPrivacyText}" Classes="caption" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Grid>
+                <Button x:Name="LoadRemoteImagesButton" Classes="subtle" Content="Load remote images" Command="{Binding Mail.Reader.LoadRemoteImagesCommand}" />
+              </StackPanel>
+            </Border>
+            <Border Classes="banner" IsVisible="{Binding Mail.Reader.ShowContrastHint}">
+              <StackPanel Spacing="8">
+                <TextBlock FontSize="14" TextWrapping="Wrap" Text="Some text in this message is very light and may be hard to read in the sender's layout." />
+                <Button Classes="subtle" Content="Readable view" Command="{Binding Mail.Reader.SetModeCommand}" CommandParameter="{x:Static app:ReaderBodyMode.Readable}" />
+              </StackPanel>
+            </Border>
+            <Border Classes="banner" IsVisible="{Binding Mail.Reader.HasRenderNotice}">
+              <Grid ColumnDefinitions="Auto,*">
+                <controls:IconView Data="{StaticResource Icon.Warning}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Warning}" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="1" Margin="10,0,0,0" FontSize="14" TextWrapping="Wrap" Text="{Binding Mail.Reader.RenderNotice}" />
+              </Grid>
+            </Border>
+
+            <!-- Attachments: tap to save or send on via the share sheet -->
+            <ItemsControl ItemsSource="{Binding Mail.Reader.Attachments}" IsVisible="{Binding Mail.Reader.HasAttachments}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="app:AttachmentViewModel">
+                  <Border Classes="chip attachment" Classes.dangerous="{Binding IsDangerous}" Margin="0,0,0,8" Padding="12,4,4,4">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                      <controls:IconView Data="{StaticResource Icon.Paperclip}" Width="17" Height="17" Foreground="{DynamicResource Hcg.Text.Secondary}" VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Name}" FontSize="15" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding SizeText}" Classes="caption" />
+                          <TextBlock Text="Can run programs — opened only if you choose" Classes="caption" Foreground="{DynamicResource Hcg.Warning}" IsVisible="{Binding IsDangerous}" />
+                        </StackPanel>
+                      </StackPanel>
+                      <Button Grid.Column="2" Classes="icon" Command="{Binding SaveCommand}" AutomationProperties.Name="{Binding Name, StringFormat='Save or share {0}'}">
+                        <controls:IconView Data="{StaticResource Icon.Download}" />
+                      </Button>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <views:MobileMessageBodyView x:Name="Body" DataContext="{Binding Mail.Reader}" />
+          </StackPanel>
+        </ScrollViewer>
+      </Panel>
+
+      <!-- Actions -->
+      <Border Grid.Row="2" Classes="bottomBar" IsVisible="{Binding Mail.Reader.HasMessage}">
+        <UniformGrid Rows="1">
+          <Button x:Name="ArchiveButton" Classes="icon" Command="{Binding Mail.ArchiveCommand}" AutomationProperties.Name="Archive">
+            <controls:IconView Data="{StaticResource Icon.Archive}" />
+          </Button>
+          <Button x:Name="DeleteButton" Classes="icon" Command="{Binding Mail.DeleteCommand}" AutomationProperties.Name="Delete">
+            <controls:IconView Data="{StaticResource Icon.Trash}" />
+          </Button>
+          <Button x:Name="FlagButton" Classes="icon" Command="{Binding Mail.ToggleFlagCommand}" CommandParameter="{x:Null}" AutomationProperties.Name="{Binding Mail.FlagToggleText}">
+            <controls:IconView Data="{StaticResource Icon.Flag}" />
+          </Button>
+          <Button x:Name="ReadButton" Classes="icon" Command="{Binding Mail.ToggleReadCommand}" AutomationProperties.Name="{Binding Mail.ReadToggleText}">
+            <controls:IconView Data="{StaticResource Icon.Mail}" />
+          </Button>
+          <Button x:Name="ReplyButton" Classes="icon" Command="{Binding Mail.ReplyCommand}" AutomationProperties.Name="Reply">
+            <controls:IconView Data="{StaticResource Icon.Reply}" Foreground="{DynamicResource Hcg.Accent}" />
+          </Button>
+          <Button x:Name="ReplyAllButton" Classes="icon" Command="{Binding Mail.ReplyAllCommand}" AutomationProperties.Name="Reply all">
+            <controls:IconView Data="{StaticResource Icon.ReplyAll}" />
+          </Button>
+          <Button x:Name="ForwardButton" Classes="icon" Command="{Binding Mail.ForwardCommand}" AutomationProperties.Name="Forward">
+            <controls:IconView Data="{StaticResource Icon.Forward}" />
+          </Button>
+        </UniformGrid>
+      </Border>
+    </Grid>
+  </Border>
+</UserControl>

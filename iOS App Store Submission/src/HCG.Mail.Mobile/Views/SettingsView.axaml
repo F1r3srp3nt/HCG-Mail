@@ -1,0 +1,145 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.Mobile.ViewModels"
+             xmlns:app="using:HCG.Mail.App.ViewModels"
+             xmlns:views="using:HCG.Mail.Mobile.Views"
+             x:Class="HCG.Mail.Mobile.Views.SettingsView"
+             x:DataType="app:SettingsViewModel">
+  <UserControl.Styles>
+    <Style Selector="StackPanel.section">
+      <Setter Property="Spacing" Value="10" />
+    </Style>
+    <Style Selector="ToggleSwitch">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+  </UserControl.Styles>
+  <Border Background="{DynamicResource Hcg.Bg.Reader}">
+    <Grid RowDefinitions="Auto,*">
+      <Border Classes="navBar">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="navTitle" Text="Settings" Margin="10,0" />
+          <Button x:Name="DoneButton" Grid.Column="1" Classes="link" Content="Done" FontWeight="SemiBold" Margin="0,0,6,0"
+                  Command="{Binding $parent[views:MobileShellView].((vm:MobileShellViewModel)DataContext).CloseSheetCommand}" CommandParameter="{Binding}" />
+        </Grid>
+      </Border>
+
+      <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="16,14,16,28" Spacing="20" MaxWidth="680">
+
+          <!-- Accounts -->
+          <StackPanel Classes="section">
+            <TextBlock Classes="section" Text="ACCOUNTS" />
+            <ItemsControl ItemsSource="{Binding Accounts}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="app:AccountViewModel">
+                  <Border Classes="group" Margin="0,0,0,10">
+                    <StackPanel Spacing="8">
+                      <Grid ColumnDefinitions="Auto,*">
+                        <Border Width="38" Height="38" CornerRadius="19" Background="{DynamicResource Hcg.Brush.Avatar}" VerticalAlignment="Top">
+                          <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+                          <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding EmailAddress}" Classes="caption" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="caption" TextWrapping="Wrap">
+                            <Run Text="{Binding ProviderLabel}" />
+                            <Run Text="·" />
+                            <Run Text="{Binding StatusText}" />
+                          </TextBlock>
+                        </StackPanel>
+                      </Grid>
+                      <WrapPanel>
+                        <Button Classes="subtle" Content="Reconnect" Margin="0,0,8,0"
+                                Command="{Binding $parent[views:SettingsView].((app:SettingsViewModel)DataContext).ReconnectAccountCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="subtle" Content="Edit and test" Margin="0,0,8,0" IsVisible="{Binding !IsMicrosoft}"
+                                Command="{Binding $parent[views:SettingsView].((app:SettingsViewModel)DataContext).EditAccountCommand}" CommandParameter="{Binding}" />
+                        <Button Classes="subtle danger" Content="Remove"
+                                Command="{Binding $parent[views:SettingsView].((app:SettingsViewModel)DataContext).RemoveAccountCommand}" CommandParameter="{Binding}" />
+                      </WrapPanel>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add email account" Command="{Binding AddAccountCommand}" />
+            <Button Classes="subtle" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add Microsoft account" Command="{Binding AddMicrosoftAccountCommand}" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding MicrosoftSignInStatus}" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding CredentialStorage, StringFormat='Passwords of IMAP accounts are stored in: {0}'}" />
+            <TextBlock Classes="caption" TextWrapping="Wrap"
+                       Text="Removing an account disconnects it and deletes its password or Microsoft sign-in and its send history from this device. Mail on the server is never deleted." />
+          </StackPanel>
+
+          <!-- Checking for mail -->
+          <StackPanel Classes="section">
+            <TextBlock Classes="section" Text="CHECKING FOR NEW MESSAGES" />
+            <ComboBox x:Name="RefreshChoice" ItemsSource="{Binding RefreshOptions}" SelectedItem="{Binding SelectedRefresh}" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="Checking for new messages" />
+            <TextBlock x:Name="RefreshExplanation" Classes="caption" TextWrapping="Wrap"
+                       Text="Manually (the default): pull down the message list or tap Refresh. Automatic checking runs only while HCG Mail is open on screen — iOS pauses the app in the background, so HCG Mail does not check for mail or notify you while it is closed." />
+          </StackPanel>
+
+          <!-- Reading -->
+          <StackPanel Classes="section">
+            <TextBlock Classes="section" Text="MESSAGE DISPLAY" />
+            <ComboBox x:Name="ViewModeChoice" ItemsSource="{Binding ViewModeOptions}" SelectedItem="{Binding SelectedViewMode}" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="Message display" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding SelectedViewMode.Description}" />
+            <ToggleSwitch x:Name="RemoteImagesToggle" IsChecked="{Binding LoadRemoteImagesAutomatically}" OnContent="Load remote images automatically" OffContent="Load remote images automatically" />
+            <TextBlock Classes="caption" TextWrapping="Wrap"
+                       Text="Off (recommended): remote images are blocked until you choose Load remote images in a message, because loading them tells the sender that and when you opened it. Images included in the message are always shown. Scripts, remote fonts, stylesheets and backgrounds are never loaded." />
+            <ToggleSwitch IsChecked="{Binding MarkAsReadWhenOpened}" OnContent="Mark messages as read when opened" OffContent="Mark messages as read when opened" />
+            <ToggleSwitch IsChecked="{Binding ConfirmBeforeOpeningLinks}" OnContent="Show the real destination before opening links" OffContent="Show the real destination before opening links" />
+          </StackPanel>
+
+          <!-- Sending and startup -->
+          <StackPanel Classes="section">
+            <TextBlock Classes="section" Text="SENDING AND STARTUP" />
+            <ToggleSwitch IsChecked="{Binding SaveCopyToSentFolder}" OnContent="Save a copy of sent messages in Sent" OffContent="Save a copy of sent messages in Sent" />
+            <ToggleSwitch IsChecked="{Binding ConnectOnStartup}" OnContent="Connect to my accounts when HCG Mail opens" OffContent="Connect to my accounts when HCG Mail opens" />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Attachments are saved through the iOS share sheet (for example Save to Files). HCG Mail never opens or runs them." />
+          </StackPanel>
+
+          <!-- Appearance -->
+          <StackPanel Classes="section">
+            <TextBlock Classes="section" Text="APPEARANCE" />
+            <ListBox x:Name="ThemeChoice" Classes="nav" ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" AutomationProperties.Name="Skin">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="app:ThemeOption">
+                  <StackPanel Margin="6,6" Spacing="2">
+                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="16" />
+                    <TextBlock Text="{Binding Description}" Classes="caption" TextWrapping="Wrap" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Text size follows Settings › Display &amp; Brightness › Text Size, and animations follow Reduce Motion." />
+          </StackPanel>
+
+          <!-- About and diagnostics -->
+          <StackPanel Classes="section">
+            <TextBlock Classes="section" Text="ABOUT AND DIAGNOSTICS" />
+            <Border Classes="group">
+              <StackPanel Spacing="8">
+                <TextBlock Text="HCG Mail" FontWeight="SemiBold" FontSize="16" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="An independent email client in the Hakmi Capital Group ecosystem. Works with standard IMAP/SMTP mailboxes and Microsoft accounts; no HCG account or HCG Connect is required." />
+                <TextBlock Classes="formLabel" Text="Version" Margin="0,4,0,0" />
+                <SelectableTextBlock x:Name="VersionText" Text="{Binding Version}" TextWrapping="Wrap" />
+                <TextBlock Classes="formLabel" Text="Device and runtime" />
+                <SelectableTextBlock Text="{Binding $parent[views:MobileShellView].((vm:MobileShellViewModel)DataContext).PlatformDescription}" TextWrapping="Wrap" />
+                <SelectableTextBlock Text="{Binding Runtime}" TextWrapping="Wrap" Classes="caption" />
+                <TextBlock Classes="formLabel" Text="Password storage" />
+                <TextBlock Text="{Binding CredentialStorage}" TextWrapping="Wrap" />
+                <TextBlock Classes="formLabel" Text="App data (settings, account list, logs — no mail content)" TextWrapping="Wrap" />
+                <SelectableTextBlock Text="{Binding DataDirectory}" TextWrapping="Wrap" Classes="caption" />
+                <TextBlock Classes="formLabel" Text="Privacy" />
+                <TextBlock TextWrapping="Wrap" Classes="caption" Text="No telemetry, analytics or advertising. Credentials and messages are exchanged only with your own mail servers (and Microsoft for Microsoft accounts). Message bodies are not stored on the device." />
+              </StackPanel>
+            </Border>
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Connection diagnostics: open an account with Edit and test and tap Test connection, or use Mail Health in the mailbox list for sending and DNS checks." />
+            <TextBlock Classes="caption" TextWrapping="Wrap" Text="Built with .NET, Avalonia UI, MailKit/MimeKit (MIT), HtmlSanitizer (MIT), HtmlRenderer (BSD-3), MSAL.NET (MIT) and the Inter typeface (OFL)." />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</UserControl>

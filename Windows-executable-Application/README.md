@@ -70,8 +70,9 @@ HCG.Mail.sln
 src/
   HCG.Mail.Core/            domain model, validation, folder-role mapping, reply logic, contracts (no dependencies)
   HCG.Mail.Email/           MailKit/MimeKit IMAP+SMTP session, connection tester, MIME conversion, HTML sanitizer
-  HCG.Mail.Infrastructure/  OS credential vaults, JSON settings/account stores, file logging, app paths
-  HCG.Mail.App/             Avalonia UI (MVVM), skins, views, view models, development preview
+  HCG.Mail.Infrastructure/  OS credential vaults, JSON settings/account stores, file logging, app paths, MSAL
+  HCG.Mail.Presentation/    platform-neutral UI shared with the iOS app: view models, skins, icons, safe HTML view
+  HCG.Mail.App/             Avalonia desktop app: windows, dialogs, desktop services, start-up
 tests/
   HCG.Mail.Tests/           unit tests + opt-in end-to-end tests against a local test server
   HCG.Mail.App.Tests/       headless UI tests (real views rendered with Skia)
@@ -80,6 +81,9 @@ assets/branding, assets/icons   official HCG logo and application icon (supplied
 docs/                       ARCHITECTURE, SETUP, SECURITY, WINDOWS_BUILD, ROADMAP, TESTING, MANUAL_TEST_CHECKLIST
 scripts/                    publish-windows.sh / publish-windows.ps1
 ```
+
+The iPhone/iPad app lives in [`../iOS App Store Submission/`](../iOS%20App%20Store%20Submission/) and references
+these projects directly; there is no second copy of the mail engine or the view models.
 
 `tests/HCG.Mail.App.Tests` was added next to the requested `tests/HCG.Mail.Tests` because UI tests need
 the Avalonia headless platform and a dedicated UI thread; keeping them separate keeps the core test
