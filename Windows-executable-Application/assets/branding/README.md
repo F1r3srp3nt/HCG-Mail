@@ -2,18 +2,20 @@
 
 ## Application icon — supplied ✅
 
-The HCG Mail application icon (metallic envelope over a globe, "HCG MAIL", cyan glow) was supplied by
-the founder and is used for the Windows executable, the taskbar/Start menu and all window title bars.
+The HCG Mail application icon (brushed-metal envelope with "HCG" lettering, cyan glow and circuit traces on black)
+was supplied by the founder on 2026-11-12, replacing the earlier "HCG MAIL" globe icon. It is used for the Windows
+executable, the taskbar/Start menu and all window title bars.
 
 | File | Purpose |
 |---|---|
-| `assets/branding/hcg-mail-app-icon-source.png` | Original artwork as supplied (1783 × 882) |
-| `assets/icons/hcg-mail-1024.png` | Square master: tile cropped from the source, transparent outside the rounded tile |
+| `assets/branding/hcg-mail-app-icon-source.png` | Original artwork as supplied (1254 × 1254, square) |
+| `assets/icons/hcg-mail-1024.png` | Square master: the artwork scaled to 1024 × 1024 with rounded corners (radius 18 %), transparent outside the tile |
 | `assets/icons/hcg-mail.ico` | Windows icon, 16 / 24 / 32 / 48 / 64 / 128 / 256 px |
-| `src/HCG.Mail.App/Assets/Icons/hcg-mail.ico`, `hcg-mail.png` | Copies built into the app (`ApplicationIcon` in `HCG.Mail.App.csproj`, `Icon=` on each window) |
+| `src/HCG.Mail.App/Assets/Icons/hcg-mail.ico`, `hcg-mail.png` (256 px) | Copies built into the app (`ApplicationIcon` in `HCG.Mail.App.csproj`, `Icon=` on each window) |
 
-To update the icon, replace the source artwork and regenerate the square master and `.ico` (crop the
-rounded tile, pad to a square, export the sizes above).
+To update the icon, replace the source artwork and regenerate the master and `.ico`: scale to 1024 px (Lanczos),
+apply the rounded-corner mask (anti-aliased), export the sizes above. Nothing is stretched; the artwork is already
+square. Other platforms' icons are produced from the 1024 px master by HCG Executable Maker.
 
 ## HCG logo — supplied ✅
 
