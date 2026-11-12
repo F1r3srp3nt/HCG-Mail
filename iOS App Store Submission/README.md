@@ -13,9 +13,9 @@ nothing is copied. [`../iOS Executable/`](../iOS%20Executable/) only describes d
 | | State |
 |---|---|
 | **Implemented** | Account setup with connection diagnostics and Keychain storage · accounts, folders, message list with paging, pull-to-refresh and search · HTML and plain-text reading with inline (cid) images · compose, drafts, reply, reply all, forward, attachments (document picker / share sheet) · read/unread, flag, archive, delete · iPhone navigation and adaptive iPad layouts (split view, slide-over, rotation) · settings, Mail Health, banners and explicit failure states · safe area, keyboard, Dynamic Type and Reduce Motion · background suspend/resume · Microsoft accounts through the shared MSAL code with an iOS adapter |
-| **Compiled** | Mobile UI library and tests: built on Linux (.NET 10). iOS head: type-checked on Linux against the iOS 26.2 reference assemblies, Avalonia.iOS 11.3.22 and MSAL for iOS. Full Xcode/.NET iOS build: done by the `iOS` GitHub Actions workflow on macOS — see the pull request's checks for the current result. |
+| **Compiled** | **Simulator (Debug): yes** — built by the `iOS` GitHub Actions workflow on macOS 26 with Xcode 26.3, .NET SDK 10.0.403 and the iOS workload 26.2.10233 (0 errors; `Assets.car` with the app icon present). **Device (ios-arm64, Release, AOT): not yet confirmed** — the first attempt was still compiling when the CI job's time limit stopped it; it now runs as its own job. Mobile library and tests also build on Linux. |
 | **Tested (headless)** | 40 tests render the real mobile views at iPhone and iPad sizes (preview mailbox, no network): layouts, rotation, split view, text size, safe area, keyboard, 44-point touch targets, navigation, compose/send/draft, reply/forward, message actions, attachments → share sheet, link confirmation, account setup, Microsoft "pending" state, settings, suspend/resume, all 13 rendering fixtures at iPhone width |
-| **Simulator-tested** | Only through CI: simulator self-test (real Keychain, sandbox, sanitizer, configuration) and preview-mode screenshots on an iPhone and an iPad simulator. Not tested interactively by a person yet. |
+| **Simulator-tested** | **Yes, automatically, in CI** (iPhone 17 Pro simulator, iOS 26.5): the app installs and starts; the self-test passed — Keychain save/replace/read/delete, app data directory, settings and account list saved and reloaded as JSON, sanitizer, Microsoft configuration (reported as not set up), TLS revocation fallback. Preview-mode screenshots were taken on an iPhone and an iPad simulator (workflow artifact `ios-simulator-screenshots`). The first simulator run found and led to the fix of a Keychain bug (replacing an existing password). **Not yet used interactively by a person.** |
 | **Device-tested** | **No.** Needs HCG's Apple Developer account, a signing certificate and a provisioning profile. |
 | **Microsoft sign-in** | **Pending.** The code is in place; builds without a client ID show Microsoft sign-in as "not set up" (no fake login). Needs the Entra app registration to include an iOS redirect URI (below). |
 | **App Store** | Not submitted. Nothing is uploaded automatically. |
@@ -54,7 +54,7 @@ iOS App Store Submission/
 
 | Component | Version | Where it is pinned |
 |---|---|---|
-| .NET SDK | 10.0 feature band 1xx (`10.0.100`, roll forward to the latest 1xx patch) | `global.json` |
+| .NET SDK | .NET 10 (`10.0.100` or newer: `global.json` rolls forward to the newest installed 10.0 SDK; CI used 10.0.403) | `global.json` |
 | .NET iOS workload | `Microsoft.NET.Sdk.iOS` manifest **26.2.10233** (iOS 26.2 SDK bindings) | `scripts/workload-rollback.json`, installed by `scripts/install-workload.sh` |
 | Xcode | **26.3** (the workload refuses to build with older Xcode) | CI selects `/Applications/Xcode_26.3.app` |
 | Minimum iOS | 16.0 (iPhone and iPad) | `SupportedOSPlatformVersion` in `HCG.Mail.iOS.csproj` |
