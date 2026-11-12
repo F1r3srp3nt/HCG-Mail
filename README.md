@@ -15,10 +15,18 @@ messages by default.
 | [`Windows Store app/`](Windows%20Store%20app/) | Future Microsoft Store distribution (MSIX packaging, Store identity, assets, certification). | 🕓 Reserved — not started |
 | [`Mac OS executable Application/`](Mac%20OS%20executable%20Application/) | Future directly distributed macOS version (`.app` bundle, Apple Silicon, Developer ID signing, notarization, DMG/PKG). | 🕓 Reserved — not started |
 | [`Mac AppStore Submission/`](Mac%20AppStore%20Submission/) | Future Mac App Store distribution (App Sandbox, entitlements, App Store Connect, privacy disclosures). | 🕓 Reserved — not started |
+| [`iOS App Store Submission/`](iOS%20App%20Store%20Submission/) | Future App Store distribution for iPhone/iPad (App Store Connect, review, privacy labels). | 🕓 Reserved — not started |
+| [`iOS Executable/`](iOS%20Executable/) | Future directly installed iOS build (TestFlight / ad-hoc). | 🕓 Reserved — not started |
+| [`Google Play Submission/`](Google%20Play%20Submission/) | Future Google Play distribution (Play Console, Data safety, signing). | 🕓 Reserved — not started |
+| [`Android Executable/`](Android%20Executable/) | Future directly installed Android build (APK/AAB). | 🕓 Reserved — not started |
+| [`Linux Store Submission/`](Linux%20Store%20Submission/) | Future Linux store distribution (Flathub / Snap Store). | 🕓 Reserved — not started |
+| [`Linux Terminal Only/`](Linux%20Terminal%20Only/) | Future terminal (text-mode) edition reusing the same mail libraries. | 🕓 Reserved — not started |
+| [`Linux UI/`](Linux%20UI/) | Future graphical Linux desktop build (AppImage / .deb). | 🕓 Reserved — not started |
 
 There is exactly **one** implementation of the email client, in `Windows-executable-Application/`.
-The future Store and macOS distributions are planned as packaging, signing and store-specific
-configuration around that same code, not as separate email clients.
+The other folders are reserved for distributions on other platforms and stores. Those builds are
+produced from the Windows application with HCG Executable Maker; the folders hold only
+platform-specific packaging, signing and store configuration, not separate email clients.
 
 ## What is implemented today
 
