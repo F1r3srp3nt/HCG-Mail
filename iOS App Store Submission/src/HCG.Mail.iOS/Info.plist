@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Bundle identifier, version and minimum iOS version come from HCG.Mail.iOS.csproj. -->
+	<key>CFBundleDisplayName</key>
+	<string>HCG Mail</string>
+	<key>CFBundleName</key>
+	<string>HCG Mail</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+		<integer>2</integer>
+	</array>
+	<key>XSAppIconAssets</key>
+	<string>Assets.xcassets/AppIcon.appiconset</string>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<!-- Portrait and landscape on iPhone; all orientations plus Split View / Slide Over on iPad. -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIRequiresFullScreen</key>
+	<false/>
+	<!-- Microsoft sign-in redirect (msauth.<bundle id>://auth). Must match the bundle identifier and the redirect URI
+	     registered in Microsoft Entra. Without a client ID in the build, Microsoft sign-in is shown as "not set up". -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Microsoft sign-in</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>msauth.com.hakmicapitalgroup.hcgmail</string>
+			</array>
+		</dict>
+	</array>
+	<!-- No camera, microphone, photos, contacts, location, tracking or background modes are used. App Transport
+	     Security keeps its default (HTTPS only); mail servers are reached over TLS sockets with full certificate checks. -->
+</dict>
+</plist>

@@ -25,11 +25,12 @@ public sealed class MailClientFactory : IMailClientFactory
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(45);
 
     /// <summary>
-    /// Verified CRL check used when the platform cannot determine revocation status. Enabled on macOS only,
-    /// where .NET requires a positive OCSP-style answer that CRL-only certificates cannot provide
-    /// (see docs/TLS_REVOCATION.md). Windows and Linux fetch CRLs natively and keep their behaviour.
+    /// Verified CRL check used when the platform cannot determine revocation status. Enabled on Apple platforms (macOS
+    /// and iOS share the same system trust evaluation), where .NET requires a positive OCSP-style answer that CRL-only
+    /// certificates cannot provide (see docs/TLS_REVOCATION.md). The fallback can only confirm "not revoked" from a
+    /// signature-verified CRL; it never relaxes any other check. Windows and Linux fetch CRLs natively and keep their behaviour.
     /// </summary>
-    public IRevocationFallback? RevocationFallback { get; init; } = OperatingSystem.IsMacOS() ? CrlRevocationFallback.Shared : null;
+    public IRevocationFallback? RevocationFallback { get; init; } = OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() ? CrlRevocationFallback.Shared : null;
 
     public IImapClient CreateImapClient(TlsValidationRecorder recorder)
     {

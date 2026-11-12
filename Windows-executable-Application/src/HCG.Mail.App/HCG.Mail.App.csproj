@@ -16,6 +16,7 @@
     <ProjectReference Include="..\HCG.Mail.Core\HCG.Mail.Core.csproj" />
     <ProjectReference Include="..\HCG.Mail.Email\HCG.Mail.Email.csproj" />
     <ProjectReference Include="..\HCG.Mail.Infrastructure\HCG.Mail.Infrastructure.csproj" />
+    <ProjectReference Include="..\HCG.Mail.Presentation\HCG.Mail.Presentation.csproj" />
   </ItemGroup>
 
   <ItemGroup>

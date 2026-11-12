@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.Mobile.ViewModels"
+             xmlns:app="using:HCG.Mail.App.ViewModels"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.Mobile.Views.MailboxesView"
+             x:DataType="vm:MobileShellViewModel">
+  <Border Background="{DynamicResource Hcg.Bg.Sidebar}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,0,1,0">
+    <DockPanel>
+      <!-- Navigation bar -->
+      <Border DockPanel.Dock="Top" Classes="navBar">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <TextBlock Classes="navTitle" Text="Mailboxes" Margin="10,0" />
+          <Button Grid.Column="1" Classes="icon" Command="{Binding Mail.OpenSettingsCommand}" AutomationProperties.Name="Settings">
+            <controls:IconView Data="{StaticResource Icon.Settings}" />
+          </Button>
+          <Button Grid.Column="2" Classes="icon" Command="{Binding CloseSidebarCommand}" IsVisible="{Binding IsSidebarOpen}" AutomationProperties.Name="Close mailboxes">
+            <controls:IconView Data="{StaticResource Icon.Close}" />
+          </Button>
+        </Grid>
+      </Border>
+
+      <!-- Add accounts -->
+      <StackPanel DockPanel.Dock="Bottom" Margin="12,8,12,12" Spacing="6">
+        <Button Classes="subtle" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding Mail.AddAccountCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <controls:IconView Data="{StaticResource Icon.Plus}" Width="18" Height="18" />
+            <TextBlock Text="Add email account" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding Mail.AddMicrosoftAccountCommand}"
+                Content="Add Microsoft account" />
+      </StackPanel>
+
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="10,10,10,6" Spacing="8">
+          <!-- Account -->
+          <ComboBox x:Name="AccountPicker" ItemsSource="{Binding Mail.Accounts}" SelectedItem="{Binding Mail.SelectedAccount}"
+                    IsVisible="{Binding Mail.HasMultipleAccounts}" HorizontalAlignment="Stretch" AutomationProperties.Name="Account">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="app:AccountViewModel">
+                <TextBlock Text="{Binding EmailAddress}" TextTrimming="CharacterEllipsis" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <Border Classes="group" IsVisible="{Binding Mail.HasSelectedAccount}">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+              <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource Hcg.Brush.Avatar}" VerticalAlignment="Top">
+                <TextBlock Text="{Binding Mail.SelectedAccount.Initials}" Foreground="White" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2">
+                <TextBlock Text="{Binding Mail.SelectedAccount.DisplayName}" FontWeight="SemiBold" FontSize="16" TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource Hcg.Text.Primary}" />
+                <TextBlock Text="{Binding Mail.SelectedAccount.EmailAddress}" Classes="caption" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="AccountStatus" Text="{Binding Mail.SelectedAccount.StatusText}" Classes="caption" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Hcg.Text.Secondary}" />
+              </StackPanel>
+              <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0">
+                <Button Classes="link" Content="Account settings" Command="{Binding Mail.OpenAccountSettingsCommand}" Margin="0,0,14,0" />
+                <Button Classes="link" Content="Mail Health" Command="{Binding Mail.OpenMailHealthCommand}" />
+              </WrapPanel>
+            </Grid>
+          </Border>
+
+          <!-- Folders -->
+          <ListBox x:Name="StandardFolders" Classes="nav" ItemsSource="{Binding Mail.SelectedAccount.StandardFolders}"
+                   SelectedItem="{Binding Mail.SelectedStandardFolder}" AutomationProperties.Name="Folders">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="app:FolderViewModel">
+                <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent" IsEnabled="{Binding IsAvailable}" Margin="4,0">
+                  <controls:IconView Data="{Binding Icon}" Width="20" Height="20" Foreground="{DynamicResource Hcg.Text.Secondary}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="16" Margin="14,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="2" Text="{Binding UnreadText}" IsVisible="{Binding HasUnread}" Classes="caption" FontWeight="SemiBold"
+                             Foreground="{DynamicResource Hcg.Text.Accent}" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <TextBlock Classes="section" Text="MORE FOLDERS" Margin="6,10,0,2" IsVisible="{Binding Mail.SelectedAccount.HasOtherFolders}" />
+          <ListBox x:Name="OtherFolders" Classes="nav" ItemsSource="{Binding Mail.SelectedAccount.OtherFolders}"
+                   SelectedItem="{Binding Mail.SelectedOtherFolder}" IsVisible="{Binding Mail.SelectedAccount.HasOtherFolders}"
+                   AutomationProperties.Name="More folders">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="app:FolderViewModel">
+                <Grid ColumnDefinitions="Auto,*,Auto" Background="Transparent" Margin="{Binding Indent}" IsEnabled="{Binding IsAvailable}">
+                  <controls:IconView Data="{Binding Icon}" Width="20" Height="20" Foreground="{DynamicResource Hcg.Text.Secondary}" VerticalAlignment="Center" Margin="4,0,0,0" />
+                  <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="16" Margin="14,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="2" Text="{Binding UnreadText}" IsVisible="{Binding HasUnread}" Classes="caption" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </StackPanel>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</UserControl>

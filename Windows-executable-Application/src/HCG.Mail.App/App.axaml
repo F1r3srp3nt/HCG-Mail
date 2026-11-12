@@ -5,8 +5,8 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <ResourceInclude Source="/Themes/Palette.axaml" />
-        <ResourceInclude Source="/Themes/Icons.axaml" />
+        <ResourceInclude Source="avares://HCG.Mail.Presentation/Themes/Palette.axaml" />
+        <ResourceInclude Source="avares://HCG.Mail.Presentation/Themes/Icons.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
@@ -18,6 +18,6 @@
         <ColorPaletteResources x:Key="Light" Accent="#1F5C99" RegionColor="#FFFFFF" ErrorText="#B91C1C" />
       </FluentTheme.Palettes>
     </FluentTheme>
-    <StyleInclude Source="/Themes/Controls.axaml" />
+    <StyleInclude Source="avares://HCG.Mail.Presentation/Themes/Controls.axaml" />
   </Application.Styles>
 </Application>

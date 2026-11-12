@@ -1,0 +1,104 @@
+# HCG Mail for iPhone and iPad — validation only.
+# Builds and tests; never signs with a distribution identity, never uploads to TestFlight or the App Store,
+# never contacts a real mailbox. Screenshots and logs are uploaded as workflow artifacts, not committed.
+name: iOS
+
+on:
+  pull_request:
+    paths:
+      - 'iOS App Store Submission/**'
+      - 'iOS Executable/**'
+      - 'Windows-executable-Application/src/**'
+      - 'Windows-executable-Application/tests/**'
+      - 'Windows-executable-Application/Directory.*'
+      - '.github/workflows/ios.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'iOS App Store Submission/**'
+      - 'Windows-executable-Application/src/**'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  AVALONIA_TELEMETRY_OPTOUT: '1'
+
+jobs:
+  tests:
+    name: Shared code and mobile UI tests (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.1xx'
+      - name: Desktop and shared tests (the iOS app reuses this code)
+        working-directory: Windows-executable-Application
+        run: dotnet test HCG.Mail.sln -c Release
+      - name: Mobile UI tests (iPhone and iPad layouts, flows, rendering — headless)
+        working-directory: iOS App Store Submission
+        env:
+          HCG_MAIL_SCREENSHOT_DIR: ${{ github.workspace }}/artifacts/headless-screenshots
+        run: dotnet test tests/HCG.Mail.Mobile.Tests -c Release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: headless-screenshots
+          path: artifacts/headless-screenshots
+          if-no-files-found: ignore
+          retention-days: 14
+
+  simulator:
+    name: iOS build, simulator self-test and screenshots (macOS)
+    runs-on: macos-26
+    timeout-minutes: 75
+    env:
+      XCODE_VERSION: '26.2'
+    defaults:
+      run:
+        working-directory: iOS App Store Submission
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: |
+          app="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$app" ]; then
+            echo "Xcode ${XCODE_VERSION} is not installed on this runner. Installed:"; ls -d /Applications/Xcode* ; exit 1
+          fi
+          sudo xcode-select -s "$app/Contents/Developer"
+          xcodebuild -version
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.1xx'
+      - name: Install the pinned iOS workload
+        run: scripts/install-workload.sh
+      - name: Toolchain
+        run: scripts/check-prerequisites.sh
+      - name: Build for the simulator (Debug)
+        run: scripts/build-simulator.sh Debug | tee "$RUNNER_TEMP/app-path.txt"
+      - name: Self-test on an iPhone simulator (Keychain, sandbox, sanitizer, configuration)
+        run: |
+          mkdir -p ../artifacts/ios-screenshots
+          HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" scripts/run-simulator.sh --self-test
+      - name: Screenshots in preview mode (sample mailbox, no network)
+        run: |
+          export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
+          scripts/run-simulator.sh --preview --screenshot ../artifacts/ios-screenshots/iphone.png
+          scripts/run-simulator.sh --ipad --preview --screenshot ../artifacts/ios-screenshots/ipad.png
+      - name: Build for the simulator (Release)
+        run: scripts/build-simulator.sh Release
+      - name: Compile for devices (ios-arm64, AOT, unsigned — no certificates in CI)
+        run: dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:EnableCodeSigning=false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-simulator-screenshots
+          path: artifacts/ios-screenshots
+          if-no-files-found: ignore
+          retention-days: 14

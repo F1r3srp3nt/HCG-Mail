@@ -21,3 +21,13 @@ coverage*/
 *.db
 *.db-shm
 *.db-wal
+
+# Apple signing material and iOS build products (never commit)
+*.ipa
+*.xcarchive
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.p8
+*.cer
+*.dSYM/

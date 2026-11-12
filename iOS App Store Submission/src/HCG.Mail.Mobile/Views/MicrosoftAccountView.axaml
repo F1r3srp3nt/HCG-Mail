@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="using:HCG.Mail.App.ViewModels"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.Mobile.Views.MicrosoftAccountView"
+             x:DataType="app:MicrosoftAccountViewModel">
+  <!-- Microsoft sign-in (Outlook.com, Hotmail, Microsoft 365). It is separate from HCG Connect: no HCG account is
+       involved, and the Microsoft password is entered only on Microsoft's own page in the system browser. -->
+  <Border Background="{DynamicResource Hcg.Bg.Reader}">
+    <Grid RowDefinitions="Auto,*,Auto">
+      <Border Classes="navBar">
+        <Grid ColumnDefinitions="Auto,*">
+          <Button x:Name="CancelButton" Classes="link" Content="{Binding CancelText}" Command="{Binding CancelCommand}" Margin="6,0" />
+          <TextBlock Grid.Column="1" Classes="navTitle" Text="{Binding Title}" HorizontalAlignment="Center" Margin="0,0,60,0" />
+        </Grid>
+      </Border>
+
+      <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="16,14,16,20" Spacing="12" MaxWidth="640">
+          <TextBlock Classes="muted" FontSize="15" Text="{Binding Heading}" TextWrapping="Wrap" />
+
+          <Border Classes="banner" IsVisible="{Binding !IsConfigured}">
+            <Grid ColumnDefinitions="Auto,*">
+              <controls:IconView Data="{StaticResource Icon.Info}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Warning}" VerticalAlignment="Top" />
+              <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="4">
+                <TextBlock Text="Pending: Microsoft sign-in is not set up in this build" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock x:Name="ConfigurationProblem" Text="{Binding ConfigurationProblem}" TextWrapping="Wrap" FontSize="14" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Classes="group">
+            <StackPanel Spacing="8">
+              <TextBlock Text="How sign-in works" FontWeight="SemiBold" FontSize="16" />
+              <TextBlock Text="{x:Static app:MicrosoftAccountViewModel.PrivacyText}" TextWrapping="Wrap" Classes="muted" FontSize="14" />
+              <TextBlock Text="{x:Static app:MicrosoftAccountViewModel.RoleText}" TextWrapping="Wrap" Classes="muted" FontSize="14" />
+            </StackPanel>
+          </Border>
+          <Border Classes="group">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Permissions" FontWeight="SemiBold" FontSize="16" />
+              <TextBlock Text="{Binding PermissionsText}" TextWrapping="Wrap" Classes="muted" FontSize="14" />
+            </StackPanel>
+          </Border>
+          <Border Classes="group">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Supported accounts" FontWeight="SemiBold" FontSize="16" />
+              <TextBlock Text="{x:Static app:MicrosoftAccountViewModel.SupportText}" TextWrapping="Wrap" Classes="muted" FontSize="14" />
+              <TextBlock Text="{x:Static app:MicrosoftAccountViewModel.TenantText}" TextWrapping="Wrap" Classes="muted" FontSize="14" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="banner" IsVisible="{Binding HasError}">
+            <Grid ColumnDefinitions="Auto,*">
+              <controls:IconView Data="{StaticResource Icon.Warning}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Warning}" VerticalAlignment="Top" />
+              <TextBlock x:Name="ErrorText" Grid.Column="1" Margin="10,0,0,0" Text="{Binding ErrorText}" TextWrapping="Wrap" />
+            </Grid>
+          </Border>
+          <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}">
+            <ProgressBar IsIndeterminate="True" Width="80" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="2" Margin="16,8,16,14" Spacing="8">
+        <Button x:Name="SignInButton" Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                Content="Sign in with Microsoft" Command="{Binding SignInCommand}" IsVisible="{Binding IsConfigured}" />
+        <Button Classes="ghost danger" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                Content="Remove account" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>

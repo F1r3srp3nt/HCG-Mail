@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.Mobile.ViewModels"
+             xmlns:app="using:HCG.Mail.App.ViewModels"
+             xmlns:views="using:HCG.Mail.Mobile.Views"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.Mobile.Views.ComposeView"
+             x:DataType="app:ComposeViewModel">
+  <Border Background="{DynamicResource Hcg.Bg.Reader}">
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
+      <Border Classes="navBar">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <Button x:Name="CancelButton" Classes="link" Content="Cancel" Margin="6,0"
+                  Command="{Binding $parent[views:MobileShellView].((vm:MobileShellViewModel)DataContext).CloseSheetCommand}" CommandParameter="{Binding}" />
+          <TextBlock Grid.Column="1" Classes="navTitle" Text="{Binding Heading}" HorizontalAlignment="Center" />
+          <Button x:Name="SendButton" Grid.Column="2" Classes="primary" Command="{Binding SendCommand}" Margin="0,0,6,0" AutomationProperties.Name="Send">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <controls:IconView Data="{StaticResource Icon.Sent}" Width="16" Height="16" StrokeThickness="2" />
+              <TextBlock Text="Send" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </Border>
+
+      <ScrollViewer x:Name="Scroller" Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="14,12" Spacing="10">
+          <StackPanel IsVisible="{Binding HasMultipleAccounts}">
+            <TextBlock Classes="formLabel" Text="From" />
+            <ComboBox ItemsSource="{Binding FromAccounts}" SelectedItem="{Binding SelectedFrom}" HorizontalAlignment="Stretch" AutomationProperties.Name="From">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="app:AccountViewModel">
+                  <TextBlock Text="{Binding EmailAddress}" TextTrimming="CharacterEllipsis" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+          </StackPanel>
+          <TextBlock Text="{Binding FromWarning}" Classes="error" TextWrapping="Wrap" IsVisible="{Binding FromWarning, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+          <StackPanel>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="formLabel" Text="To" VerticalAlignment="Bottom" />
+              <Button Grid.Column="1" Classes="link" Content="Cc / Bcc" Command="{Binding ToggleCcBccCommand}" />
+            </Grid>
+            <TextBox x:Name="ToBox" Text="{Binding To}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" Watermark="name@example.com" AutomationProperties.Name="To" />
+          </StackPanel>
+          <StackPanel IsVisible="{Binding ShowCcBcc}">
+            <TextBlock Classes="formLabel" Text="Cc" />
+            <TextBox Text="{Binding Cc}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" AutomationProperties.Name="Cc" />
+          </StackPanel>
+          <StackPanel IsVisible="{Binding ShowCcBcc}">
+            <TextBlock Classes="formLabel" Text="Bcc" />
+            <TextBox Text="{Binding Bcc}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" Watermark="Hidden from other recipients" AutomationProperties.Name="Bcc" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="formLabel" Text="Subject" />
+            <TextBox x:Name="SubjectBox" Text="{Binding Subject}" FontWeight="SemiBold" AutomationProperties.Name="Subject" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="formLabel" Text="Priority" />
+            <ComboBox x:Name="PriorityBox" ItemsSource="{x:Static app:ComposeViewModel.PriorityOptions}" SelectedItem="{Binding SelectedPriority}"
+                      HorizontalAlignment="Stretch" AutomationProperties.Name="Priority" />
+            <TextBlock Classes="caption" Margin="2,4,0,0" TextWrapping="Wrap"
+                       Text="Recipients' mail apps decide how priority is shown. It does not affect spam filtering or delivery." />
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding Attachments}" IsVisible="{Binding HasAttachments}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="app:ComposeAttachmentViewModel">
+                <Border Classes="chip" Margin="0,0,0,8" Padding="12,2,2,2">
+                  <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                    <controls:IconView Data="{StaticResource Icon.Paperclip}" Width="16" Height="16" Foreground="{DynamicResource Hcg.Text.Secondary}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Margin="10,0" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="15" />
+                    <TextBlock Grid.Column="2" Text="{Binding SizeText}" Classes="caption" VerticalAlignment="Center" />
+                    <Button Grid.Column="3" Classes="icon" AutomationProperties.Name="{Binding Name, StringFormat='Remove {0}'}"
+                            Command="{Binding $parent[views:ComposeView].((app:ComposeViewModel)DataContext).RemoveAttachmentCommand}" CommandParameter="{Binding}">
+                      <controls:IconView Data="{StaticResource Icon.Close}" Width="15" Height="15" />
+                    </Button>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Border Classes="card" BoxShadow="{DynamicResource Hcg.Shadow.None}" Padding="2">
+            <TextBox x:Name="BodyBox" Classes="bare multiline" Text="{Binding Body}" AcceptsReturn="True" TextWrapping="Wrap"
+                     MinHeight="260" Padding="12,10" Watermark="Write your message…" AutomationProperties.Name="Message" />
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- Status -->
+      <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" Margin="14,4" IsVisible="{Binding HasStatus}">
+        <ProgressBar IsIndeterminate="True" Width="60" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+        <TextBlock x:Name="StatusText" Text="{Binding StatusMessage}" Classes.error="{Binding StatusIsError}" FontSize="14" TextWrapping="Wrap"
+                   Foreground="{DynamicResource Hcg.Text.Secondary}" VerticalAlignment="Center" />
+      </StackPanel>
+
+      <Border Grid.Row="3" Classes="bottomBar">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+          <Button x:Name="AttachButton" Classes="toolbar" Command="{Binding AddAttachmentsCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <controls:IconView Data="{StaticResource Icon.Paperclip}" Width="18" Height="18" />
+              <TextBlock Text="Attach" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="SaveDraftButton" Grid.Column="1" Classes="toolbar" Command="{Binding SaveDraftCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <controls:IconView Data="{StaticResource Icon.Drafts}" Width="18" Height="18" />
+              <TextBlock Text="Save draft" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Grid.Column="3" Classes="toolbar danger" Command="{Binding DiscardCommand}" AutomationProperties.Name="Discard">
+            <controls:IconView Data="{StaticResource Icon.Trash}" Width="18" Height="18" />
+          </Button>
+        </Grid>
+      </Border>
+    </Grid>
+  </Border>
+</UserControl>

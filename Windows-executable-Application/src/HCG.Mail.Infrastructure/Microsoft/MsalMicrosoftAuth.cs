@@ -53,21 +53,52 @@ public sealed class MsalMicrosoftAuth : IMicrosoftAuth
 
     private readonly IPublicClientApplication _app;
     private readonly ILogger _logger;
+    private readonly Func<ITokenCache, Task<string?>>? _persistCache;
+    private readonly Func<AcquireTokenInteractiveParameterBuilder, AcquireTokenInteractiveParameterBuilder> _configureInteractive;
     private readonly SemaphoreSlim _cacheGate = new(1, 1);
     private bool _cacheReady;
 
+    /// <summary>Desktop: system browser with the loopback redirect, tokens persisted by MsalCacheHelper in OS protection.</summary>
     public MsalMicrosoftAuth(string clientId, AppPaths paths, ILogger<MsalMicrosoftAuth> logger)
+        : this(CreateBuilder(clientId).WithRedirectUri(MicrosoftAuthOptions.RedirectUri).Build(),
+            cache => PersistDesktopCacheAsync(cache, paths.DataDirectory),
+            ConfigureDesktopBrowser,
+            logger)
+    {
+    }
+
+    /// <summary>
+    /// Platform hosts (iOS) build the client themselves (redirect URI, keychain group, parent window) and reuse the
+    /// scopes, error mapping and account handling here. <paramref name="persistCache"/> is null when the platform's MSAL
+    /// build already keeps tokens in OS storage (the iOS Keychain); otherwise it returns a problem text when persistence
+    /// is unavailable.
+    /// </summary>
+    public MsalMicrosoftAuth(IPublicClientApplication app, Func<ITokenCache, Task<string?>>? persistCache,
+        Func<AcquireTokenInteractiveParameterBuilder, AcquireTokenInteractiveParameterBuilder>? configureInteractive, ILogger logger)
+    {
+        _app = app;
+        _persistCache = persistCache;
+        _configureInteractive = configureInteractive ?? (b => b);
+        _logger = logger;
+    }
+
+    /// <summary>The shared client settings: work/school and personal accounts, public client, no secret.</summary>
+    public static PublicClientApplicationBuilder CreateBuilder(string clientId)
     {
         if (!MicrosoftAuthOptions.IsValidClientId(clientId))
             throw new ArgumentException("The Microsoft client ID must be a GUID.", nameof(clientId));
-        _logger = logger;
-        CachePath = paths.DataDirectory;
-        _app = PublicClientApplicationBuilder.Create(clientId)
-            .WithAuthority(AadAuthorityAudience.AzureAdAndPersonalMicrosoftAccount) // work/school and personal accounts
-            .WithRedirectUri(MicrosoftAuthOptions.RedirectUri)
-            .WithClientName("HCG Mail")
-            .Build();
+        return PublicClientApplicationBuilder.Create(clientId)
+            .WithAuthority(AadAuthorityAudience.AzureAdAndPersonalMicrosoftAccount)
+            .WithClientName("HCG Mail");
     }
+
+    private static AcquireTokenInteractiveParameterBuilder ConfigureDesktopBrowser(AcquireTokenInteractiveParameterBuilder request) =>
+        request.WithUseEmbeddedWebView(false) // the system browser: HCG Mail never sees the password
+            .WithSystemWebViewOptions(new SystemWebViewOptions
+            {
+                HtmlMessageSuccess = "<html><body style='font-family:sans-serif'><h2>Signed in</h2><p>You can close this tab and return to HCG Mail.</p></body></html>",
+                HtmlMessageError = "<html><body style='font-family:sans-serif'><h2>Sign-in did not complete</h2><p>Return to HCG Mail for details.</p></body></html>",
+            });
 
     public bool IsConfigured => true;
     public string? ConfigurationProblem => null;
@@ -76,19 +107,10 @@ public sealed class MsalMicrosoftAuth : IMicrosoftAuth
     /// <summary>Set when tokens cannot be persisted securely on this computer (kept in memory only).</summary>
     public string? PersistenceProblem { get; private set; }
 
-    private string CachePath { get; }
-
     public async Task<MicrosoftSignIn> SignInAsync(string? loginHint, CancellationToken cancellationToken)
     {
         await EnsureCacheAsync().ConfigureAwait(false);
-        var request = _app.AcquireTokenInteractive(MailScopes)
-            .WithUseEmbeddedWebView(false) // the system browser: HCG Mail never sees the password
-            .WithPrompt(Prompt.SelectAccount)
-            .WithSystemWebViewOptions(new SystemWebViewOptions
-            {
-                HtmlMessageSuccess = "<html><body style='font-family:sans-serif'><h2>Signed in</h2><p>You can close this tab and return to HCG Mail.</p></body></html>",
-                HtmlMessageError = "<html><body style='font-family:sans-serif'><h2>Sign-in did not complete</h2><p>Return to HCG Mail for details.</p></body></html>",
-            });
+        var request = _configureInteractive(_app.AcquireTokenInteractive(MailScopes).WithPrompt(Prompt.SelectAccount));
         if (!string.IsNullOrWhiteSpace(loginHint))
             request = request.WithLoginHint(loginHint);
 
@@ -176,29 +198,39 @@ public sealed class MsalMicrosoftAuth : IMicrosoftAuth
         {
             if (_cacheReady)
                 return;
-            try
+            if (_persistCache is not null)
             {
-                AppPaths.CreatePrivateDirectory(CachePath);
-                var properties = new StorageCreationPropertiesBuilder("msal-token-cache.bin", CachePath)
-                    .WithMacKeyChain("HCG Mail Microsoft sign-in", "MSALCache")
-                    .WithLinuxKeyring("hcgmail_msal.keyring", MsalCacheHelper.LinuxKeyRingDefaultCollection, "HCG Mail Microsoft sign-in",
-                        new KeyValuePair<string, string>("Version", "1"), new KeyValuePair<string, string>("ProductGroup", "HCG Mail"))
-                    .Build();
-                var helper = await MsalCacheHelper.CreateAsync(properties).ConfigureAwait(false);
-                helper.VerifyPersistence();
-                helper.RegisterCache(_app.UserTokenCache);
-            }
-            catch (Exception ex) when (ex is MsalCachePersistenceException or PlatformNotSupportedException or IOException or UnauthorizedAccessException or DllNotFoundException)
-            {
-                // Never fall back to a plaintext token file.
-                PersistenceProblem = "The protected token store is not available on this computer, so Microsoft sign-in is kept only until HCG Mail closes.";
-                _logger.LogWarning("Microsoft token cache persistence unavailable ({Error}); tokens are kept in memory only", ex.GetType().Name);
+                PersistenceProblem = await _persistCache(_app.UserTokenCache).ConfigureAwait(false);
+                if (PersistenceProblem is not null)
+                    _logger.LogWarning("Microsoft token cache persistence unavailable; tokens are kept in memory only");
             }
             _cacheReady = true;
         }
         finally
         {
             _cacheGate.Release();
+        }
+    }
+
+    private static async Task<string?> PersistDesktopCacheAsync(ITokenCache cache, string directory)
+    {
+        try
+        {
+            AppPaths.CreatePrivateDirectory(directory);
+            var properties = new StorageCreationPropertiesBuilder("msal-token-cache.bin", directory)
+                .WithMacKeyChain("HCG Mail Microsoft sign-in", "MSALCache")
+                .WithLinuxKeyring("hcgmail_msal.keyring", MsalCacheHelper.LinuxKeyRingDefaultCollection, "HCG Mail Microsoft sign-in",
+                    new KeyValuePair<string, string>("Version", "1"), new KeyValuePair<string, string>("ProductGroup", "HCG Mail"))
+                .Build();
+            var helper = await MsalCacheHelper.CreateAsync(properties).ConfigureAwait(false);
+            helper.VerifyPersistence();
+            helper.RegisterCache(cache);
+            return null;
+        }
+        catch (Exception ex) when (ex is MsalCachePersistenceException or PlatformNotSupportedException or IOException or UnauthorizedAccessException or DllNotFoundException)
+        {
+            // Never fall back to a plaintext token file.
+            return "The protected token store is not available on this computer, so Microsoft sign-in is kept only until HCG Mail closes.";
         }
     }
 }

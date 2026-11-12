@@ -1,0 +1,169 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:HCG.Mail.Mobile.ViewModels"
+             xmlns:app="using:HCG.Mail.App.ViewModels"
+             xmlns:controls="using:HCG.Mail.App.Controls"
+             x:Class="HCG.Mail.Mobile.Views.MessageListView"
+             x:DataType="vm:MobileShellViewModel">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.sender">
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+    </Style>
+    <Style Selector="TextBlock.sender.unread">
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    </Style>
+    <Style Selector="TextBlock.subject">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+    </Style>
+    <Style Selector="TextBlock.subject.unread">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+    </Style>
+    <Style Selector="TextBlock.date.unread">
+      <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Accent}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Background="{DynamicResource Hcg.Bg.List}">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+
+      <!-- Navigation bar -->
+      <Border Classes="navBar">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+          <Button x:Name="MailboxesButton" Classes="nav" Command="{Binding ShowMailboxesCommand}" IsVisible="{Binding ShowMailboxesButton}"
+                  AutomationProperties.Name="Mailboxes">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <controls:IconView Data="{StaticResource Icon.Inbox}" />
+              <TextBlock Text="Mailboxes" VerticalAlignment="Center" IsVisible="{Binding IsCompact}" Foreground="{DynamicResource Hcg.Text.Accent}" />
+            </StackPanel>
+          </Button>
+          <StackPanel Grid.Column="1" Margin="8,4" VerticalAlignment="Center">
+            <TextBlock x:Name="FolderTitle" Classes="navTitle" Text="{Binding Mail.MessageList.FolderTitle}" />
+            <TextBlock Classes="caption" Text="{Binding Mail.MessageList.CountText}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <Button x:Name="RefreshButton" Grid.Column="2" Classes="icon" Command="{Binding Mail.RefreshCommand}" AutomationProperties.Name="Refresh">
+            <controls:IconView Data="{StaticResource Icon.Refresh}" Classes.spin="{Binding SpinRefreshIcon}">
+              <controls:IconView.RenderTransform>
+                <RotateTransform />
+              </controls:IconView.RenderTransform>
+            </controls:IconView>
+          </Button>
+          <Button x:Name="ComposeButton" Grid.Column="3" Classes="icon" Command="{Binding Mail.ComposeCommand}" AutomationProperties.Name="New message">
+            <controls:IconView Data="{StaticResource Icon.Compose}" Foreground="{DynamicResource Hcg.Accent}" />
+          </Button>
+        </Grid>
+      </Border>
+
+      <!-- Search -->
+      <TextBox Grid.Row="1" x:Name="SearchBox" Margin="12,10,12,6" Text="{Binding Mail.MessageList.SearchText}"
+               Watermark="Search loaded messages" AutomationProperties.Name="Search"
+               IsEnabled="{Binding Mail.MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Enter" Command="{Binding Mail.MessageList.SearchServerCommand}" />
+        </TextBox.KeyBindings>
+        <TextBox.InnerLeftContent>
+          <controls:IconView Data="{StaticResource Icon.Search}" Width="17" Height="17" Margin="10,0,0,0" Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+        </TextBox.InnerLeftContent>
+        <TextBox.InnerRightContent>
+          <Button Classes="icon" Command="{Binding Mail.MessageList.ClearSearchCommand}" IsVisible="{Binding Mail.MessageList.IsSearching}"
+                  AutomationProperties.Name="Clear search">
+            <controls:IconView Data="{StaticResource Icon.Close}" Width="15" Height="15" />
+          </Button>
+        </TextBox.InnerRightContent>
+      </TextBox>
+
+      <StackPanel Grid.Row="2" Spacing="2">
+        <Grid ColumnDefinitions="*,Auto" Margin="14,0,10,4" IsVisible="{Binding Mail.MessageList.IsSearching}">
+          <TextBlock Classes="caption" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding Mail.MessageList.SearchScopeText}" />
+          <Button Grid.Column="1" Classes="link" Content="Search all" Command="{Binding Mail.MessageList.SearchServerCommand}"
+                  IsVisible="{Binding Mail.MessageList.CanOfferServerSearch}" AutomationProperties.Name="Search the whole folder on the server" />
+        </Grid>
+        <ProgressBar IsIndeterminate="True" Height="2" MinHeight="2" Margin="12,0" IsVisible="{Binding Mail.MessageList.IsLoading}" />
+      </StackPanel>
+
+      <!-- Content -->
+      <Panel Grid.Row="3">
+        <RefreshContainer x:Name="PullToRefresh" IsVisible="{Binding Mail.MessageList.ShowList}">
+          <ListBox x:Name="Messages" Classes="messages" ItemsSource="{Binding Mail.MessageList.Items}"
+                   SelectedItem="{Binding Mail.MessageList.SelectedItem}" SelectionMode="Single" AutomationProperties.Name="Messages">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="app:MessageItemViewModel">
+                <Grid ColumnDefinitions="18,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="6,11,10,11" Background="Transparent">
+                  <Ellipse Grid.RowSpan="2" Width="10" Height="10" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="0,6,0,0"
+                           Fill="{DynamicResource Hcg.Accent}" IsVisible="{Binding !IsRead}" />
+                  <TextBlock Grid.Column="1" Classes="sender" Classes.unread="{Binding !IsRead}" Text="{Binding Sender}" TextTrimming="CharacterEllipsis" />
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="8,0,0,0">
+                    <controls:IconView Data="{StaticResource Icon.Flag}" Width="14" Height="14" IsVisible="{Binding IsFlagged}"
+                                       Foreground="{DynamicResource Hcg.Warning}" VerticalAlignment="Center" />
+                    <TextBlock Classes="caption date" Classes.unread="{Binding !IsRead}" Text="{Binding DateText}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <TextBlock Grid.Row="1" Grid.Column="1" Classes="subject" Classes.unread="{Binding !IsRead}" Text="{Binding Subject}"
+                             TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
+                  <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" Spacing="3" Margin="6,0,0,0" HorizontalAlignment="Right">
+                    <controls:IconView Data="{StaticResource Icon.Reply}" Width="14" Height="14" IsVisible="{Binding IsAnswered}"
+                                       Foreground="{DynamicResource Hcg.Text.Tertiary}" VerticalAlignment="Center" />
+                    <controls:IconView Data="{StaticResource Icon.Paperclip}" Width="15" Height="15" IsVisible="{Binding HasAttachments}"
+                                       Foreground="{DynamicResource Hcg.Text.Tertiary}" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Classes="caption" FontSize="14" Text="{Binding Preview}"
+                             IsVisible="{Binding HasPreview}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" Margin="0,3,0,0" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </RefreshContainer>
+
+        <StackPanel IsVisible="{Binding Mail.MessageList.IsEmpty}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" Margin="24">
+          <controls:IconView Data="{StaticResource Icon.Inbox}" Width="36" Height="36" Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+          <TextBlock Text="{Binding Mail.MessageList.EmptyText}" Classes="muted" FontSize="15" TextAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding Mail.MessageList.HasError}" VerticalAlignment="Center" Spacing="12" Margin="24">
+          <controls:IconView Data="{StaticResource Icon.Warning}" Width="32" Height="32" Foreground="{DynamicResource Hcg.Danger}" />
+          <TextBlock Text="{Binding Mail.MessageList.ErrorMessage}" Classes="body" TextAlignment="Center" />
+          <Button Classes="subtle" HorizontalAlignment="Center" Content="Try again" Command="{Binding Mail.RefreshCommand}" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding Mail.ShowConnecting}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" Margin="24">
+          <ProgressBar IsIndeterminate="True" Width="160" />
+          <TextBlock Text="Connecting to your mail server…" Classes="muted" FontSize="15" HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding Mail.ShowNeedsSignIn}" VerticalAlignment="Center" Spacing="12" Margin="24">
+          <TextBlock Text="Sign in to Microsoft again" Classes="h3" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding Mail.SelectedAccount.StatusText}" Classes="body" TextAlignment="Center" />
+          <Button Classes="primary" HorizontalAlignment="Center" Content="Reconnect" Command="{Binding Mail.EnterPasswordCommand}" />
+        </StackPanel>
+        <StackPanel IsVisible="{Binding Mail.ShowNeedsPassword}" VerticalAlignment="Center" Spacing="12" Margin="24">
+          <controls:IconView Data="{StaticResource Icon.Lock}" Width="32" Height="32" Foreground="{DynamicResource Hcg.Accent}" />
+          <TextBlock Text="Password required" Classes="h3" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding Mail.SelectedAccount.EmailAddress, StringFormat='Enter the password for {0} to connect.'}" Classes="body" TextAlignment="Center" />
+          <Button Classes="primary" HorizontalAlignment="Center" Content="Enter password" Command="{Binding Mail.EnterPasswordCommand}" />
+        </StackPanel>
+
+        <StackPanel x:Name="AccountError" IsVisible="{Binding Mail.ShowAccountError}" VerticalAlignment="Center" Spacing="12" Margin="24">
+          <controls:IconView Data="{StaticResource Icon.Warning}" Width="32" Height="32" Foreground="{DynamicResource Hcg.Danger}" />
+          <TextBlock Text="Could not connect" Classes="h3" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding Mail.SelectedAccount.StatusText}" Classes="body" TextAlignment="Center" />
+          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+            <Button Classes="primary" Content="Reconnect" Command="{Binding Mail.ReconnectCommand}" />
+            <Button Classes="subtle" Content="Account settings" Command="{Binding Mail.OpenAccountSettingsCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Panel>
+
+      <!-- Paging and status -->
+      <StackPanel Grid.Row="4">
+        <Button x:Name="LoadOlderButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="10,4"
+                Command="{Binding Mail.MessageList.LoadOlderCommand}" IsVisible="{Binding Mail.MessageList.HasOlder}" Content="Load older messages" />
+        <TextBlock x:Name="StatusLine" Text="{Binding Mail.StatusText}" Classes="caption" HorizontalAlignment="Center" TextAlignment="Center"
+                   TextWrapping="Wrap" Margin="12,2,12,8" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>
