@@ -1,0 +1,51 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: Nested MIME: mixed/alternative/related
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <215415720@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="MIX"
+
+This is a multi-part message in MIME format.
+--MIX
+Content-Type: multipart/alternative; boundary="ALT"
+
+--ALT
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Hei Ola, her er tallene for tredje kvartal =E2=80=93 med logo.
+
+Mvh
+Fixture-teamet
+
+--ALT
+Content-Type: multipart/related; boundary="REL"; type="text/html"
+
+--REL
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: base64
+
+PGh0bWw+PGhlYWQ+PG1ldGEgY2hhcnNldD0idXRmLTgiPjwvaGVhZD48Ym9keT4KPGgxIHN0eWxl
+PSJjb2xvcjojMGIyNTQwIj5LdmFydGFsc3JhcHBvcnQ8L2gxPgo8cD5IZWkgT2xhLCBoZXIgZXIg
+dGFsbGVuZSBmb3IgdHJlZGplIGt2YXJ0YWwg4oCTIG1lZCBsb2dvOjwvcD4KPHA+PGltZyBzcmM9
+ImNpZDpsb2dvLTFAZXhhbXBsZS5jb20iIGFsdD0iSENHIHRlc3QgbG9nbyIgd2lkdGg9IjI0IiBo
+ZWlnaHQ9IjI0Ij48L3A+CjxwPk12aDxicj5GaXh0dXJlLXRlYW1ldDwvcD48L2JvZHk+PC9odG1s
+Pg==
+--REL
+Content-Type: image/png; name="logo.png"
+Content-Transfer-Encoding: base64
+Content-ID: <logo-1@example.com>
+Content-Disposition: inline; filename="logo.png"
+
+iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAIAAABvFaqvAAAAH0lEQVR4nGPgTl5BFcQwatCoQaMG
+jRo0atCoQQNvEACE7XGfg/bsNgAAAABJRU5ErkJggg==
+--REL--
+--ALT--
+--MIX
+Content-Type: application/pdf; name="rapport.pdf"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="rapport.pdf"
+
+JVBERi0xLjQgc3ludGhldGljIGZpeHR1cmU=
+--MIX--

@@ -446,4 +446,55 @@ public class LocalMailServerTests
         Assert.Equal(HCG.Mail.Core.Delivery.DeliveryState.NotSent, record.State);
         Assert.DoesNotContain("wrong-password", System.Text.Json.JsonSerializer.Serialize(record));
     }
+
+    // ---- previews and server search ----------------------------------------------------------
+
+    [LocalMailServerFact]
+    public async Task Inbox_previews_are_clean_text_for_newsletters_and_mislabelled_markup()
+    {
+        var folderName = "Previews" + Guid.NewGuid().ToString("N")[..6];
+        using (var imap = new MailClientFactory().CreateImapClient(new TlsValidationRecorder()))
+        {
+            await imap.ConnectAsync(Host, 993, MailKit.Security.SecureSocketOptions.SslOnConnect);
+            await imap.AuthenticateAsync("kari@hcgmail.test", Password("kari"));
+            var folder = await imap.GetFolder(imap.PersonalNamespaces[0]).CreateAsync(folderName, true);
+            foreach (var name in new[] { "05-light-newsletter.eml", "07-remote-images-only.eml", "13-markup-in-text-plain.eml" })
+                await folder!.AppendAsync(new MailKit.AppendRequest(MimeKit.MimeMessage.Load(Email.RenderingPipelineTests.Fixture(name))));
+            await imap.DisconnectAsync(true);
+        }
+
+        await using var kari = Factory.Create(Account("kari"), Password("kari"));
+        await kari.ConnectAsync();
+        var full = (await kari.GetFoldersAsync()).Single(f => f.Name == folderName)!.FullName;
+        var previews = (await kari.GetMessagesAsync(full, 0, 50)).Messages.ToDictionary(m => m.Subject, m => m.Preview);
+
+        Assert.All(previews.Values, p =>
+        {
+            Assert.DoesNotContain("http", p);
+            Assert.DoesNotContain("<", p);
+            Assert.DoesNotContain("\u034f", p, StringComparison.Ordinal); // ordinal: culture comparison ignores this character
+            Assert.DoesNotContain("[image:", p);
+        });
+        // The server's own snippet of this newsletter is mostly invisible padding; what remains after cleaning is its first line.
+        Assert.StartsWith("View this email in your browser", previews["Light newsletter layout"]);
+        Assert.Equal("Autumn sale – 30 % off everything this week.", previews["Image-only promotion"]);
+        Assert.Equal("Hello there, Your invoice is attached.", previews["HTML markup in a text/plain part"]);
+    }
+
+    [LocalMailServerFact]
+    public async Task Server_search_finds_messages_beyond_the_loaded_page()
+    {
+        var token = "srch" + Guid.NewGuid().ToString("N")[..8];
+        await using var ola = Factory.Create(Account("ola"), Password("ola"));
+        await using var kari = Factory.Create(Account("kari"), Password("kari"));
+        await ola.SendAsync(new OutgoingMessage { To = [new EmailAddress(null, "kari@hcgmail.test")], Subject = "Faktura " + token, TextBody = "Beløp 499 kr" }, saveCopyToSent: false);
+        await ola.SendAsync(new OutgoingMessage { To = [new EmailAddress(null, "kari@hcgmail.test")], Subject = "Annet", TextBody = "Referanse " + token }, saveCopyToSent: false);
+        await kari.ConnectAsync();
+        await WaitForAsync(kari, "INBOX", m => m.Subject == "Faktura " + token);
+
+        var results = await kari.SearchAsync("INBOX", token, 100);
+
+        Assert.Equal(2, results.Count); // subject match and body match
+        Assert.Empty(await kari.SearchAsync("INBOX", "no-such-text-" + token, 100));
+    }
 }

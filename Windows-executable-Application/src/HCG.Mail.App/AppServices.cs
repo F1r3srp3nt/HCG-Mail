@@ -1,6 +1,7 @@
 using HCG.Mail.App.Preview;
 using HCG.Mail.App.Services;
 using HCG.Mail.App.ViewModels;
+using HCG.Mail.Core.Accounts;
 using HCG.Mail.Core.Delivery;
 using HCG.Mail.Core.Security;
 using HCG.Mail.Core.Services;
@@ -8,11 +9,13 @@ using HCG.Mail.Core.Settings;
 using HCG.Mail.Email;
 using HCG.Mail.Email.Deliverability;
 using HCG.Mail.Email.Diagnostics;
+using HCG.Mail.Email.Graph;
 using HCG.Mail.Email.Html;
 using HCG.Mail.Email.Imap;
 using HCG.Mail.Infrastructure;
 using HCG.Mail.Infrastructure.Credentials;
 using HCG.Mail.Infrastructure.Logging;
+using HCG.Mail.Infrastructure.Microsoft;
 using HCG.Mail.Infrastructure.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -60,13 +63,21 @@ public static class AppServices
             services.AddSingleton<IConnectionTester, PreviewConnectionTester>();
             services.AddSingleton<IDeliveryLog, InMemoryDeliveryLog>();
             services.AddSingleton<IMailDns, OfflineMailDns>();
+            services.AddSingleton<IMicrosoftAuth>(new UnconfiguredMicrosoftAuth("Microsoft sign-in is not available in development preview mode."));
         }
         else
         {
             services.AddSingleton(_ => CredentialVaultFactory.CreateForCurrentPlatform());
             services.AddSingleton<IAccountStore, JsonAccountStore>();
             services.AddSingleton<IAppSettingsStore, JsonAppSettingsStore>();
-            services.AddSingleton<IMailSessionFactory, MailKitMailSessionFactory>();
+            services.AddSingleton<IMailSessionFactory, MailSessionFactory>();
+            services.AddSingleton<IMicrosoftAuth>(sp =>
+            {
+                var clientId = MicrosoftAuthOptions.ResolveClientId(typeof(AppServices).Assembly);
+                return MicrosoftAuthOptions.IsValidClientId(clientId)
+                    ? new MsalMicrosoftAuth(clientId!, sp.GetRequiredService<AppPaths>(), sp.GetRequiredService<ILogger<MsalMicrosoftAuth>>())
+                    : new UnconfiguredMicrosoftAuth(MicrosoftAuthOptions.NotConfiguredMessage);
+            });
             services.AddSingleton<IConnectionTester, ConnectionTester>();
             services.AddSingleton<IDeliveryLog, JsonDeliveryLog>();
             services.AddSingleton<IMailDns, SystemMailDns>();

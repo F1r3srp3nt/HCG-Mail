@@ -1,0 +1,12 @@
+From: Fixture Sender <news@example.com>
+To: Test Reader <reader@hcgmail.test>
+Subject: Light text without its background
+Date: Thu, 12 Nov 2026 09:30:00 +0100
+Message-ID: <2538096258@example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body><table width="100%"><tr><td style="background-image:url(https://cdn.example.com/dark.jpg);color:#ffffff;padding:30px;font-size:18px">
+White text that relies on a remote dark background image.</td></tr></table>
+<p style="color:#ffffff">White paragraph with no background at all.</p>
+<p style="color:#eeeeee">Very light grey paragraph.</p><p>Normal paragraph.</p></body></html>

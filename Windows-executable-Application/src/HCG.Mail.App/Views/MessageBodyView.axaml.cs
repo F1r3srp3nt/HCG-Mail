@@ -25,6 +25,16 @@ public partial class MessageBodyView : UserControl
         Html.ImageLoad += OnImageLoad;
         Html.StylesheetLoad += OnStylesheetLoad;
         Html.LinkClicked += OnLinkClicked;
+        Html.RenderError += OnRenderError;
+    }
+
+    private void OnRenderError(object? sender, HtmlRendererRoutedEventArgs<HtmlRenderErrorEventArgs> e)
+    {
+        // Image load failures are reported here too; only a failure of the document itself switches to text.
+        if (e.Event.Type is HtmlRenderErrorType.Image)
+            return;
+        var reader = Reader;
+        Dispatcher.UIThread.Post(() => reader?.OnHtmlRenderFailed(e.Event.Message));
     }
 
     private MessageReaderViewModel? Reader => DataContext as MessageReaderViewModel;

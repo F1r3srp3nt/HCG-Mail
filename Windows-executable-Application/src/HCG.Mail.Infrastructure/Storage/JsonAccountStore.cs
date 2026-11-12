@@ -56,6 +56,8 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
         public EndpointDto? Imap { get; set; }
         public EndpointDto? Smtp { get; set; }
         public string? PresetId { get; set; }
+        public MailProviderKind? Provider { get; set; }
+        public string? MicrosoftAccountId { get; set; }
 
         public static AccountDto From(MailAccount a) => new()
         {
@@ -66,12 +68,31 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
             Imap = EndpointDto.From(a.Imap),
             Smtp = EndpointDto.From(a.Smtp),
             PresetId = a.PresetId,
+            Provider = a.Provider == MailProviderKind.ImapSmtp ? null : a.Provider,
+            MicrosoftAccountId = a.MicrosoftAccountId,
         };
 
         public MailAccount? ToAccount()
         {
-            if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(EmailAddress) || string.IsNullOrWhiteSpace(Username)
-                || Imap?.ToEndpoint() is not { } imap || Smtp?.ToEndpoint() is not { } smtp)
+            if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(EmailAddress) || string.IsNullOrWhiteSpace(Username))
+                return null;
+            if (Provider == MailProviderKind.MicrosoftGraph)
+            {
+                if (string.IsNullOrWhiteSpace(MicrosoftAccountId))
+                    return null;
+                return new MailAccount
+                {
+                    Id = Id,
+                    DisplayName = DisplayName ?? "",
+                    EmailAddress = EmailAddress,
+                    Username = Username,
+                    Imap = MailAccount.GraphEndpoint,
+                    Smtp = MailAccount.GraphEndpoint,
+                    Provider = MailProviderKind.MicrosoftGraph,
+                    MicrosoftAccountId = MicrosoftAccountId,
+                };
+            }
+            if (Imap?.ToEndpoint() is not { } imap || Smtp?.ToEndpoint() is not { } smtp)
                 return null;
             return new MailAccount
             {

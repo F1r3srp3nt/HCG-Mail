@@ -12,6 +12,16 @@ namespace HCG.Mail.App.ViewModels;
 
 public sealed record ThemeOption(ThemeKind Kind, string Name, string Description);
 
+public sealed record RefreshOption(int Minutes, string Label)
+{
+    public override string ToString() => Label;
+}
+
+public sealed record ViewModeOption(Core.Services.MessageViewMode Mode, string Label, string Description)
+{
+    public override string ToString() => Label;
+}
+
 public sealed partial class SettingsViewModel : ObservableObject
 {
     private readonly AppSettingsService _settings;
@@ -28,6 +38,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _connectOnStartup;
     [ObservableProperty] private bool _askWhereToSaveAttachments;
     [ObservableProperty] private string _downloadDirectory;
+    [ObservableProperty] private RefreshOption _selectedRefresh;
+    [ObservableProperty] private ViewModeOption _selectedViewMode;
+    [ObservableProperty] private bool _loadRemoteImagesAutomatically;
 
     public SettingsViewModel(AppSettingsService settings, ThemeService themes, IDialogService dialogs, AppPaths paths, ICredentialVault vault, MainWindowViewModel main)
     {
@@ -46,7 +59,21 @@ public sealed partial class SettingsViewModel : ObservableObject
         _connectOnStartup = s.ConnectOnStartup;
         _askWhereToSaveAttachments = s.AskWhereToSaveAttachments;
         _downloadDirectory = s.DownloadDirectory ?? AppPaths.DefaultDownloadDirectory();
+        _selectedRefresh = RefreshOptions.FirstOrDefault(o => o.Minutes == s.AutomaticRefreshMinutes) ?? RefreshOptions[0];
+        _selectedViewMode = ViewModeOptions.First(o => o.Mode == s.DefaultMessageView);
+        _loadRemoteImagesAutomatically = s.LoadRemoteImagesAutomatically;
     }
+
+    public IReadOnlyList<RefreshOption> RefreshOptions { get; } =
+        AppSettings.AutomaticRefreshChoices.Select(m => new RefreshOption(m, m == 0 ? "Manually only (Refresh / F5)" : $"Every {m} minutes while HCG Mail is open")).ToList();
+
+    public IReadOnlyList<ViewModeOption> ViewModeOptions { get; } =
+    [
+        new(Core.Services.MessageViewMode.Original, "Original", "The sender's layout, colours and fonts, made safe. Recommended."),
+        new(Core.Services.MessageViewMode.Readable, "Readable", "The same text, images and links with the sender's colours, backgrounds and fonts removed: dark text on white."),
+    ];
+
+    public string MicrosoftSignInStatus => _main.MicrosoftSignInStatus;
 
     public IReadOnlyList<ThemeOption> Themes { get; } =
     [
@@ -70,6 +97,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnConfirmBeforeOpeningLinksChanged(bool value) => _settings.Update(s => s with { ConfirmBeforeOpeningLinks = value });
     partial void OnConnectOnStartupChanged(bool value) => _settings.Update(s => s with { ConnectOnStartup = value });
     partial void OnAskWhereToSaveAttachmentsChanged(bool value) => _settings.Update(s => s with { AskWhereToSaveAttachments = value });
+    partial void OnSelectedViewModeChanged(ViewModeOption value) => _settings.Update(s => s with { DefaultMessageView = value.Mode });
+    partial void OnLoadRemoteImagesAutomaticallyChanged(bool value) => _settings.Update(s => s with { LoadRemoteImagesAutomatically = value });
+
+    partial void OnSelectedRefreshChanged(RefreshOption value)
+    {
+        _settings.Update(s => s with { AutomaticRefreshMinutes = value.Minutes });
+        _main.ApplyRefreshSchedule();
+    }
 
     [RelayCommand]
     private async Task BrowseDownloadDirectoryAsync()
@@ -93,4 +128,13 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [RelayCommand]
     private Task EditAccountAsync(AccountViewModel account) => _main.EditAccountAsync(account);
+
+    [RelayCommand]
+    private Task AddMicrosoftAccountAsync() => _main.AddMicrosoftAccountCommand.ExecuteAsync(null);
+
+    [RelayCommand]
+    private Task ReconnectAccountAsync(AccountViewModel account) => _main.ReconnectAccountAsync(account);
+
+    [RelayCommand]
+    private Task RemoveAccountAsync(AccountViewModel account) => _main.RemoveAccountAsync(account.Account);
 }

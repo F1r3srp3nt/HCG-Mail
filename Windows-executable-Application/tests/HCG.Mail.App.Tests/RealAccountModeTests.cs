@@ -135,9 +135,39 @@ public class RealAccountModeTests
             .Where(f => f.FieldType == typeof(DispatcherTimer) || f.FieldType == typeof(System.Timers.Timer) || f.FieldType == typeof(System.Threading.Timer) || f.FieldType == typeof(PeriodicTimer))
             .Select(f => f.Name)
             .ToList();
-        // The only timer is the 120 ms debounce used when a message is clicked.
-        Assert.Equal(["_selectionDelay"], timers);
+        // The 120 ms debounce used when a message is clicked, and the optional automatic-refresh timer, which only
+        // exists when the user turns automatic checking on (see the test below).
+        Assert.Equal(["_autoRefresh", "_selectionDelay"], timers.Order());
+        // The old setting name (5 minutes in builds that polled) must stay ignored, so upgrading never turns polling on.
         Assert.Null(typeof(AppSettings).GetProperty("RefreshIntervalMinutes"));
+        Assert.Equal(0, new AppSettings().AutomaticRefreshMinutes);
+    }
+
+    [AvaloniaFact]
+    public async Task Automatic_refresh_timer_exists_only_when_enabled_in_settings()
+    {
+        await using var ui = await UiHarness.StartAsync();
+        var field = typeof(MainWindowViewModel).GetField("_autoRefresh", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.Null(field.GetValue(ui.ViewModel));
+
+        var settings = ui.Services.GetRequiredService<AppSettingsService>();
+        settings.Update(s => s with { AutomaticRefreshMinutes = 15 });
+        ui.ViewModel.ApplyRefreshSchedule();
+        var timer = Assert.IsType<DispatcherTimer>(field.GetValue(ui.ViewModel));
+        Assert.Equal(TimeSpan.FromMinutes(15), timer.Interval);
+        Assert.True(timer.IsEnabled);
+
+        settings.Update(s => s with { AutomaticRefreshMinutes = 0 });
+        ui.ViewModel.ApplyRefreshSchedule();
+        Assert.Null(field.GetValue(ui.ViewModel));
+    }
+
+    [Fact]
+    public void Old_refresh_interval_in_settings_files_does_not_enable_polling()
+    {
+        var json = "{\"version\":1,\"refreshIntervalMinutes\":5,\"notifyOnNewMail\":true}";
+        var loaded = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase })!;
+        Assert.Equal(0, loaded.Normalize().AutomaticRefreshMinutes);
     }
 
     [AvaloniaFact]

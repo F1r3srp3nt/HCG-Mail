@@ -29,4 +29,6 @@ public interface IDialogService
     void ShowCompose(ComposeViewModel viewModel);
 
     void ShowMailHealth(MailHealthViewModel viewModel);
+
+    Task<bool> ShowMicrosoftAccountAsync(MicrosoftAccountViewModel viewModel);
 }

@@ -62,7 +62,10 @@
 
       <!-- Search -->
       <TextBox Grid.Row="1" x:Name="SearchBox" Margin="14,0,14,10" Text="{Binding MessageList.SearchText}"
-               Watermark="Search loaded messages" IsEnabled="{Binding MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
+               Watermark="Filter loaded messages (Enter: search the whole folder)" IsEnabled="{Binding MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Enter" Command="{Binding MessageList.SearchServerCommand}" />
+        </TextBox.KeyBindings>
         <TextBox.InnerLeftContent>
           <controls:IconView Data="{StaticResource Icon.Search}" Width="15" Height="15" Margin="10,0,0,0"
                              Foreground="{DynamicResource Hcg.Text.Tertiary}" />
@@ -75,8 +78,16 @@
         </TextBox.InnerRightContent>
       </TextBox>
 
-      <ProgressBar Grid.Row="2" IsIndeterminate="True" Height="2" MinHeight="2" Margin="14,0"
-                   IsVisible="{Binding MessageList.IsLoading}" />
+      <StackPanel Grid.Row="2" Spacing="4">
+        <Grid ColumnDefinitions="*,Auto" Margin="16,0,14,6" IsVisible="{Binding MessageList.IsSearching}">
+          <TextBlock x:Name="SearchScope" Classes="caption" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding MessageList.SearchScopeText}" />
+          <Button x:Name="SearchServerButton" Grid.Column="1" Classes="link" FontSize="11.5" Margin="8,0,0,0" Content="Search the whole folder"
+                  Command="{Binding MessageList.SearchServerCommand}" IsVisible="{Binding MessageList.CanOfferServerSearch}"
+                  ToolTip.Tip="Ask the mail server to search every message in this folder, not only the ones loaded here" />
+        </Grid>
+        <ProgressBar IsIndeterminate="True" Height="2" MinHeight="2" Margin="14,0"
+                     IsVisible="{Binding MessageList.IsLoading}" />
+      </StackPanel>
 
       <!-- Content -->
       <Panel Grid.Row="3">
@@ -133,6 +144,11 @@
           <TextBlock Text="Connecting to your mail server…" Classes="muted" HorizontalAlignment="Center" />
         </StackPanel>
 
+        <StackPanel IsVisible="{Binding ShowNeedsSignIn}" VerticalAlignment="Center" Spacing="12" Margin="28">
+          <TextBlock Text="Sign in to Microsoft again" Classes="h3" HorizontalAlignment="Center" />
+          <TextBlock Text="{Binding SelectedAccount.StatusText}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+          <Button Classes="primary" HorizontalAlignment="Center" Content="Reconnect" Command="{Binding EnterPasswordCommand}" />
+        </StackPanel>
         <StackPanel IsVisible="{Binding ShowNeedsPassword}" VerticalAlignment="Center" Spacing="12" Margin="28">
           <controls:IconView Data="{StaticResource Icon.Lock}" Width="30" Height="30" Foreground="{DynamicResource Hcg.Accent}" />
           <TextBlock Text="Password required" Classes="h3" HorizontalAlignment="Center" />

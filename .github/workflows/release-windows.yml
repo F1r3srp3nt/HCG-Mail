@@ -43,6 +43,10 @@ jobs:
         run: dotnet test HCG.Mail.sln -c Release
 
       - name: Build HCGMail.exe (win-x64, self-contained)
+        env:
+          # Public Microsoft application (client) ID for Outlook.com / Microsoft 365 sign-in, from the repository
+          # variable HCG_MICROSOFT_CLIENT_ID (Settings → Secrets and variables → Actions → Variables). Not a secret.
+          HCG_MICROSOFT_CLIENT_ID: ${{ vars.HCG_MICROSOFT_CLIENT_ID }}
         run: bash scripts/publish-windows.sh
 
       - name: Checksums

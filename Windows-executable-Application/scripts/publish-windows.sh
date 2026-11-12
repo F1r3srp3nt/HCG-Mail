@@ -10,7 +10,8 @@ VERSION=$(sed -n 's:.*<InformationalVersion>\(.*\)</InformationalVersion>.*:\1:p
 OUT=artifacts/publish/win-x64
 rm -rf "$OUT"
 dotnet publish src/HCG.Mail.App -c Release -r win-x64 --self-contained true \
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o "$OUT"
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none \
+  -p:HcgMicrosoftClientId="${HCG_MICROSOFT_CLIENT_ID:-}" -o "$OUT"
 ZIP="artifacts/HCGMail-${VERSION}-win-x64.zip"
 rm -f "$ZIP"
 (cd "$OUT" && zip -q -9 "../../../$ZIP" HCGMail.exe)

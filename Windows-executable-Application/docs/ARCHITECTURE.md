@@ -77,6 +77,13 @@ replaced without touching view models.
 * In Trash, or when the server has no Trash: **permanent delete after confirmation**
   (`\Deleted` + `UID EXPUNGE`; plain `EXPUNGE` only on servers without UIDPLUS).
 
+### Providers
+
+`MailAccount.Provider` selects the session: `MailKitMailSession` (IMAP + SMTP, password in the OS vault) or
+`GraphMailSession` (Microsoft Graph v1.0 with delegated MSAL tokens). `MailSessionFactory` picks one per account;
+both implement `IMailSession`, so folders, lists, the reader, compose, drafts, search and Mail Health work the same
+way. Graph message bodies are fetched as MIME and reuse `MimeConverter`. See [MICROSOFT_ACCOUNTS.md](MICROSOFT_ACCOUNTS.md).
+
 ## UI architecture (MVVM)
 
 * CommunityToolkit.Mvvm source generators (`[ObservableProperty]`, `[RelayCommand]`), compiled
@@ -126,6 +133,7 @@ HTML is shown on a light "paper" surface in both skins, because most HTML mail a
 | Logs | `logs/hcg-mail-YYYYMMDD.log` | 7-day retention; no secrets or message content |
 | Send history | `delivery-history.json` | Last 300 SMTP outcomes (state, server reply, Message-ID); no message content — see [DELIVERABILITY.md](DELIVERABILITY.md) |
 | Message bodies, attachments | **not cached** | Fetched on demand, held in memory only |
+| Microsoft sign-in tokens | `msal-token-cache.bin` (DPAPI) / Keychain / Secret Service | MSAL cache; removed with the account |
 
 Settings folder: `%LOCALAPPDATA%\HCG\HCG Mail` (Windows), `~/Library/Application Support/HCG Mail`
 (macOS), `$XDG_CONFIG_HOME/hcg-mail` (Linux); override with `HCG_MAIL_DATA_DIR`.

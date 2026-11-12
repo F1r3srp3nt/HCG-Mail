@@ -13,8 +13,11 @@ public enum MessageFlags
     Deleted = 1 << 4,
 }
 
-/// <summary>Identifies a message on the server. UIDs are only meaningful together with the folder's UIDVALIDITY.</summary>
-public sealed record MessageRef(string FolderFullName, uint Uid, uint UidValidity);
+/// <summary>
+/// Identifies a message on the server. IMAP: <see cref="Uid"/> within the folder's UIDVALIDITY. Microsoft Graph:
+/// <see cref="ServerId"/> (Uid and UidValidity are 0) and <see cref="FolderFullName"/> is the folder id.
+/// </summary>
+public sealed record MessageRef(string FolderFullName, uint Uid, uint UidValidity, string? ServerId = null);
 
 public sealed record MessageSummary
 {

@@ -37,6 +37,12 @@ public interface IMailSession : IAsyncDisposable
     /// <summary>Loads the newest <paramref name="count"/> messages, skipping the newest <paramref name="skip"/> (for "load older").</summary>
     Task<FolderPage> GetMessagesAsync(string folderFullName, int skip, int count, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Searches the whole folder on the server (subject, sender and text), newest first. Distinct from filtering the
+    /// messages already loaded in the list.
+    /// </summary>
+    Task<IReadOnlyList<MessageSummary>> SearchAsync(string folderFullName, string query, int maxResults, CancellationToken cancellationToken = default);
+
     Task<MessageContent> GetMessageAsync(MessageRef message, CancellationToken cancellationToken = default);
 
     Task SetFlagsAsync(IReadOnlyList<MessageRef> messages, MessageFlags flags, bool add, CancellationToken cancellationToken = default);

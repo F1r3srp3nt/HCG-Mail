@@ -24,8 +24,14 @@ public static class MimeConverter
         var parts = Classify(message);
         var html = parts.Html?.Text;
         var text = parts.Text?.Text;
-        if (string.IsNullOrWhiteSpace(text) && html is not null)
-            text = htmlToText.ToText(html);
+
+        // Some mailers send an HTML alternative with nothing visible in it next to a real plain-text part.
+        // Preferring that HTML is what produced a blank reading pane while the list preview (taken from the
+        // text part) showed content, so an HTML body only wins when it actually shows something.
+        if (html is not null && !Html.HtmlToTextConverter.HasVisibleContent(html))
+            html = null;
+        if (string.IsNullOrWhiteSpace(text))
+            text = html is not null ? htmlToText.ToText(html) : "";
 
         return new MessageContent
         {
@@ -40,7 +46,7 @@ public static class MimeConverter
             MessageId = message.MessageId,
             InReplyTo = message.InReplyTo,
             References = message.References.ToList(),
-            TextBody = text ?? "",
+            TextBody = string.IsNullOrWhiteSpace(text) ? "" : text,
             HtmlBody = html,
             Attachments = parts.Attachments.Select((entity, i) => ToAttachmentInfo(entity, i)).ToList(),
             InlineResources = parts.Inline.Select(ToInlineResource).Where(r => r is not null).Select(r => r!).ToList(),

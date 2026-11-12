@@ -125,6 +125,26 @@
     <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Pressed}" />
   </Style>
 
+  <!-- Segmented choice (message view mode) -->
+  <Style Selector="Button.segment">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Border.Default}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Secondary}" />
+    <Setter Property="Padding" Value="9,3" />
+    <Setter Property="MinHeight" Value="24" />
+  </Style>
+  <Style Selector="Button.segment:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Hover}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+  <Style Selector="Button.segment.selected">
+    <Setter Property="Background" Value="{DynamicResource Hcg.Bg.AccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Hcg.Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
+  </Style>
+
   <Style Selector="Button.ghost, Button.toolbar, Button.icon, Button.nav, Button.link">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />

@@ -29,7 +29,7 @@
           <Rectangle Height="1" Fill="{DynamicResource Hcg.Brush.AccentLine}" Margin="0,6" />
           <TextBlock Classes="h1" Text="Welcome to HCG Mail" />
           <TextBlock Classes="muted" TextWrapping="Wrap" LineHeight="20"
-                     Text="Connect your existing email account using IMAP and SMTP. HCG Mail works with privately hosted domain email such as Domene.no — no Outlook, Microsoft 365 or HCG account is required." />
+                     Text="Connect your existing email account using IMAP and SMTP — for example privately hosted domain email such as Domene.no — or sign in with a Microsoft account (Outlook.com, Hotmail, Microsoft 365). No HCG account is required." />
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
             <controls:IconView Data="{StaticResource Icon.Shield}" Width="16" Height="16" Foreground="{DynamicResource Hcg.Accent}" />
             <TextBlock Classes="caption" TextWrapping="Wrap" MaxWidth="420" VerticalAlignment="Center"
@@ -43,6 +43,8 @@
               </StackPanel>
             </Button>
           </Border>
+          <Button x:Name="AddMicrosoftAccountButton" Classes="subtle" Command="{Binding AddMicrosoftAccountCommand}" Padding="18,10" HorizontalAlignment="Left"
+                  Content="Add Microsoft account (Outlook.com / Microsoft 365)" />
         </StackPanel>
       </Border>
 
@@ -70,6 +72,7 @@
         <controls:IconView Data="{StaticResource Icon.Warning}" Width="30" Height="30" Foreground="{DynamicResource Hcg.Danger}" />
         <TextBlock Text="The message could not be opened" Classes="h3" HorizontalAlignment="Center" />
         <TextBlock Text="{Binding Reader.ErrorMessage}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
+        <Button Classes="subtle" Content="Retry" Command="{Binding Reader.RetryCommand}" HorizontalAlignment="Center" />
       </StackPanel>
 
       <!-- Message -->
@@ -130,23 +133,56 @@
             </StackPanel>
             <StackPanel Grid.Column="2" Spacing="6" HorizontalAlignment="Right">
               <TextBlock Text="{Binding Reader.DateText}" Classes="caption" HorizontalAlignment="Right" />
-              <Button Classes="link" FontSize="11.5" HorizontalAlignment="Right" IsVisible="{Binding Reader.HasHtml}"
-                      Content="{Binding Reader.ViewModeText}" Command="{Binding Reader.ToggleViewModeCommand}" />
+              <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" IsVisible="{Binding Reader.HasHtml}">
+                <Button x:Name="OriginalModeButton" Classes="segment" Classes.selected="{Binding Reader.IsOriginalMode}" Content="Original" FontSize="11.5"
+                        Command="{Binding Reader.SetModeCommand}" CommandParameter="{x:Static vm:ReaderBodyMode.Original}"
+                        ToolTip.Tip="The sender's layout, colours and fonts" />
+                <Button x:Name="ReadableModeButton" Classes="segment" Classes.selected="{Binding Reader.IsReadableMode}" Content="Readable" FontSize="11.5"
+                        Command="{Binding Reader.SetModeCommand}" CommandParameter="{x:Static vm:ReaderBodyMode.Readable}"
+                        ToolTip.Tip="Same content and images in plain dark-on-white colours, without the sender's styling" />
+                <Button x:Name="PlainTextModeButton" Classes="segment" Classes.selected="{Binding Reader.IsPlainTextMode}" Content="Plain text" FontSize="11.5"
+                        Command="{Binding Reader.SetModeCommand}" CommandParameter="{x:Static vm:ReaderBodyMode.PlainText}"
+                        ToolTip.Tip="The message's text only" />
+              </StackPanel>
             </StackPanel>
           </Grid>
         </StackPanel>
 
-        <!-- Remote content blocked -->
-        <Border Grid.Row="2" Classes="banner" IsVisible="{Binding Reader.ShowRemoteBanner}" Margin="0,0,0,12">
-          <Grid ColumnDefinitions="Auto,*,Auto">
-            <controls:IconView Data="{StaticResource Icon.Shield}" Width="17" Height="17" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Center" />
-            <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
-              <TextBlock Text="{Binding Reader.RemoteBannerText}" FontSize="12.5" TextWrapping="Wrap" />
-              <TextBlock Text="Loading them lets the sender see that and when you opened this message." Classes="caption" TextWrapping="Wrap" />
-            </StackPanel>
-            <Button Grid.Column="2" Classes="subtle" Content="Load images" Command="{Binding Reader.LoadRemoteImagesCommand}" VerticalAlignment="Center" />
-          </Grid>
-        </Border>
+        <!-- Notices: blocked remote content, readability, formatting failures -->
+        <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,12">
+          <StackPanel.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.Or}">
+              <Binding Path="Reader.ShowRemoteBanner" />
+              <Binding Path="Reader.ShowContrastHint" />
+              <Binding Path="Reader.HasRenderNotice" />
+            </MultiBinding>
+          </StackPanel.IsVisible>
+          <Border Classes="banner" IsVisible="{Binding Reader.ShowRemoteBanner}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <controls:IconView Data="{StaticResource Icon.Shield}" Width="17" Height="17" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Reader.RemoteBannerText}" FontSize="12.5" TextWrapping="Wrap" />
+                <TextBlock Text="{x:Static vm:MessageReaderViewModel.RemoteImagesPrivacyText}" Classes="caption" TextWrapping="Wrap" />
+              </StackPanel>
+              <Button x:Name="LoadRemoteImagesButton" Grid.Column="2" Classes="subtle" Content="Load remote images" Command="{Binding Reader.LoadRemoteImagesCommand}" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+          <Border Classes="banner" IsVisible="{Binding Reader.ShowContrastHint}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <controls:IconView Data="{StaticResource Icon.Text}" Width="17" Height="17" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Margin="10,0" VerticalAlignment="Center" FontSize="12.5" TextWrapping="Wrap"
+                         Text="Some text in this message is very light and may be hard to read in the sender's layout." />
+              <Button Grid.Column="2" Classes="subtle" Content="Readable view" VerticalAlignment="Center"
+                      Command="{Binding Reader.SetModeCommand}" CommandParameter="{x:Static vm:ReaderBodyMode.Readable}" />
+            </Grid>
+          </Border>
+          <Border Classes="banner" IsVisible="{Binding Reader.HasRenderNotice}">
+            <Grid ColumnDefinitions="Auto,*">
+              <controls:IconView Data="{StaticResource Icon.Warning}" Width="17" Height="17" Foreground="{DynamicResource Hcg.Warning}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Margin="10,0" VerticalAlignment="Center" FontSize="12.5" TextWrapping="Wrap" Text="{Binding Reader.RenderNotice}" />
+            </Grid>
+          </Border>
+        </StackPanel>
 
         <!-- Attachments -->
         <ItemsControl Grid.Row="3" ItemsSource="{Binding Reader.Attachments}" IsVisible="{Binding Reader.HasAttachments}" Margin="0,0,0,12">

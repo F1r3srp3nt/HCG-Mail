@@ -19,6 +19,12 @@ public enum MailErrorKind
     MessageNotFound,
     NotSupported,
     LocalFile,
+
+    /// <summary>The provider is limiting requests (HTTP 429/503 with Retry-After). Nothing was changed by the refused request.</summary>
+    Throttled,
+
+    /// <summary>The sign-in has expired or consent was revoked; the user must reconnect the account (Microsoft accounts).</summary>
+    ReconnectRequired,
 }
 
 /// <summary>
@@ -35,8 +41,14 @@ public sealed class MailOperationException : Exception
     }
 
     public MailErrorKind Kind { get; }
+
+    /// <summary>
+    /// The request may have reached the server before the connection failed, so whether it took effect is unknown
+    /// (for a send: the message may or may not have been accepted). Never retried automatically.
+    /// </summary>
+    public bool OutcomeUnknown { get; init; }
     public string UserMessage { get; }
 
     /// <summary>Connection-level failures where reconnecting later may succeed.</summary>
-    public bool IsTransient => Kind is MailErrorKind.Network or MailErrorKind.Timeout or MailErrorKind.Dns;
+    public bool IsTransient => Kind is MailErrorKind.Network or MailErrorKind.Timeout or MailErrorKind.Dns or MailErrorKind.Throttled;
 }
