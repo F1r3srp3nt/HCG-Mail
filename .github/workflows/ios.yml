@@ -60,7 +60,7 @@ jobs:
   simulator:
     name: iOS build, simulator self-test and screenshots (macOS)
     runs-on: macos-26
-    timeout-minutes: 75
+    timeout-minutes: 90
     env:
       XCODE_VERSION: '26.3'  # required by the pinned iOS workload 26.2.10233
     defaults:
@@ -97,10 +97,6 @@ jobs:
           export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
           scripts/run-simulator.sh --preview --screenshot ../artifacts/ios-screenshots/iphone.png
           scripts/run-simulator.sh --ipad --preview --screenshot ../artifacts/ios-screenshots/ipad.png
-      - name: Build for the simulator (Release)
-        run: scripts/build-simulator.sh Release
-      - name: Compile for devices (ios-arm64, AOT, unsigned — no certificates in CI)
-        run: dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:EnableCodeSigning=false
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -108,3 +104,29 @@ jobs:
           path: artifacts/ios-screenshots
           if-no-files-found: ignore
           retention-days: 14
+
+  device-aot:
+    # The App Store build is fully AOT-compiled; this takes much longer than a simulator build, so it runs as its own
+    # job in parallel. Unsigned: CI holds no certificates, so this proves the code compiles for devices, nothing more.
+    name: Compile for devices (ios-arm64, Release, AOT, unsigned)
+    runs-on: macos-26
+    timeout-minutes: 150
+    env:
+      XCODE_VERSION: '26.3'
+    defaults:
+      run:
+        shell: bash
+        working-directory: iOS App Store Submission
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode ${{ env.XCODE_VERSION }}
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          xcodebuild -version
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.1xx'
+      - name: Install the pinned iOS workload
+        run: scripts/install-workload.sh
+      - name: Release build for ios-arm64 (AOT), without code signing
+        run: dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:EnableCodeSigning=false
