@@ -478,18 +478,23 @@ public sealed class GraphMailSession : IMailSession
         e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : null;
 }
 
-/// <summary>Chooses the session type for an account: IMAP/SMTP or Microsoft Graph.</summary>
+/// <summary>Chooses the session type for an account: IMAP/SMTP, Microsoft Graph or the Gmail API.</summary>
 public sealed class MailSessionFactory(
     IMailClientFactory clientFactory,
     IHtmlToTextConverter htmlToText,
     ILoggerFactory loggerFactory,
     IMicrosoftAuth microsoftAuth,
-    IDeliveryLog? deliveryLog = null) : IMailSessionFactory
+    IDeliveryLog? deliveryLog = null,
+    IGoogleAuth? googleAuth = null) : IMailSessionFactory
 {
     private readonly Imap.MailKitMailSessionFactory _imap = new(clientFactory, htmlToText, loggerFactory, deliveryLog);
 
-    public IMailSession Create(MailAccount account, string password) =>
-        account.IsMicrosoft
-            ? new GraphMailSession(account, microsoftAuth, htmlToText, loggerFactory.CreateLogger<GraphMailSession>(), deliveryLog)
-            : _imap.Create(account, password);
+    public IMailSession Create(MailAccount account, string password) => account.Provider switch
+    {
+        MailProviderKind.MicrosoftGraph => new GraphMailSession(account, microsoftAuth, htmlToText, loggerFactory.CreateLogger<GraphMailSession>(), deliveryLog),
+        MailProviderKind.Gmail => new Gmail.GmailMailSession(account,
+            googleAuth ?? new UnconfiguredGoogleAuth("Google sign-in is not available in this build."),
+            htmlToText, loggerFactory.CreateLogger<Gmail.GmailMailSession>(), deliveryLog),
+        _ => _imap.Create(account, password),
+    };
 }

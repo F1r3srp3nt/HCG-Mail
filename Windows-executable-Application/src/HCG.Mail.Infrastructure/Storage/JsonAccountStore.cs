@@ -58,6 +58,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
         public string? PresetId { get; set; }
         public MailProviderKind? Provider { get; set; }
         public string? MicrosoftAccountId { get; set; }
+        public string? GoogleAccountId { get; set; }
 
         public static AccountDto From(MailAccount a) => new()
         {
@@ -70,6 +71,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
             PresetId = a.PresetId,
             Provider = a.Provider == MailProviderKind.ImapSmtp ? null : a.Provider,
             MicrosoftAccountId = a.MicrosoftAccountId,
+            GoogleAccountId = a.GoogleAccountId,
         };
 
         public MailAccount? ToAccount()
@@ -90,6 +92,22 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
                     Smtp = MailAccount.GraphEndpoint,
                     Provider = MailProviderKind.MicrosoftGraph,
                     MicrosoftAccountId = MicrosoftAccountId,
+                };
+            }
+            if (Provider == MailProviderKind.Gmail)
+            {
+                if (string.IsNullOrWhiteSpace(GoogleAccountId))
+                    return null;
+                return new MailAccount
+                {
+                    Id = Id,
+                    DisplayName = DisplayName ?? "",
+                    EmailAddress = EmailAddress,
+                    Username = Username,
+                    Imap = MailAccount.GmailEndpoint,
+                    Smtp = MailAccount.GmailEndpoint,
+                    Provider = MailProviderKind.Gmail,
+                    GoogleAccountId = GoogleAccountId,
                 };
             }
             if (Imap?.ToEndpoint() is not { } imap || Smtp?.ToEndpoint() is not { } smtp)
