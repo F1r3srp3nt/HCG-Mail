@@ -13,4 +13,7 @@
     <Product>HCG Mail</Product>
     <Copyright>© Hakmi Capital Group</Copyright>
   </PropertyGroup>
+
+  <!-- Microsoft and Google sign-in registrations, shared by every build (desktop, iOS, CI, HCG Executable Maker). -->
+  <Import Project="$(MSBuildThisFileDirectory)oauth-clients.props" />
 </Project>

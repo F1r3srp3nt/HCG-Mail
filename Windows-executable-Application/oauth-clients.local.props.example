@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Copy to oauth-clients.local.props (same folder; git ignores it) to give your local builds the OAuth client
+    values without environment variables. Keep the conditions: values passed with -p: or environment variables win.
+  -->
+  <PropertyGroup>
+    <HcgMicrosoftClientId Condition="'$(HcgMicrosoftClientId)' == ''">00000000-0000-0000-0000-000000000000</HcgMicrosoftClientId>
+    <HcgGoogleClientId Condition="'$(HcgGoogleClientId)' == ''">000000000000-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com</HcgGoogleClientId>
+    <HcgGoogleClientSecret Condition="'$(HcgGoogleClientSecret)' == ''">replace-with-the-desktop-client-secret</HcgGoogleClientSecret>
+  </PropertyGroup>
+</Project>

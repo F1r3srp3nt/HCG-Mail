@@ -51,9 +51,11 @@
     <BundleResource Include="PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
   </ItemGroup>
 
-  <!-- Microsoft application (client) ID for Outlook.com / Microsoft 365 sign-in. Public, not a secret.
-       Empty by default, which shows Microsoft sign-in as "not set up": pass -p:HcgMicrosoftClientId=<GUID>.
+  <!-- Microsoft application (client) ID for Outlook.com / Microsoft 365 sign-in, from the shared oauth-clients.props
+       (environment HCG_MICROSOFT_CLIENT_ID, oauth-clients.local.props or the committed value). Public, not a secret.
+       Empty, Microsoft sign-in shows "not set up". Google sign-in is not available on iOS yet.
        The iOS trimmer strips assembly metadata attributes, so the value is compiled into a constant instead. -->
+  <Import Project="$(HcgSharedDir)oauth-clients.targets" Condition="'$(HcgSharedRootFound)' == 'true'" />
   <Target Name="HcgWriteBuildInfo" BeforeTargets="CoreCompile">
     <PropertyGroup>
       <_HcgBuildInfoFile>$(IntermediateOutputPath)HcgBuildInfo.g.cs</_HcgBuildInfoFile>

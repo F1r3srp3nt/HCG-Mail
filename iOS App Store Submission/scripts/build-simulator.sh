@@ -9,8 +9,8 @@ CONFIG="${1:-Debug}"
 RID="$(simulator_rid)"
 OUT="$OUT_ROOT/simulator/$CONFIG"
 
+# Mailbox sign-in values (HCG_MICROSOFT_CLIENT_ID etc.) reach the build through oauth-clients.props.
 extra=()
-[[ -n "${HCG_MICROSOFT_CLIENT_ID:-}" ]] && extra+=("-p:HcgMicrosoftClientId=$HCG_MICROSOFT_CLIENT_ID")
 
 dotnet build "$APP_PROJECT" -c "$CONFIG" -f "$TFM" -r "$RID" -o "$OUT" ${extra[@]+"${extra[@]}"} >&2
 
