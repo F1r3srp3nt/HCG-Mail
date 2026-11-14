@@ -144,6 +144,23 @@ public sealed class FlowTests
         await MobileHarness.WaitUntil(() => ui.Mail.MessageList.Items.Any(m => m.Subject == "Unfinished"), "the draft in Drafts");
     }
 
+    [AvaloniaFact]
+    public async Task Closing_an_untouched_composer_does_not_ask_about_a_draft()
+    {
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone);
+        await ui.OpenFirstMessageAsync();
+        foreach (var open in new Action[] { () => ui.Mail.ComposeCommand.Execute(null), () => ui.Mail.ReplyCommand.Execute(null) })
+        {
+            open();
+            await MobileHarness.Settle();
+            var compose = Assert.IsType<ComposeViewModel>(ui.Overlays.CurrentSheet);
+            Assert.False(compose.IsDirty);
+            await ui.Shell.CloseSheetCommand.ExecuteAsync(compose);
+            Assert.False(ui.Overlays.HasPrompt);
+            Assert.False(ui.Overlays.HasSheet);
+        }
+    }
+
     [AvaloniaTheory]
     [InlineData(ComposeKind.Reply)]
     [InlineData(ComposeKind.ReplyAll)]

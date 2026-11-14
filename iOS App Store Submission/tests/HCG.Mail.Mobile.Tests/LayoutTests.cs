@@ -150,10 +150,19 @@ public sealed class LayoutTests
     {
         await using var ui = await MobileHarness.StartAsync(Devices.IPhone);
         await ui.OpenFirstMessageAsync();
+        // An HTML message, so the Original / Readable / Plain text buttons are on screen too.
+        ui.Mail.MessageList.SelectedItem = ui.Mail.MessageList.Items.First(i => i.Subject.Contains("HTML", StringComparison.Ordinal));
+        ui.Shell.OnMessageChosen();
+        await MobileHarness.WaitUntil(() => ui.Mail.Reader.HasHtml, "an HTML message");
+        await MobileHarness.Settle(300);
+        Assert.True(ui.View.ReaderPane.ReadableModeButton.IsEffectivelyVisible);
         var small = new List<string>();
         foreach (var button in Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(ui.View).OfType<Avalonia.Controls.Button>())
         {
             if (!button.IsEffectivelyVisible || button.Bounds.Width == 0)
+                continue;
+            // Scroll bar arrows are mouse affordances inside the scroll bar's template; touch scrolls the content.
+            if (button.TemplatedParent is Avalonia.Controls.Primitives.ScrollBar)
                 continue;
             if (button.Bounds.Height < 43.5)
                 small.Add($"{button.Name ?? button.Content?.ToString() ?? button.GetType().Name}: {button.Bounds.Height:F0}pt");

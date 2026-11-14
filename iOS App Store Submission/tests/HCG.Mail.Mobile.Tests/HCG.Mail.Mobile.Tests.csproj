@@ -23,5 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <!-- Where the shared test fixtures are, as resolved by Directory.Build.props (no machine-specific paths). -->
+    <AssemblyMetadata Include="HcgSharedDir" Value="$(HcgSharedDir)" />
   </ItemGroup>
 </Project>

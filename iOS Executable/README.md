@@ -26,6 +26,11 @@ The `.ipa` is written to `artifacts/ios/ipa/` (not committed). Ad-hoc builds are
 or Xcode (Window → Devices and Simulators); TestFlight builds are uploaded manually with Transporter.
 Nothing is uploaded or distributed automatically; every distribution requires founder approval.
 
+## Building with HCG Executable Maker
+
+See [HCG_EXECUTABLE_MAKER.md](HCG_EXECUTABLE_MAKER.md): which project Maker must select when the whole repository
+is imported (`hcg-apps.json`), the commands to run on a Mac, and the diagnostics it should pass through.
+
 ## Not in this repository
 
 Certificates, private keys (`.p12`, `.p8`), provisioning profiles and signed builds stay on the signing Mac.

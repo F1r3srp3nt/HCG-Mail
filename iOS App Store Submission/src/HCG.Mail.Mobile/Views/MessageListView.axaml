@@ -78,6 +78,14 @@
       </TextBox>
 
       <StackPanel Grid.Row="2" Spacing="2">
+        <!-- Offline: keep the loaded list, say clearly that it may be out of date -->
+        <Border x:Name="OfflineNotice" Classes="banner" Margin="12,0,12,6" IsVisible="{Binding ShowOfflineNotice}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <controls:IconView Data="{StaticResource Icon.Warning}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Warning}" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <TextBlock x:Name="OfflineNoticeText" Grid.Column="1" Margin="10,0" FontSize="14" TextWrapping="Wrap" Text="{Binding OfflineNoticeText}" />
+            <Button Grid.Column="2" Classes="subtle" Content="Retry" Command="{Binding Mail.ReconnectCommand}" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
         <Grid ColumnDefinitions="*,Auto" Margin="14,0,10,4" IsVisible="{Binding Mail.MessageList.IsSearching}">
           <TextBlock Classes="caption" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding Mail.MessageList.SearchScopeText}" />
           <Button Grid.Column="1" Classes="link" Content="Search all" Command="{Binding Mail.MessageList.SearchServerCommand}"

@@ -14,7 +14,8 @@ nothing is copied. [`../iOS Executable/`](../iOS%20Executable/) only describes d
 |---|---|
 | **Implemented** | Account setup with connection diagnostics and Keychain storage · accounts, folders, message list with paging, pull-to-refresh and search · HTML and plain-text reading with inline (cid) images · compose, drafts, reply, reply all, forward, attachments (document picker / share sheet) · read/unread, flag, archive, delete · iPhone navigation and adaptive iPad layouts (split view, slide-over, rotation) · settings, Mail Health, banners and explicit failure states · safe area, keyboard, Dynamic Type and Reduce Motion · background suspend/resume · Microsoft accounts through the shared MSAL code with an iOS adapter |
 | **Compiled** | **Simulator (Debug): yes** — built by the `iOS` GitHub Actions workflow on macOS 26 with Xcode 26.3, .NET SDK 10.0.403 and the iOS workload 26.2.10233 (0 errors; `Assets.car` with the app icon present). **Device (ios-arm64, Release, full AOT): yes** — the App Store configuration compiles without errors in its own CI job (about 20 minutes); it is built unsigned because CI holds no certificates. Mobile library and tests also build on Linux. |
-| **Tested (headless)** | 40 tests render the real mobile views at iPhone and iPad sizes (preview mailbox, no network): layouts, rotation, split view, text size, safe area, keyboard, 44-point touch targets, navigation, compose/send/draft, reply/forward, message actions, attachments → share sheet, link confirmation, account setup, Microsoft "pending" state, settings, suspend/resume, all 13 rendering fixtures at iPhone width |
+| **Tested (headless)** | 44 tests render the real mobile views at iPhone, iPhone SE and iPad sizes (preview mailbox, no network): layouts, rotation, split view, text size (100/130/150 %), safe area, keyboard, nothing clipped on iPhone SE, 44-point touch targets, VoiceOver names on icon buttons, navigation, compose/send/draft, reply/forward, message actions, attachments → share sheet, link confirmation, account setup, Microsoft "pending" state, settings, suspend/resume, all 13 rendering fixtures at iPhone width |
+| **Tested against a real mail server** | **Yes, on a local test server** (Dovecot IMAP + Postfix SMTP over TLS with a CRL-checked certificate, disposable test mailboxes `ola@`/`kari@hcgmail.test`; delivery is local only). With production services and the mobile UI: add an account through the setup sheet and its connection test → connect → folders and inbox → open an HTML message (scripts and tracker removed, remote content blocked) → compose and send → refresh shows it in Inbox and Sent → **relaunch** reconnects with the stored password → remove the account: confirmation, account, stored password and history gone, mail on the server untouched → relaunch shows the welcome screen. A second test cuts the connection mid-session: the list stays readable with an offline notice and Retry, then recovers. Log files are checked to contain neither the password nor the address. Run on Linux (headless UI) — **not yet on a simulator or a device, and not against a public provider (e.g. Domene.no)**. |
 | **Simulator-tested** | **Yes, automatically, in CI** (iPhone 17 Pro simulator, iOS 26.5): the app installs and starts; the self-test passed — Keychain save/replace/read/delete, app data directory, settings and account list saved and reloaded as JSON, sanitizer, Microsoft configuration (reported as not set up), TLS revocation fallback. Preview-mode screenshots were taken on an iPhone and an iPad simulator (workflow artifact `ios-simulator-screenshots`). The first simulator run found and led to the fix of a Keychain bug (replacing an existing password). **Not yet used interactively by a person.** |
 | **Device-tested** | **No.** Needs HCG's Apple Developer account, a signing certificate and a provisioning profile. |
 | **Microsoft sign-in** | **Pending.** The code is in place; builds without a client ID show Microsoft sign-in as "not set up" (no fake login). Needs the Entra app registration to include an iOS redirect URI (below). |
@@ -31,7 +32,11 @@ Xcode is still required on the Mac because it provides the SDK, simulators and s
 ```
 iOS App Store Submission/
   HCG.Mail.iOS.sln                 shared projects + the three iOS-side projects
-  Directory.*.props, global.json   import the desktop settings and pinned package versions; add Avalonia.iOS
+  Directory.Build.props            finds the shared code (HcgSharedRoot / HCG_SHARED_ROOT), imports the desktop settings
+  Directory.Build.targets          build diagnostics HCG001–HCG004
+  Directory.Packages.props         the desktop's pinned package versions + Avalonia.iOS
+  toolchain.props                  required Xcode, pinned iOS workload, minimum iOS (read by scripts and CI)
+  global.json                      .NET 10 SDK
   src/HCG.Mail.Mobile/             iPhone/iPad interface (net10.0, no iOS APIs — testable anywhere)
     MobileServices.cs                composition root (shared engine + mobile services)
     ViewModels/                      MobileShellViewModel (navigation, layout, insets, text size), overlays
@@ -47,7 +52,8 @@ iOS App Store Submission/
     Info.plist, Entitlements.plist, PrivacyInfo.xcprivacy, LaunchScreen.storyboard
     SelfTest.cs                      simulator/device checks (HCG_MAIL_SELF_TEST=1)
   tests/HCG.Mail.Mobile.Tests/     headless tests of the mobile interface
-  scripts/                         prerequisites, workload install, simulator build/run, IPA export, icon
+  scripts/                         doctor (diagnostics), workload install, simulator build/run, IPA export, icon,
+                                   verify-app-selection.py (one iOS app in the repository)
 ```
 
 ## Pinned versions
@@ -55,14 +61,30 @@ iOS App Store Submission/
 | Component | Version | Where it is pinned |
 |---|---|---|
 | .NET SDK | .NET 10 (`10.0.100` or newer: `global.json` rolls forward to the newest installed 10.0 SDK; CI used 10.0.403) | `global.json` |
-| .NET iOS workload | `Microsoft.NET.Sdk.iOS` manifest **26.2.10233** (iOS 26.2 SDK bindings) | `scripts/workload-rollback.json`, installed by `scripts/install-workload.sh` |
-| Xcode | **26.3** (the workload refuses to build with older Xcode) | CI selects `/Applications/Xcode_26.3.app` |
-| Minimum iOS | 16.0 (iPhone and iPad) | `SupportedOSPlatformVersion` in `HCG.Mail.iOS.csproj` |
+| .NET iOS workload | `Microsoft.NET.Sdk.iOS` manifest **26.2.10233** (iOS 26.2 SDK bindings) | `HcgIosWorkloadManifest` in `toolchain.props`, installed by `scripts/install-workload.sh` |
+| Xcode | **26.3** (the workload refuses to build with older Xcode) | `HcgRequiredXcode` in `toolchain.props`; CI selects `/Applications/Xcode_26.3.app` |
+| Minimum iOS | 16.0 (iPhone and iPad) | `HcgMinimumIos` in `toolchain.props` → `SupportedOSPlatformVersion` |
 | Avalonia / Avalonia.iOS | 11.3.22 | `../Windows-executable-Application/Directory.Packages.props` + `Directory.Packages.props` here |
 | MailKit / MimeKit, HtmlSanitizer, MSAL.NET | 4.18.2, 9.2.1039, 4.91.1 | `../Windows-executable-Application/Directory.Packages.props` |
 
 All package versions are central; the iOS projects cannot drift from the desktop app. When you move to a newer
-Xcode, update the workload manifest version in `scripts/workload-rollback.json` to the one that matches it.
+Xcode, change `HcgRequiredXcode` and `HcgIosWorkloadManifest` together in `toolchain.props`.
+
+## Build diagnostics
+
+Each cause has its own message, so a missing workload is never mistaken for a signing problem.
+`scripts/doctor.sh` checks all categories up front (it also runs on Linux and says what can be done there):
+
+| Category | Reported as | Fix |
+|---|---|---|
+| Shared sources | `error HCG001` — the mail engine / view models in `Windows-executable-Application/` were not found | Build from a complete HCG-Mail clone, or pass `-p:HcgSharedRoot=<path>` / set `HCG_SHARED_ROOT` |
+| Host | `error HCG002` — the iOS app is being built on Linux or Windows | Build on a Mac; elsewhere run `dotnet test tests/HCG.Mail.Mobile.Tests` |
+| Deployment target | `error HCG003` — `SupportedOSPlatformVersion` below 16.0 | Keep `HcgMinimumIos` |
+| Signing (devices only) | `HCG004` message, then the SDK's "No valid iOS code signing keys" if none is installed | Pass `CodesignKey`/`CodesignProvision` or use `scripts/export-ipa.sh`; simulators need none |
+| .NET iOS workload | SDK `NETSDK1147` / doctor `[workload]` | `scripts/install-workload.sh` |
+| Xcode | SDK "requires Xcode 26.3" / doctor `[xcode]` | `sudo xcode-select -s /Applications/Xcode_26.3.app` |
+
+Paths are never machine-specific: the shared code is found relative to `Directory.Build.props`.
 
 ## Set up a Mac
 
@@ -77,7 +99,7 @@ xcodebuild -runFirstLaunch
 # 3. The pinned iOS workload, then check everything:
 cd "HCG-Mail/iOS App Store Submission"
 scripts/install-workload.sh
-scripts/check-prerequisites.sh
+scripts/doctor.sh                          # sources, host, SDK, workload, Xcode, deployment, signing
 ```
 
 ## Build and run in the Simulator
@@ -109,8 +131,18 @@ dotnet test tests/HCG.Mail.Mobile.Tests                       # Linux, macOS or 
 HCG_MAIL_SCREENSHOT_DIR=/tmp/shots dotnet test tests/HCG.Mail.Mobile.Tests   # + iPhone/iPad PNGs
 ```
 
-Testing with a real mailbox is a manual step for the account owner. The tests and scripts never sign in to, or
-send from, a real account.
+The complete workflow (add account → inbox → read → send → relaunch → remove) runs against a disposable local
+Dovecot/Postfix server, never a real mailbox. On Linux, as root in a throw-away container or VM:
+
+```bash
+sudo apt-get install -y dovecot-imapd dovecot-lmtpd postfix
+sudo ../Windows-executable-Application/tests/integration-server/setup-local-mail-server.sh start
+HCG_MAIL_E2E=1 dotnet test tests/HCG.Mail.Mobile.Tests --filter "FullyQualifiedName~RealServer"
+sudo ../Windows-executable-Application/tests/integration-server/setup-local-mail-server.sh cleanup
+```
+
+Testing with a real provider mailbox (for example a Domene.no test account) is a manual step for the account
+owner; the tests and scripts never sign in to, or send from, a real account.
 
 ## Run on your own iPhone or iPad (development signing)
 

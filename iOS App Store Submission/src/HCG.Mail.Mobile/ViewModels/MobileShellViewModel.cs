@@ -39,6 +39,7 @@ public sealed partial class MobileShellViewModel : ObservableObject
     public const double MaxTextScale = 1.6;
 
     private readonly IMobilePlatform _platform;
+    private AccountViewModel? _watchedAccount;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowMailboxesPane), nameof(ShowListPane), nameof(ShowReaderPane), nameof(Title))]
@@ -81,7 +82,18 @@ public sealed partial class MobileShellViewModel : ObservableObject
         platform.AccessibilitySettingsChanged += (_, _) => App.Services.UiThread.Post(ApplyAccessibility);
 
         mail.PropertyChanged += OnMailPropertyChanged;
+        WatchAccount(mail.SelectedAccount);
         mail.Reader.PropertyChanged += OnReaderPropertyChanged;
+        overlays.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MobileOverlays.Banner))
+                DropBannerDuplicatingOfflineNotice();
+        };
+        mail.MessageList.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MessageListViewModel.Folder))
+                OnPropertyChanged(nameof(ShowOfflineNotice));
+        };
     }
 
     public MainWindowViewModel Mail { get; }
@@ -91,6 +103,16 @@ public sealed partial class MobileShellViewModel : ObservableObject
     public bool IsCompact => Layout == ShellLayout.Compact;
     public bool IsWide => Layout == ShellLayout.Wide;
     public bool AnimationsEnabled => !ReduceMotion;
+
+    /// <summary>
+    /// The connection was lost (no network, server unreachable) while a folder was already shown: the messages loaded
+    /// earlier stay readable and a notice says so. Without a loaded folder the full-screen error state is shown instead.
+    /// </summary>
+    public bool ShowOfflineNotice => Mail.SelectedAccount?.HasError == true && Mail.MessageList.Folder is not null;
+
+    public string OfflineNoticeText => Mail.SelectedAccount?.StatusText is { Length: > 0 } reason
+        ? $"Not connected — showing messages loaded earlier. {reason}"
+        : "Not connected — showing messages loaded earlier.";
 
     /// <summary>The refresh icon turns while mail is being checked, unless the user asked iOS to reduce motion.</summary>
     public bool SpinRefreshIcon => Mail.IsBusy && AnimationsEnabled;
@@ -251,8 +273,38 @@ public sealed partial class MobileShellViewModel : ObservableObject
     {
         if (e.PropertyName == nameof(MainWindowViewModel.IsBusy))
             OnPropertyChanged(nameof(SpinRefreshIcon));
+        if (e.PropertyName == nameof(MainWindowViewModel.SelectedAccount))
+            WatchAccount(Mail.SelectedAccount);
         if (e.PropertyName == nameof(MainWindowViewModel.SelectedAccount) && Mail.SelectedAccount is null && Page == MailPage.Reader)
             Page = MailPage.Messages;
+    }
+
+    private void WatchAccount(AccountViewModel? account)
+    {
+        if (_watchedAccount is not null)
+            _watchedAccount.PropertyChanged -= OnAccountPropertyChanged;
+        _watchedAccount = account;
+        if (account is not null)
+            account.PropertyChanged += OnAccountPropertyChanged;
+        OnAccountPropertyChanged(null, new PropertyChangedEventArgs(null));
+    }
+
+    private void OnAccountPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is null or nameof(AccountViewModel.HasError) or nameof(AccountViewModel.StatusText))
+        {
+            OnPropertyChanged(nameof(ShowOfflineNotice));
+            OnPropertyChanged(nameof(OfflineNoticeText));
+            DropBannerDuplicatingOfflineNotice();
+        }
+    }
+
+    /// <summary>The offline notice already explains a failed refresh; an error banner with the same text would cover it.</summary>
+    private void DropBannerDuplicatingOfflineNotice()
+    {
+        if (ShowOfflineNotice && Overlays.Banner is { IsError: true } banner
+            && string.Equals(banner.Message, Mail.SelectedAccount?.StatusText, StringComparison.Ordinal))
+            Overlays.DismissBannerCommand.Execute(null);
     }
 
     private void OnReaderPropertyChanged(object? sender, PropertyChangedEventArgs e)

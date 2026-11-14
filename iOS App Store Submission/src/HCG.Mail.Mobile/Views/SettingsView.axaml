@@ -9,9 +9,6 @@
     <Style Selector="StackPanel.section">
       <Setter Property="Spacing" Value="10" />
     </Style>
-    <Style Selector="ToggleSwitch">
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-    </Style>
   </UserControl.Styles>
   <Border Background="{DynamicResource Hcg.Bg.Reader}">
     <Grid RowDefinitions="Auto,*">
@@ -84,18 +81,33 @@
             <ComboBox x:Name="ViewModeChoice" ItemsSource="{Binding ViewModeOptions}" SelectedItem="{Binding SelectedViewMode}" HorizontalAlignment="Stretch"
                       AutomationProperties.Name="Message display" />
             <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding SelectedViewMode.Description}" />
-            <ToggleSwitch x:Name="RemoteImagesToggle" IsChecked="{Binding LoadRemoteImagesAutomatically}" OnContent="Load remote images automatically" OffContent="Load remote images automatically" />
+            <Grid ColumnDefinitions="*,Auto" MinHeight="44">
+              <TextBlock Text="Load remote images automatically" FontSize="16" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <ToggleSwitch Grid.Column="1" x:Name="RemoteImagesToggle" IsChecked="{Binding LoadRemoteImagesAutomatically}" OnContent="" OffContent="" AutomationProperties.Name="Load remote images automatically" VerticalAlignment="Center" />
+            </Grid>
             <TextBlock Classes="caption" TextWrapping="Wrap"
                        Text="Off (recommended): remote images are blocked until you choose Load remote images in a message, because loading them tells the sender that and when you opened it. Images included in the message are always shown. Scripts, remote fonts, stylesheets and backgrounds are never loaded." />
-            <ToggleSwitch IsChecked="{Binding MarkAsReadWhenOpened}" OnContent="Mark messages as read when opened" OffContent="Mark messages as read when opened" />
-            <ToggleSwitch IsChecked="{Binding ConfirmBeforeOpeningLinks}" OnContent="Show the real destination before opening links" OffContent="Show the real destination before opening links" />
+            <Grid ColumnDefinitions="*,Auto" MinHeight="44">
+              <TextBlock Text="Mark messages as read when opened" FontSize="16" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding MarkAsReadWhenOpened}" OnContent="" OffContent="" AutomationProperties.Name="Mark messages as read when opened" VerticalAlignment="Center" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto" MinHeight="44">
+              <TextBlock Text="Show the real destination before opening links" FontSize="16" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding ConfirmBeforeOpeningLinks}" OnContent="" OffContent="" AutomationProperties.Name="Show the real destination before opening links" VerticalAlignment="Center" />
+            </Grid>
           </StackPanel>
 
           <!-- Sending and startup -->
           <StackPanel Classes="section">
             <TextBlock Classes="section" Text="SENDING AND STARTUP" />
-            <ToggleSwitch IsChecked="{Binding SaveCopyToSentFolder}" OnContent="Save a copy of sent messages in Sent" OffContent="Save a copy of sent messages in Sent" />
-            <ToggleSwitch IsChecked="{Binding ConnectOnStartup}" OnContent="Connect to my accounts when HCG Mail opens" OffContent="Connect to my accounts when HCG Mail opens" />
+            <Grid ColumnDefinitions="*,Auto" MinHeight="44">
+              <TextBlock Text="Save a copy of sent messages in Sent" FontSize="16" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding SaveCopyToSentFolder}" OnContent="" OffContent="" AutomationProperties.Name="Save a copy of sent messages in Sent" VerticalAlignment="Center" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto" MinHeight="44">
+              <TextBlock Text="Connect to my accounts when HCG Mail opens" FontSize="16" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+              <ToggleSwitch Grid.Column="1" IsChecked="{Binding ConnectOnStartup}" OnContent="" OffContent="" AutomationProperties.Name="Connect to my accounts when HCG Mail opens" VerticalAlignment="Center" />
+            </Grid>
             <TextBlock Classes="caption" TextWrapping="Wrap" Text="Attachments are saved through the iOS share sheet (for example Save to Files). HCG Mail never opens or runs them." />
           </StackPanel>
 

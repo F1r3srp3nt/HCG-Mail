@@ -4,8 +4,11 @@
     the iOS app can never drift onto different versions of Avalonia, MailKit, MSAL or the sanitizer.
     Only iOS-only packages are added below, pinned to the same Avalonia version.
   -->
-  <Import Project="$(MSBuildThisFileDirectory)../Windows-executable-Application/Directory.Packages.props" />
+  <Import Project="$(HcgSharedDir)Directory.Packages.props" Condition="'$(HcgSharedRootFound)' == 'true'" />
+  <PropertyGroup Condition="'$(HcgSharedRootFound)' != 'true'">
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
   <ItemGroup Label="iOS">
-    <PackageVersion Include="Avalonia.iOS" Version="$(AvaloniaVersion)" />
+    <PackageVersion Include="Avalonia.iOS" Version="$(AvaloniaVersion)" Condition="'$(AvaloniaVersion)' != ''" />
   </ItemGroup>
 </Project>
