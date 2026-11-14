@@ -18,7 +18,13 @@ public partial class MobileMessageBodyView : UserControl
         InitializeComponent();
         // Same safe loading as the desktop: cid:/data: images only, remote images after consent, no stylesheets.
         MessageHtmlBridge.Attach(Html, () => DataContext as MessageReaderViewModel);
-        HtmlScroller.SizeChanged += (_, _) => FitWidth(reset: true);
+        // Only a change of the available width re-fits; a height change (for example the horizontal scroll bar
+        // appearing) must not, or fitting and scrolling would keep triggering each other.
+        HtmlScroller.SizeChanged += (_, e) =>
+        {
+            if (Math.Abs(e.NewSize.Width - _fittedViewport) > 1)
+                FitWidth(reset: true);
+        };
         Html.PropertyChanged += (_, e) =>
         {
             if (e.Property == TheArtOfDev.HtmlRenderer.Avalonia.HtmlControl.TextProperty)
@@ -26,6 +32,8 @@ public partial class MobileMessageBodyView : UserControl
         };
         Html.LayoutUpdated += (_, _) => FitWidth(reset: false);
     }
+
+    private double _fittedViewport = -1;
 
     /// <summary>The current shrink-to-fit factor (1 when the message fits the screen).</summary>
     public double FitScale { get; private set; } = 1;
@@ -39,6 +47,7 @@ public partial class MobileMessageBodyView : UserControl
         var viewport = HtmlScroller.Bounds.Width;
         if (viewport <= 0)
             return;
+        _fittedViewport = viewport;
         var width = viewport;
         if (!reset && Html.Container is { } container)
         {

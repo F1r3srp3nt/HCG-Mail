@@ -85,7 +85,9 @@ public sealed partial class ComposeViewModel : ObservableObject
         foreach (var attachment in initial.Attachments)
             Attachments.Add(new ComposeAttachmentViewModel(attachment));
         Attachments.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasAttachments));
-        _savedSnapshot = initial.Kind == ComposeKind.EditDraft ? Snapshot() : "";
+        // "Unchanged" means as opened: closing a new message, reply or forward that the user has not edited does not
+        // ask about saving a draft (it used to, because new messages started with an empty baseline).
+        _savedSnapshot = Snapshot();
     }
 
     public static IReadOnlyList<PriorityOption> PriorityOptions { get; } =

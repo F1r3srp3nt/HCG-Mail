@@ -6,7 +6,8 @@ namespace HCG.Mail.Infrastructure.Logging;
 
 /// <summary>
 /// Minimal daily-rolling file logger. HCG Mail logs operations, hosts, account ids and error
-/// types only — never passwords, message bodies, subjects or recipient lists.
+/// types only — never passwords, message bodies, subjects or recipient lists. Every line, including exception
+/// text, additionally passes through <see cref="LogRedactor"/> before it is written.
 /// </summary>
 public sealed class FileLoggerProvider : ILoggerProvider
 {
@@ -36,18 +37,19 @@ public sealed class FileLoggerProvider : ILoggerProvider
           .Append(category[(category.LastIndexOf('.') + 1)..]).Append(": ").Append(message);
         if (exception is not null)
         {
-            // Full exception including stack trace and inner exceptions, so failures can be reproduced.
-            // HCG Mail never puts passwords or tokens into exception messages.
+            // Full exception including stack trace and inner exceptions, so failures can be reproduced; server
+            // replies quoted in exception messages are redacted below.
             sb.Append(Environment.NewLine).Append(exception);
         }
         sb.Append(Environment.NewLine);
 
+        var text = LogRedactor.Redact(sb.ToString());
         var path = Path.Combine(_directory, $"hcg-mail-{DateTime.Now:yyyyMMdd}.log");
         lock (_lock)
         {
             try
             {
-                File.AppendAllText(path, sb.ToString());
+                File.AppendAllText(path, text);
             }
             catch (IOException)
             {

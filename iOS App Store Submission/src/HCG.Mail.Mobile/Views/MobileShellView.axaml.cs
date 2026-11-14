@@ -18,6 +18,7 @@ public partial class MobileShellView : UserControl
     public const double SidebarWidth = 300;
     public const double ListWidth = 360;
     public const double SheetCardMaxWidth = 720;
+    public const double NavBarHeight = 52;
 
     private MobileShellViewModel? _shell;
     private IInsetsManager? _insets;
@@ -185,6 +186,7 @@ public partial class MobileShellView : UserControl
             SheetFrame.Padding = pad;
         }
         PromptCard.Margin = new Thickness(pad.Left + 28, pad.Top + 28, pad.Right + 28, pad.Bottom + 28);
-        BannerHost.Margin = new Thickness(pad.Left + 12, _shell.TopInset + 8, pad.Right + 12, 0);
+        // Below the navigation bar, so refresh/compose/back stay reachable while a notice is shown.
+        BannerHost.Margin = new Thickness(pad.Left + 12, _shell.TopInset + NavBarHeight + 6, pad.Right + 12, 0);
     }
 }
