@@ -8,8 +8,9 @@ $version = $props.Project.PropertyGroup.InformationalVersion
 $out = 'artifacts\publish\win-x64'
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 dotnet publish src\HCG.Mail.App -c Release -r win-x64 --self-contained true `
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none `
-  "-p:HcgMicrosoftClientId=$env:HCG_MICROSOFT_CLIENT_ID" -o $out
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o $out
+# Mailbox sign-in values come from oauth-clients.props ($env:HCG_MICROSOFT_CLIENT_ID, $env:HCG_GOOGLE_CLIENT_ID,
+# $env:HCG_GOOGLE_CLIENT_SECRET or oauth-clients.local.props); the build prints them as HCG020.
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }
 $zip = "artifacts\HCGMail-$version-win-x64.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }

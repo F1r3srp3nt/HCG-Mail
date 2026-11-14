@@ -61,7 +61,12 @@ HCG_IOS_BUILD_NUMBER=<n> \
 scripts/export-ipa.sh                # → artifacts/ios/ipa/*.ipa
 ```
 
-Optional: `HCG_MICROSOFT_CLIENT_ID=<GUID>` enables Microsoft sign-in in the build.
+Optional: `HCG_MICROSOFT_CLIENT_ID=<GUID>` enables Microsoft sign-in in the build (or commit the ID in
+`Windows-executable-Application/oauth-clients.props`). For the **desktop** app Maker can also pass
+`HCG_GOOGLE_CLIENT_ID` and `HCG_GOOGLE_CLIENT_SECRET` (keep the secret in Maker's secret store; never write it to the
+log or the repository). Every build prints an `HCG020` line naming which providers it was configured for. Pass that line
+through; it is how to tell whether the values reached the build. See
+`Windows-executable-Application/docs/OAUTH_ACTIVATION_CHECKLIST.md`.
 
 ## 4. Diagnostics Maker should pass through unchanged
 

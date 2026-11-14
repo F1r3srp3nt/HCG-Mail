@@ -15,6 +15,7 @@ using HCG.Mail.Email.Imap;
 using HCG.Mail.Infrastructure;
 using HCG.Mail.Infrastructure.Credentials;
 using HCG.Mail.Infrastructure.Logging;
+using HCG.Mail.Infrastructure.Google;
 using HCG.Mail.Infrastructure.Microsoft;
 using HCG.Mail.Infrastructure.Storage;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,6 +65,7 @@ public static class AppServices
             services.AddSingleton<IDeliveryLog, InMemoryDeliveryLog>();
             services.AddSingleton<IMailDns, OfflineMailDns>();
             services.AddSingleton<IMicrosoftAuth>(new UnconfiguredMicrosoftAuth("Microsoft sign-in is not available in development preview mode."));
+            services.AddSingleton<IGoogleAuth>(new UnconfiguredGoogleAuth("Google sign-in is not available in development preview mode."));
         }
         else
         {
@@ -77,6 +79,14 @@ public static class AppServices
                 return MicrosoftAuthOptions.IsValidClientId(clientId)
                     ? new MsalMicrosoftAuth(clientId!, sp.GetRequiredService<AppPaths>(), sp.GetRequiredService<ILogger<MsalMicrosoftAuth>>())
                     : new UnconfiguredMicrosoftAuth(MicrosoftAuthOptions.NotConfiguredMessage);
+            });
+            services.AddSingleton<IGoogleAuth>(sp =>
+            {
+                var clientId = GoogleAuthOptions.ResolveClientId(typeof(AppServices).Assembly);
+                var clientSecret = GoogleAuthOptions.ResolveClientSecret(typeof(AppServices).Assembly);
+                return GoogleAuthOptions.ConfigurationProblem(clientId, clientSecret) is { } problem
+                    ? new UnconfiguredGoogleAuth(problem)
+                    : new GoogleOAuth(clientId!, clientSecret!, sp.GetRequiredService<ICredentialVault>(), sp.GetRequiredService<ILogger<GoogleOAuth>>());
             });
             services.AddSingleton<IConnectionTester, ConnectionTester>();
             services.AddSingleton<IDeliveryLog, JsonDeliveryLog>();

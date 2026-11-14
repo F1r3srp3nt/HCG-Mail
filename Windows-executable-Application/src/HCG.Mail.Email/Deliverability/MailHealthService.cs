@@ -51,6 +51,10 @@ public sealed class MailHealthService(IMailDns dns)
             ? [new("Outgoing server", CheckStatus.NotTested,
                 "This Microsoft account sends through Microsoft Graph; Exchange Online chooses the sending servers, so there is no SMTP server for HCG Mail to check. " +
                 "The authoritative result is in the headers of a message as received (Analyze a received message).")]
+            : account.IsGoogle
+            ? [new("Outgoing server", CheckStatus.NotTested,
+                "This Google account sends through the Gmail API; Google chooses the sending servers, so there is no SMTP server for HCG Mail to check. " +
+                "The authoritative result is in the headers of a message as received (Analyze a received message).")]
             : await _checker.CheckSendingServerAsync(domain, account.Smtp.Host, cancellationToken).ConfigureAwait(false);
 
         var spfSection = new CheckSection("SPF", "Which servers may send mail for your domain (TXT record on the domain).", spf);
@@ -66,7 +70,9 @@ public sealed class MailHealthService(IMailDns dns)
         var dmarcSection = new CheckSection("DMARC policy and alignment", "Your published policy, and whether SPF/DKIM results match the visible From domain.", alignment);
 
         var serverSection = new CheckSection("Sending server",
-            account.IsMicrosoft ? "Your domain's receiving servers; sending is handled by Microsoft." : $"DNS of your outgoing server {account.Smtp.Host} and your domain's receiving servers.", [mx, .. server]);
+            account.IsMicrosoft ? "Your domain's receiving servers; sending is handled by Microsoft."
+            : account.IsGoogle ? "Your domain's receiving servers; sending is handled by Google."
+            : $"DNS of your outgoing server {account.Smtp.Host} and your domain's receiving servers.", [mx, .. server]);
         var historySection = new CheckSection("SMTP history", "Replies from your outgoing server to recent sends from this computer.", CheckHistory(history));
         var formatSection = new CheckSection("Message format", "The message HCG Mail builds, checked as it is transmitted (nothing is sent).", MessageFormatValidator.ValidateOwnOutput(account));
         var reputationSection = new CheckSection("Sender reputation", "Reputation is measured by each receiver and by blocklist operators; HCG Mail does not query them.",

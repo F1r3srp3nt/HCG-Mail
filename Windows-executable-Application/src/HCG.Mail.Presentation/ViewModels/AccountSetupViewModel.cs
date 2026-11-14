@@ -44,6 +44,7 @@ public sealed partial class AccountSetupViewModel : ObservableObject
     private readonly Func<MailAccount, Task> _onSaved;
     private readonly Func<MailAccount, Task<bool>>? _onRemove;
     private readonly Func<Task>? _onUseMicrosoft;
+    private readonly Func<Task>? _onUseGoogle;
     private readonly MailAccount? _existing;
     private bool _usernameEdited;
     private bool _validated;
@@ -90,9 +91,11 @@ public sealed partial class AccountSetupViewModel : ObservableObject
         MailAccount? existing = null,
         Func<MailAccount, Task<bool>>? onRemove = null,
         string? message = null,
-        Func<Task>? onUseMicrosoft = null)
+        Func<Task>? onUseMicrosoft = null,
+        Func<Task>? onUseGoogle = null)
     {
         _onUseMicrosoft = onUseMicrosoft;
+        _onUseGoogle = onUseGoogle;
         _tester = tester;
         _vault = vault;
         _onSaved = onSaved;
@@ -305,6 +308,17 @@ public sealed partial class AccountSetupViewModel : ObservableObject
         CloseRequested?.Invoke(this, false);
         if (_onUseMicrosoft is not null)
             await _onUseMicrosoft();
+    }
+
+    /// <summary>Gmail / Google Workspace use Google sign-in instead of an IMAP password (or app password).</summary>
+    public bool CanUseGoogle => _existing is null && _onUseGoogle is not null;
+
+    [RelayCommand]
+    private async Task UseGoogleAsync()
+    {
+        CloseRequested?.Invoke(this, false);
+        if (_onUseGoogle is not null)
+            await _onUseGoogle();
     }
 
     [RelayCommand]

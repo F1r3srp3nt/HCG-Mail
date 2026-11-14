@@ -14,4 +14,6 @@ public interface IDialogService : IUserPrompts
     void ShowMailHealth(MailHealthViewModel viewModel);
 
     Task<bool> ShowMicrosoftAccountAsync(MicrosoftAccountViewModel viewModel);
+
+    Task<bool> ShowGoogleAccountAsync(GoogleAccountViewModel viewModel);
 }

@@ -16,8 +16,8 @@ require_macos
 : "${HCG_IOS_PROVISIONING_PROFILE:?set HCG_IOS_PROVISIONING_PROFILE (see the comment at the top of this script)}"
 OUT="$OUT_ROOT/ipa"
 
+# Mailbox sign-in values (HCG_MICROSOFT_CLIENT_ID etc.) reach the build through oauth-clients.props.
 extra=()
-[[ -n "${HCG_MICROSOFT_CLIENT_ID:-}" ]] && extra+=("-p:HcgMicrosoftClientId=$HCG_MICROSOFT_CLIENT_ID")
 
 dotnet publish "$APP_PROJECT" -c Release -f "$TFM" -r ios-arm64 \
   -p:ArchiveOnBuild=true \

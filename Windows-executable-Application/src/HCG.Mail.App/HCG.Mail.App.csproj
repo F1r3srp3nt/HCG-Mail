@@ -34,9 +34,13 @@
   <ItemGroup>
     <InternalsVisibleTo Include="HCG.Mail.App.Tests" />
   </ItemGroup>
-  <!-- Microsoft application (client) ID for Outlook.com / Microsoft 365 sign-in. Public, not a secret.
-       Empty by default: pass -p:HcgMicrosoftClientId=<GUID> when building (see docs/MICROSOFT_ACCOUNTS.md). -->
+  <!-- Mailbox sign-in registrations from ../../oauth-clients.props (Microsoft client ID; Google client ID and the
+       desktop client secret, which Google does not treat as confidential for installed apps). Empty values make the
+       app report that sign-in is not set up. See docs/MICROSOFT_ACCOUNTS.md and docs/GOOGLE_ACCOUNTS.md. -->
   <ItemGroup>
     <AssemblyMetadata Include="HcgMicrosoftClientId" Value="$(HcgMicrosoftClientId)" />
+    <AssemblyMetadata Include="HcgGoogleClientId" Value="$(HcgGoogleClientId)" />
+    <AssemblyMetadata Include="HcgGoogleClientSecret" Value="$(HcgGoogleClientSecret)" />
   </ItemGroup>
+  <Import Project="../../oauth-clients.targets" />
 </Project>

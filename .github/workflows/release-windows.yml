@@ -44,9 +44,12 @@ jobs:
 
       - name: Build HCGMail.exe (win-x64, self-contained)
         env:
-          # Public Microsoft application (client) ID for Outlook.com / Microsoft 365 sign-in, from the repository
-          # variable HCG_MICROSOFT_CLIENT_ID (Settings → Secrets and variables → Actions → Variables). Not a secret.
+          # Mailbox sign-in registrations (read by oauth-clients.props). Client IDs are public: repository variables
+          # HCG_MICROSOFT_CLIENT_ID and HCG_GOOGLE_CLIENT_ID (Settings → Secrets and variables → Actions → Variables).
+          # The Google desktop client secret is kept out of the repository: repository secret HCG_GOOGLE_CLIENT_SECRET.
           HCG_MICROSOFT_CLIENT_ID: ${{ vars.HCG_MICROSOFT_CLIENT_ID }}
+          HCG_GOOGLE_CLIENT_ID: ${{ vars.HCG_GOOGLE_CLIENT_ID }}
+          HCG_GOOGLE_CLIENT_SECRET: ${{ secrets.HCG_GOOGLE_CLIENT_SECRET }}
         run: bash scripts/publish-windows.sh
 
       - name: Checksums

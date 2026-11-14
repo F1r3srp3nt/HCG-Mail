@@ -29,7 +29,7 @@
           <Rectangle Height="1" Fill="{DynamicResource Hcg.Brush.AccentLine}" Margin="0,6" />
           <TextBlock Classes="h1" Text="Welcome to HCG Mail" />
           <TextBlock Classes="muted" TextWrapping="Wrap" LineHeight="20"
-                     Text="Connect your existing email account using IMAP and SMTP — for example privately hosted domain email such as Domene.no — or sign in with a Microsoft account (Outlook.com, Hotmail, Microsoft 365). No HCG account is required." />
+                     Text="Connect your existing email account using IMAP and SMTP — for example privately hosted domain email such as Domene.no — or sign in with a Microsoft account (Outlook.com, Hotmail, Microsoft 365) or a Google account (Gmail, Google Workspace). No HCG account is required." />
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
             <controls:IconView Data="{StaticResource Icon.Shield}" Width="16" Height="16" Foreground="{DynamicResource Hcg.Accent}" />
             <TextBlock Classes="caption" TextWrapping="Wrap" MaxWidth="420" VerticalAlignment="Center"
@@ -45,6 +45,8 @@
           </Border>
           <Button x:Name="AddMicrosoftAccountButton" Classes="subtle" Command="{Binding AddMicrosoftAccountCommand}" Padding="18,10" HorizontalAlignment="Left"
                   Content="Add Microsoft account (Outlook.com / Microsoft 365)" />
+          <Button x:Name="AddGoogleAccountButton" Classes="subtle" Command="{Binding AddGoogleAccountCommand}" Padding="18,10" HorizontalAlignment="Left"
+                  Content="Add Google account (Gmail / Google Workspace)" />
         </StackPanel>
       </Border>
 

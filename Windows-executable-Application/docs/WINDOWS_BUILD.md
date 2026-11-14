@@ -83,9 +83,25 @@ creates a pre-release with `HCGMail-<version>-win-x64.zip` and `SHA256SUMS.txt`.
 other operating-system versions are produced from the Windows build with HCG Executable Maker. The
 build is unsigned.
 
-## Microsoft sign-in client ID
+## Microsoft and Google sign-in clients
 
-Builds include Microsoft sign-in only when a Microsoft application (client) ID is supplied:
-`HCG_MICROSOFT_CLIENT_ID=<GUID> scripts/publish-windows.sh`, or the repository variable `HCG_MICROSOFT_CLIENT_ID` for
-the release workflow. Without it, the app explains that Microsoft sign-in is not set up. See
-[MICROSOFT_ACCOUNTS.md](MICROSOFT_ACCOUNTS.md).
+Builds include mailbox sign-in only for providers whose OAuth client values reach the build through
+`oauth-clients.props`:
+
+* committed client IDs
+* or `oauth-clients.local.props`
+* or the environment variables `HCG_MICROSOFT_CLIENT_ID`, `HCG_GOOGLE_CLIENT_ID` and `HCG_GOOGLE_CLIENT_SECRET`
+
+For example:
+
+```bash
+HCG_MICROSOFT_CLIENT_ID=<GUID> HCG_GOOGLE_CLIENT_ID=<id> HCG_GOOGLE_CLIENT_SECRET=<secret> scripts/publish-windows.sh
+```
+
+The release workflow takes:
+
+* the repository variables `HCG_MICROSOFT_CLIENT_ID` and `HCG_GOOGLE_CLIENT_ID`
+* the repository secret `HCG_GOOGLE_CLIENT_SECRET`
+
+The build log line `HCG020` shows what was found. Without a value, the app explains that sign-in is not set up. See
+[OAUTH_ACTIVATION_CHECKLIST.md](OAUTH_ACTIVATION_CHECKLIST.md).

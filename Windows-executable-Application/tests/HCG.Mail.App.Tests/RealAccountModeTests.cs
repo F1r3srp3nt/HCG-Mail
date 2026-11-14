@@ -64,6 +64,9 @@ public class RealAccountModeTests
             Assert.Empty(vm.MessageList.Items);
             Assert.Null(vm.SelectedAccount);
             Assert.Contains("Manual refresh", vm.StatusText);
+            // Both sign-in providers are offered next to IMAP; their dialogs explain when a build lacks configuration.
+            Assert.True(HasVisibleButton(window, "AddMicrosoftAccountButton"));
+            Assert.True(HasVisibleButton(window, "AddGoogleAccountButton"));
             UiHarness.Capture(window, "20-normal-first-run-logo");
             window.Close();
             await vm.DisposeAsync();
@@ -203,4 +206,7 @@ public class RealAccountModeTests
         Assert.InRange(ratio, 2.1, 2.25);              // supplied artwork crop: 1520 × 700
         Assert.True(bitmap.PixelSize.Height >= 4 * 38); // ≥ 4× the 38 px display height for high-DPI screens
     }
+
+    private static bool HasVisibleButton(Avalonia.Visual root, string name) =>
+        Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(root).OfType<Avalonia.Controls.Button>().Any(b => b.Name == name && b.IsEffectivelyVisible);
 }
