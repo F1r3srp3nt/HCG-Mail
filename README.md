@@ -58,13 +58,17 @@ SwiftUI/Xcode project. On a Mac:
 
 ```bash
 cd "HCG-Mail/iOS App Store Submission"
-scripts/install-workload.sh && scripts/check-prerequisites.sh
+scripts/install-workload.sh && scripts/doctor.sh
 scripts/run-simulator.sh                  # build and start in the iPhone simulator
 dotnet test tests/HCG.Mail.Mobile.Tests   # headless iPhone/iPad UI tests (any OS)
 ```
 
 Device signing, the Release `.ipa` (never uploaded automatically), Microsoft sign-in setup and the current test
 status are in the [iOS README](iOS%20App%20Store%20Submission/README.md).
+
+Build tools that import the whole repository (such as HCG Executable Maker) find the applications in
+[`hcg-apps.json`](hcg-apps.json); the iOS specifics for Maker are in
+[`iOS Executable/HCG_EXECUTABLE_MAKER.md`](iOS%20Executable/HCG_EXECUTABLE_MAKER.md).
 
 ## Build and run (desktop)
 
