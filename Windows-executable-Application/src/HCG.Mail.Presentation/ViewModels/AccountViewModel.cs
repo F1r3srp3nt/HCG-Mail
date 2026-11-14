@@ -57,9 +57,18 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
     public bool NeedsPassword => Status == AccountStatus.NeedsPassword;
     public bool NeedsSignIn => Status == AccountStatus.NeedsSignIn;
     public bool IsMicrosoft => Account.IsMicrosoft;
+    public bool IsGoogle => Account.IsGoogle;
+
+    /// <summary>Signed in with Microsoft or Google: no password to edit; reconnecting means signing in again.</summary>
+    public bool UsesOAuth => Account.UsesOAuth;
 
     /// <summary>How the account connects, shown in settings and the sending-account picker.</summary>
-    public string ProviderLabel => Account.IsMicrosoft ? "Microsoft account (Outlook.com / Microsoft 365)" : "IMAP / SMTP";
+    public string ProviderLabel => Account.Provider switch
+    {
+        MailProviderKind.MicrosoftGraph => "Microsoft account (Outlook.com / Microsoft 365)",
+        MailProviderKind.Gmail => "Google account (Gmail / Google Workspace)",
+        _ => "IMAP / SMTP",
+    };
     public bool HasError => Status == AccountStatus.Error;
     public bool CanReconnect => Status is AccountStatus.Error or AccountStatus.Offline;
     public bool HasOtherFolders => OtherFolders.Count > 0;
@@ -73,8 +82,8 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
     /// <summary>Connects using the stored password. Returns false (and sets <see cref="NeedsPassword"/>) when none is stored.</summary>
     public async Task<bool> ConnectAsync()
     {
-        if (Account.IsMicrosoft)
-            return await ConnectWithAsync(""); // no password: delegated Microsoft tokens from the protected cache
+        if (Account.UsesOAuth)
+            return await ConnectWithAsync(""); // no password: delegated Microsoft/Google tokens from protected storage
 
         string? password;
         try

@@ -71,6 +71,12 @@ public sealed class DialogService : IDialogService
         return await window.ShowDialog<bool>(Owner);
     }
 
+    public async Task<bool> ShowGoogleAccountAsync(GoogleAccountViewModel viewModel)
+    {
+        var window = new GoogleAccountWindow { DataContext = viewModel };
+        return await window.ShowDialog<bool>(Owner);
+    }
+
     public void ShowMailHealth(MailHealthViewModel viewModel)
     {
         var window = new MailHealthWindow { DataContext = viewModel };

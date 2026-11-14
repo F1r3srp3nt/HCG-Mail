@@ -59,6 +59,7 @@
               <DataTemplate DataType="app:ComposeViewModel"><views:ComposeView /></DataTemplate>
               <DataTemplate DataType="app:AccountSetupViewModel"><views:AccountSetupView /></DataTemplate>
               <DataTemplate DataType="app:MicrosoftAccountViewModel"><views:MicrosoftAccountView /></DataTemplate>
+              <DataTemplate DataType="app:GoogleAccountViewModel"><views:GoogleAccountView /></DataTemplate>
               <DataTemplate DataType="app:SettingsViewModel"><views:SettingsView /></DataTemplate>
               <DataTemplate DataType="app:MailHealthViewModel"><views:MailHealthView /></DataTemplate>
             </ContentControl.DataTemplates>

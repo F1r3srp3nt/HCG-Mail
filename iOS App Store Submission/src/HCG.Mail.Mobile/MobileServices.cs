@@ -31,6 +31,9 @@ namespace HCG.Mail.Mobile;
 /// </summary>
 public static class MobileServices
 {
+    public const string GoogleNotOnIos =
+        "Google sign-in is not available on iPhone and iPad yet. Gmail can be added on the desktop app, or here with IMAP and a Google app password where the account allows app passwords.";
+
     public static ServiceProvider Build(IMobilePlatform platform, AppMode mode, Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
@@ -70,6 +73,7 @@ public static class MobileServices
             services.AddSingleton<IDeliveryLog, InMemoryDeliveryLog>();
             services.AddSingleton<IMailDns, OfflineMailDns>();
             services.AddSingleton<IMicrosoftAuth>(new UnconfiguredMicrosoftAuth("Microsoft sign-in is not available in development preview mode."));
+            services.AddSingleton<IGoogleAuth>(new UnconfiguredGoogleAuth(GoogleNotOnIos));
         }
         else
         {
@@ -78,6 +82,9 @@ public static class MobileServices
             services.AddSingleton<IAppSettingsStore, JsonAppSettingsStore>();
             services.AddSingleton<IMailSessionFactory, MailSessionFactory>();
             services.AddSingleton(platform.MicrosoftAuth);
+            // Google sign-in needs its own iOS OAuth client and redirect; until that exists the shared view models see
+            // an unavailable provider, and the iPhone/iPad views offer no Google button.
+            services.AddSingleton<IGoogleAuth>(new UnconfiguredGoogleAuth(GoogleNotOnIos));
             services.AddSingleton<IConnectionTester, ConnectionTester>();
             services.AddSingleton<IDeliveryLog, JsonDeliveryLog>();
             services.AddSingleton<IMailDns, SystemMailDns>();

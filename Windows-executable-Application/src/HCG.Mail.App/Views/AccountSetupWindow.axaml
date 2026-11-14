@@ -41,6 +41,13 @@
               <Button x:Name="UseMicrosoftButton" Grid.Column="1" Margin="12,0,0,0" Classes="subtle" Content="Add Microsoft account" Command="{Binding UseMicrosoftCommand}" />
             </Grid>
           </Border>
+          <Border Classes="banner" Margin="0,8,0,0" IsVisible="{Binding CanUseGoogle}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
+                         Text="Gmail or Google Workspace? Use Google sign-in instead — no password or app password is stored in HCG Mail." />
+              <Button x:Name="UseGoogleButton" Grid.Column="1" Margin="12,0,0,0" Classes="subtle" Content="Add Google account" Command="{Binding UseGoogleCommand}" />
+            </Grid>
+          </Border>
           <Border Classes="banner" Margin="0,14,0,0" IsVisible="{Binding HasIntroMessage}">
             <TextBlock Text="{Binding IntroMessage}" TextWrapping="Wrap" Foreground="{DynamicResource Hcg.Text.Accent}" />
           </Border>

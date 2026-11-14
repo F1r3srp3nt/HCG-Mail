@@ -28,6 +28,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private readonly MailHealthViewModelFactory? _mailHealth;
     private DispatcherTimer? _autoRefresh;
     private readonly IMicrosoftAuth _microsoftAuth;
+    private readonly IGoogleAuth _googleAuth;
     private readonly IDeliveryLog? _deliveryLog;
     private readonly ThemeService _themes;
     private readonly IAccountStore _accountStore;
@@ -77,8 +78,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         MailHealthViewModelFactory? mailHealth = null,
         IMicrosoftAuth? microsoftAuth = null,
         IDeliveryLog? deliveryLog = null,
-        RemoteImageLoader? remoteImages = null)
+        RemoteImageLoader? remoteImages = null,
+        IGoogleAuth? googleAuth = null)
     {
+        _googleAuth = googleAuth ?? new UnconfiguredGoogleAuth("Google sign-in is not available in this mode.");
         _mailHealth = mailHealth;
         _microsoftAuth = microsoftAuth ?? new UnconfiguredMicrosoftAuth("Microsoft sign-in is not available in this mode.");
         _deliveryLog = deliveryLog;
@@ -136,6 +139,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     public string MicrosoftSignInStatus => _microsoftAuth.IsConfigured
         ? "Microsoft sign-in is available for Outlook.com, Hotmail and Microsoft 365 accounts."
         : _microsoftAuth.ConfigurationProblem ?? "Microsoft sign-in is not available.";
+
+    public string GoogleSignInStatus => _googleAuth.IsConfigured
+        ? "Google sign-in is available for Gmail and Google Workspace accounts."
+        : _googleAuth.ConfigurationProblem ?? "Google sign-in is not available.";
     public bool ShowAccountError => SelectedAccount?.HasError == true && MessageList.Folder is null;
     public bool ShowConnecting => SelectedAccount?.IsConnecting == true && MessageList.Folder is null;
     public bool IsDraftsFolder => SelectedFolder?.Role == FolderRole.Drafts;
@@ -241,9 +248,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     /// </summary>
     public bool ShareSavedAttachments { get; set; }
 
-    /// <summary>Reconnects one account: Microsoft accounts sign in again; IMAP accounts reconnect with the stored password.</summary>
+    /// <summary>Reconnects one account: Microsoft/Google accounts sign in again when needed; IMAP accounts reconnect with the stored password.</summary>
     public Task ReconnectAccountAsync(AccountViewModel account) =>
-        account.IsMicrosoft && account.NeedsSignIn ? ReconnectMicrosoftAccountAsync(account) : ConnectAccountAsync(account);
+        account.NeedsSignIn && account.IsMicrosoft ? ReconnectMicrosoftAccountAsync(account)
+        : account.NeedsSignIn && account.IsGoogle ? ReconnectGoogleAccountAsync(account)
+        : ConnectAccountAsync(account);
 
     private AccountViewModel CreateAccountViewModel(MailAccount account)
     {
@@ -724,7 +733,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             Accounts.Add(avm);
             SelectedAccount = avm;
             await ConnectAccountAsync(avm);
-        }, onUseMicrosoft: AddMicrosoftAccountAsync);
+        }, onUseMicrosoft: AddMicrosoftAccountAsync, onUseGoogle: AddGoogleAccountAsync);
         await _dialogs.ShowAccountSetupAsync(vm);
     }
 
@@ -763,6 +772,41 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         await _dialogs.ShowMicrosoftAccountAsync(vm);
     }
 
+    /// <summary>Gmail / Google Workspace through Google sign-in in the system browser.</summary>
+    [RelayCommand]
+    private async Task AddGoogleAccountAsync()
+    {
+        var vm = new GoogleAccountViewModel(_googleAuth, _sessionFactory, async account =>
+        {
+            _accountStore.Save(Accounts.Select(a => a.Account).Append(account).ToList());
+            var avm = CreateAccountViewModel(account);
+            Accounts.Add(avm);
+            SelectedAccount = avm;
+            await ConnectAccountAsync(avm);
+        }, IsGoogleKeyInUse);
+        await _dialogs.ShowGoogleAccountAsync(vm);
+    }
+
+    private bool IsGoogleKeyInUse(string key) =>
+        Accounts.Any(a => a.Account.IsGoogle && string.Equals(a.Account.GoogleAccountId, key, StringComparison.Ordinal));
+
+    private async Task ReconnectGoogleAccountAsync(AccountViewModel account)
+    {
+        var vm = new GoogleAccountViewModel(_googleAuth, _sessionFactory, async updated =>
+        {
+            _accountStore.Save(Accounts.Select(a => a.Account.Id == updated.Id ? updated : a.Account).ToList());
+            if (account == SelectedAccount)
+            {
+                MessageList.Clear();
+                Reader.Clear();
+                SelectedFolder = null;
+            }
+            await account.UpdateAccountAsync(updated);
+            await ConnectAccountAsync(account);
+        }, IsGoogleKeyInUse, account.Account, RemoveAccountAsync);
+        await _dialogs.ShowGoogleAccountAsync(vm);
+    }
+
     [RelayCommand]
     private void OpenMailHealth()
     {
@@ -782,6 +826,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private Task EnterPasswordAsync() =>
         SelectedAccount is null ? Task.CompletedTask
         : SelectedAccount.IsMicrosoft ? ReconnectMicrosoftAccountAsync(SelectedAccount)
+        : SelectedAccount.IsGoogle ? ReconnectGoogleAccountAsync(SelectedAccount)
         : EditAccountAsync(SelectedAccount, $"Enter the password for {SelectedAccount.EmailAddress} to connect.");
 
     public async Task EditAccountAsync(AccountViewModel account, string? message = null)
@@ -789,6 +834,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         if (account.IsMicrosoft)
         {
             await ReconnectMicrosoftAccountAsync(account);
+            return;
+        }
+        if (account.IsGoogle)
+        {
+            await ReconnectGoogleAccountAsync(account);
             return;
         }
         var vm = new AccountSetupViewModel(_tester, _vault, async updated =>
@@ -819,12 +869,15 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     {
         var secretText = account.IsMicrosoft
             ? $"its Microsoft sign-in (the tokens HCG Mail keeps in your {PlatformText.Device}'s protected storage) will be deleted"
+            : account.IsGoogle
+            ? $"its Google sign-in (the token HCG Mail keeps in {_vault.StorageDescription}) will be deleted"
             : $"its saved password will be deleted from {_vault.StorageDescription}";
         if (!await _dialogs.ConfirmAsync(
                 "Remove this account?",
                 $"{account.EmailAddress} will be removed from HCG Mail on this {PlatformText.Device}, {secretText}, and its send history on this {PlatformText.Device} will be cleared.\n\n" +
                 $"No email is deleted from the mail server — you can add the account again at any time. HCG Mail does not store message contents on this {PlatformText.Device}, so there are no local messages to delete. Your other accounts are not affected." +
-                (account.IsMicrosoft ? " To also withdraw HCG Mail's access on Microsoft's side, remove it at account.microsoft.com (personal) or myapps.microsoft.com (work or school)." : ""),
+                (account.IsMicrosoft ? " To also withdraw HCG Mail's access on Microsoft's side, remove it at account.microsoft.com (personal) or myapps.microsoft.com (work or school)." : "") +
+                (account.IsGoogle ? " To also withdraw HCG Mail's access on Google's side (for all your devices), remove it at myaccount.google.com/permissions." : ""),
                 "Remove account",
                 destructive: true))
             return false;
@@ -876,6 +929,27 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
                 _logger.LogWarning(ex, "Could not remove Microsoft tokens of account {AccountId}", account.Id);
                 _notifications.Warning("Account removed — sign-in not deleted",
                     $"{account.EmailAddress} was removed, but its Microsoft sign-in could not be deleted from the protected token store ({ex.GetType().Name}).");
+            }
+            return true;
+        }
+
+        if (account.IsGoogle)
+        {
+            var googleKey = account.GoogleAccountId is { } g ? CredentialKeys.ForGoogle(g) : null;
+            try
+            {
+                // Only this device's token is deleted: revoking at Google would also sign out the user's other devices.
+                if (account.GoogleAccountId is { } key && !IsGoogleKeyInUse(key))
+                    await _googleAuth.SignOutAsync(key);
+                _notifications.Success("Account removed", $"{account.EmailAddress} and its Google sign-in were removed from this {PlatformText.Device}. No email was deleted from the server.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not remove the Google token of account {AccountId}", account.Id);
+                if (googleKey is not null)
+                    _settings.Update(s => s with { PendingCredentialDeletions = s.PendingCredentialDeletions.Append(googleKey).ToList() });
+                _notifications.Warning("Account removed — sign-in not deleted",
+                    $"{account.EmailAddress} was removed, but its Google sign-in could not be deleted from {_vault.StorageDescription} ({ex.GetType().Name}). HCG Mail will try again the next time it starts.");
             }
             return true;
         }

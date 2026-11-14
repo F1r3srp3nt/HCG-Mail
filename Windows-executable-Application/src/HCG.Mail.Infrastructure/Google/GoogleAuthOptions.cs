@@ -27,6 +27,24 @@ public static partial class GoogleAuthOptions
         "Google sign-in is not set up in this build of HCG Mail: it has no Google OAuth client. The app must be registered " +
         "in Google Cloud and its client ID and desktop client secret added to the build (see docs/GOOGLE_ACCOUNTS.md).";
 
+    public const string MissingSecretMessage =
+        "Google sign-in is not set up in this build of HCG Mail: the Google client ID is present but the desktop client " +
+        "secret is missing (HcgGoogleClientSecret, see docs/GOOGLE_ACCOUNTS.md).";
+
+    public const string InvalidClientIdMessage =
+        "Google sign-in is not set up in this build of HCG Mail: the configured Google client ID is not in the form " +
+        "<number>-<id>.apps.googleusercontent.com (see docs/GOOGLE_ACCOUNTS.md).";
+
+    /// <summary>
+    /// Why the configured values cannot be used, or null when Google sign-in can be offered. Sign-in is never enabled
+    /// with a partial configuration: a missing or malformed value keeps it unavailable with an explanation.
+    /// </summary>
+    public static string? ConfigurationProblem(string? clientId, string? clientSecret) =>
+        string.IsNullOrWhiteSpace(clientId) ? NotConfiguredMessage
+        : !IsValidClientId(clientId) ? InvalidClientIdMessage
+        : string.IsNullOrWhiteSpace(clientSecret) ? MissingSecretMessage
+        : null;
+
     public static string? ResolveClientId(Assembly appAssembly) => Resolve(ClientIdVariable, ClientIdMetadataKey, appAssembly);
 
     public static string? ResolveClientSecret(Assembly appAssembly) => Resolve(ClientSecretVariable, ClientSecretMetadataKey, appAssembly);

@@ -103,8 +103,12 @@
               <TextBlock Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding MicrosoftSignInStatus}" />
               <Button Grid.Column="1" Classes="subtle" Margin="12,0,0,0" Content="Add Microsoft account" Command="{Binding AddMicrosoftAccountCommand}" />
             </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding GoogleSignInStatus}" />
+              <Button Grid.Column="1" Classes="subtle" Margin="12,0,0,0" Content="Add Google account" Command="{Binding AddGoogleAccountCommand}" />
+            </Grid>
             <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="Removing an account disconnects it and deletes its password or Microsoft sign-in and its send history from this computer. Mail on the server is never deleted, and HCG Mail keeps no copies of messages on this computer." />
+                       Text="Removing an account disconnects it and deletes its password or Microsoft or Google sign-in and its send history from this computer. Mail on the server is never deleted, and HCG Mail keeps no copies of messages on this computer." />
             <ItemsControl ItemsSource="{Binding Accounts}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:AccountViewModel">
@@ -125,7 +129,7 @@
                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <Button Classes="subtle" Content="Reconnect" ToolTip.Tip="Connect again (Microsoft accounts: sign in again)"
                                 Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).ReconnectAccountCommand}" CommandParameter="{Binding}" />
-                        <Button Classes="subtle" Content="Edit" IsVisible="{Binding !IsMicrosoft}"
+                        <Button Classes="subtle" Content="Edit" IsVisible="{Binding !UsesOAuth}"
                                 Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).EditAccountCommand}" CommandParameter="{Binding}" />
                         <Button Classes="subtle danger" Content="Remove"
                                 Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).RemoveAccountCommand}" CommandParameter="{Binding}" />

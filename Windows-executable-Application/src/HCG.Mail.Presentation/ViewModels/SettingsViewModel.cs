@@ -74,6 +74,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     ];
 
     public string MicrosoftSignInStatus => _main.MicrosoftSignInStatus;
+    public string GoogleSignInStatus => _main.GoogleSignInStatus;
 
     public IReadOnlyList<ThemeOption> Themes { get; } =
     [
@@ -131,6 +132,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [RelayCommand]
     private Task AddMicrosoftAccountAsync() => _main.AddMicrosoftAccountCommand.ExecuteAsync(null);
+
+    [RelayCommand]
+    private Task AddGoogleAccountAsync() => _main.AddGoogleAccountCommand.ExecuteAsync(null);
 
     [RelayCommand]
     private Task ReconnectAccountAsync(AccountViewModel account) => _main.ReconnectAccountAsync(account);

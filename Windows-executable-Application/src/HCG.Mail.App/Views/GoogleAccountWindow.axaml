@@ -1,0 +1,65 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:HCG.Mail.App.ViewModels"
+        xmlns:controls="using:HCG.Mail.App.Controls"
+        x:Class="HCG.Mail.App.Views.GoogleAccountWindow"
+        x:DataType="vm:GoogleAccountViewModel"
+        Title="{Binding Title}"
+        Icon="/Assets/Icons/hcg-mail.ico"
+        Width="640" Height="680" MinWidth="520" MinHeight="520"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <Grid RowDefinitions="*,Auto" Background="{DynamicResource Hcg.Bg.Reader}">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="28,24,28,16" Spacing="14">
+        <StackPanel Spacing="4">
+          <TextBlock Classes="h1" Text="{Binding Title}" />
+          <TextBlock Classes="muted" Text="{Binding Heading}" />
+        </StackPanel>
+
+        <Border Classes="banner" IsVisible="{Binding !IsConfigured}">
+          <TextBlock x:Name="ConfigurationProblem" Text="{Binding ConfigurationProblem}" TextWrapping="Wrap" />
+        </Border>
+
+        <Border Classes="card" Padding="16,12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="How sign-in works" FontWeight="SemiBold" />
+            <TextBlock Text="{x:Static vm:GoogleAccountViewModel.PrivacyText}" TextWrapping="Wrap" Classes="muted" />
+            <TextBlock Text="{x:Static vm:GoogleAccountViewModel.RoleText}" TextWrapping="Wrap" Classes="muted" />
+          </StackPanel>
+        </Border>
+        <Border Classes="card" Padding="16,12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Permissions" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding PermissionsText}" TextWrapping="Wrap" Classes="muted" />
+          </StackPanel>
+        </Border>
+        <Border Classes="card" Padding="16,12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Supported accounts" FontWeight="SemiBold" />
+            <TextBlock Text="{x:Static vm:GoogleAccountViewModel.SupportText}" TextWrapping="Wrap" Classes="muted" />
+            <TextBlock Text="{x:Static vm:GoogleAccountViewModel.TestingText}" TextWrapping="Wrap" Classes="muted" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="banner" IsVisible="{Binding HasError}">
+          <Grid ColumnDefinitions="Auto,*">
+            <controls:IconView Data="{StaticResource Icon.Warning}" Width="17" Height="17" Foreground="{DynamicResource Hcg.Warning}" VerticalAlignment="Top" />
+            <TextBlock x:Name="ErrorText" Grid.Column="1" Margin="10,0,0,0" Text="{Binding ErrorText}" TextWrapping="Wrap" />
+          </Grid>
+        </Border>
+        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsBusy}">
+          <ProgressBar IsIndeterminate="True" Width="80" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="1" Background="{DynamicResource Hcg.Bg.TitleBar}" BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,1,0,0" Padding="24,12">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <Button Classes="subtle danger" Content="Remove account" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" />
+        <Button Grid.Column="2" Classes="subtle" Content="{Binding CancelText}" Command="{Binding CancelCommand}" Margin="0,0,10,0" />
+        <Button x:Name="SignInButton" Grid.Column="3" Classes="primary" Content="Sign in with Google" Command="{Binding SignInCommand}" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

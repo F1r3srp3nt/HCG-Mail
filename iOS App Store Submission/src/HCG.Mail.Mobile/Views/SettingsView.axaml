@@ -48,7 +48,7 @@
                       <WrapPanel>
                         <Button Classes="subtle" Content="Reconnect" Margin="0,0,8,0"
                                 Command="{Binding $parent[views:SettingsView].((app:SettingsViewModel)DataContext).ReconnectAccountCommand}" CommandParameter="{Binding}" />
-                        <Button Classes="subtle" Content="Edit and test" Margin="0,0,8,0" IsVisible="{Binding !IsMicrosoft}"
+                        <Button Classes="subtle" Content="Edit and test" Margin="0,0,8,0" IsVisible="{Binding !UsesOAuth}"
                                 Command="{Binding $parent[views:SettingsView].((app:SettingsViewModel)DataContext).EditAccountCommand}" CommandParameter="{Binding}" />
                         <Button Classes="subtle danger" Content="Remove"
                                 Command="{Binding $parent[views:SettingsView].((app:SettingsViewModel)DataContext).RemoveAccountCommand}" CommandParameter="{Binding}" />

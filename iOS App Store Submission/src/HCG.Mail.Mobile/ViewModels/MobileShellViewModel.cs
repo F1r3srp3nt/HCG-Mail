@@ -256,6 +256,9 @@ public sealed partial class MobileShellViewModel : ObservableObject
                 // Cancels a pending browser sign-in as well.
                 microsoft.CancelCommand.Execute(null);
                 return;
+            case GoogleAccountViewModel google:
+                google.CancelCommand.Execute(null);
+                return;
             default:
                 Overlays.CloseSheet(sheet);
                 return;

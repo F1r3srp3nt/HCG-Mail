@@ -275,6 +275,27 @@ public sealed class FlowTests
     }
 
     [AvaloniaFact]
+    public async Task Google_sign_in_is_not_offered_on_iphone_and_its_sheet_explains_why()
+    {
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone);
+        // No Google button on iPhone/iPad until an iOS Google OAuth client exists.
+        Assert.DoesNotContain(Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(ui.View).OfType<Avalonia.Controls.Button>(),
+            b => b.Content is string text && text.Contains("Google"));
+
+        var showing = ui.Mail.AddGoogleAccountCommand.ExecuteAsync(null);
+        await MobileHarness.Settle();
+        var google = Assert.IsType<GoogleAccountViewModel>(ui.Overlays.CurrentSheet);
+        Assert.False(google.IsConfigured);
+        Assert.Contains("iPhone and iPad", google.ConfigurationProblem);
+        var view = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(ui.View).OfType<Views.GoogleAccountView>().Single();
+        Assert.False(view.SignInButton.IsVisible);
+        Assert.True(view.ConfigurationProblem.IsEffectivelyVisible);
+        await ui.Shell.CloseSheetCommand.ExecuteAsync(google);
+        await showing;
+        Assert.False(ui.Overlays.HasSheet);
+    }
+
+    [AvaloniaFact]
     public async Task Settings_explain_that_nothing_is_checked_in_the_background()
     {
         await using var ui = await MobileHarness.StartAsync(Devices.IPhone);

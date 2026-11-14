@@ -101,4 +101,17 @@ public sealed class MobileDialogService(MobileOverlays overlays, IMobilePlatform
         await entry.Closed;
         return connected;
     }
+
+    public async Task<bool> ShowGoogleAccountAsync(GoogleAccountViewModel viewModel)
+    {
+        var connected = false;
+        var entry = overlays.PushSheet(viewModel);
+        viewModel.CloseRequested += (_, result) =>
+        {
+            connected = result;
+            overlays.CloseSheet(viewModel);
+        };
+        await entry.Closed;
+        return connected;
+    }
 }
