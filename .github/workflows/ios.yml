@@ -121,7 +121,6 @@ jobs:
     name: Compile for devices (ios-arm64, Release, AOT, unsigned)
     runs-on: macos-26
     timeout-minutes: 150
-    env:
     defaults:
       run:
         shell: bash
