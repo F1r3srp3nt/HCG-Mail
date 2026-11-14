@@ -196,9 +196,16 @@ desktop app; `IosMicrosoftAuth` only builds the iOS client: sign-in in the syste
 To enable it, in the existing Microsoft Entra app registration (see
 [`docs/MICROSOFT_ACCOUNTS.md`](../Windows-executable-Application/docs/MICROSOFT_ACCOUNTS.md)) add the platform
 **iOS / macOS** with bundle ID `com.hakmicapitalgroup.hcgmail`; Entra then lists the redirect URI
-`msauth.com.hakmicapitalgroup.hcgmail://auth`. Build with `-p:HcgMicrosoftClientId=<GUID>`. Without a client ID, or
+`msauth.com.hakmicapitalgroup.hcgmail://auth`. The client ID reaches the build through the shared
+`oauth-clients.props` (committed value, `oauth-clients.local.props`, `HCG_MICROSOFT_CLIENT_ID`, or
+`-p:HcgMicrosoftClientId=<GUID>`), including Xcode archives made by `scripts/export-ipa.sh`. Without a client ID, or
 if Info.plist lacks the URL scheme, the app says Microsoft sign-in is *not set up* and offers no sign-in button.
 Microsoft sign-in has not been tested on iOS yet.
+
+**Google accounts** are not offered on iPhone/iPad yet: they need a separate iOS OAuth client in Google Cloud (see
+[`docs/GOOGLE_ACCOUNTS.md`](../Windows-executable-Application/docs/GOOGLE_ACCOUNTS.md#ios-later)). The shared view
+models see Google as unavailable, and no Google button is shown. Gmail can be added with IMAP and an app password where
+the account allows one.
 
 ## Security and privacy
 

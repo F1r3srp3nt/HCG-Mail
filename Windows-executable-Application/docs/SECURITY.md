@@ -50,6 +50,21 @@ they are enforced in code, and the known limitations.
   callback; the bearer token is only ever sent to `graph.microsoft.com` (absolute links to any other host are refused).
 * Writes (send, draft, move, delete) are never retried automatically. See [MICROSOFT_ACCOUNTS.md](MICROSOFT_ACCOUNTS.md).
 
+## Google accounts
+
+* Sign-in: authorization code flow with PKCE (S256) and a constant-time-checked `state`, in the system browser, with a
+  one-shot loopback listener bound to `127.0.0.1` only. The Google "Desktop app" client secret is sent as Google
+  requires for installed apps. Google does not treat it as confidential, but it is never committed (environment,
+  `-p:` or the git-ignored local file only). Scopes: `gmail.modify` (no permanent deletion) and
+  `openid email profile`. Google access grants no HCG roles or permissions.
+* The refresh token is stored in the same protected credential store as passwords (`oauth:google:<sub>`). Access
+  tokens are held in memory. No token, authorization code or client secret is logged.
+* The ID token is accepted only from Google's token endpoint over TLS, with the issuer, audience (this client) and
+  `email_verified` checked.
+* Gmail calls use .NET's standard TLS validation. The bearer token is only sent to `gmail.googleapis.com`. Request
+  paths are built by the app and never taken from server responses.
+* Writes are never retried automatically. See [GOOGLE_ACCOUNTS.md](GOOGLE_ACCOUNTS.md).
+
 ## Credential storage
 
 `ICredentialVault` abstracts the OS store:

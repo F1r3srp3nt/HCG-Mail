@@ -141,6 +141,7 @@ HTML is shown on a light "paper" surface in both skins, because most HTML mail a
 | Send history | `delivery-history.json` | Last 300 SMTP outcomes (state, server reply, Message-ID); no message content — see [DELIVERABILITY.md](DELIVERABILITY.md) |
 | Message bodies, attachments | **not cached** | Fetched on demand, held in memory only |
 | Microsoft sign-in tokens | `msal-token-cache.bin` (DPAPI) / Keychain / Secret Service | MSAL cache; removed with the account |
+| Google sign-in (refresh token) | Windows Credential Manager / macOS Keychain | Keyed `oauth:google:<sub>`; access tokens in memory only; removed with the account — see [GOOGLE_ACCOUNTS.md](GOOGLE_ACCOUNTS.md) |
 
 Settings folder: `%LOCALAPPDATA%\HCG\HCG Mail` (Windows), `~/Library/Application Support/HCG Mail`
 (macOS), `$XDG_CONFIG_HOME/hcg-mail` (Linux); override with `HCG_MAIL_DATA_DIR`.
