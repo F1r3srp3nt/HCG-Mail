@@ -11,6 +11,7 @@ on:
       - 'Windows-executable-Application/src/**'
       - 'Windows-executable-Application/tests/**'
       - 'Windows-executable-Application/Directory.*'
+      - 'hcg-apps.json'
       - '.github/workflows/ios.yml'
   push:
     branches: [main]
@@ -41,6 +42,18 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.1xx'
+      - name: Exactly one iOS application in the repository (hcg-apps.json and a project scan agree)
+        run: python3 -I "iOS App Store Submission/scripts/verify-app-selection.py"
+      - name: Build diagnostics (HCG001 for a lone iOS folder, HCG002 for the iOS app on Linux)
+        run: |
+          set +e
+          dotnet build "iOS App Store Submission/src/HCG.Mail.iOS/HCG.Mail.iOS.csproj" > "$RUNNER_TEMP/ios-on-linux.log" 2>&1
+          grep -q "error HCG002" "$RUNNER_TEMP/ios-on-linux.log" || { cat "$RUNNER_TEMP/ios-on-linux.log"; exit 1; }
+          lone="$RUNNER_TEMP/lone"; mkdir -p "$lone"; cp -r "iOS App Store Submission" "$lone/"
+          dotnet build "$lone/iOS App Store Submission/src/HCG.Mail.Mobile/HCG.Mail.Mobile.csproj" > "$RUNNER_TEMP/lone.log" 2>&1
+          grep -q "error HCG001" "$RUNNER_TEMP/lone.log" || { cat "$RUNNER_TEMP/lone.log"; exit 1; }
+          dotnet build "$lone/iOS App Store Submission/src/HCG.Mail.Mobile/HCG.Mail.Mobile.csproj" -p:HcgSharedRoot="$PWD/Windows-executable-Application" || exit 1
+          echo "HCG001/HCG002 reported as expected; HcgSharedRoot override builds."
       - name: Desktop and shared tests (the iOS app reuses this code)
         working-directory: Windows-executable-Application
         run: dotnet test HCG.Mail.sln -c Release
@@ -61,8 +74,6 @@ jobs:
     name: iOS build, simulator self-test and screenshots (macOS)
     runs-on: macos-26
     timeout-minutes: 90
-    env:
-      XCODE_VERSION: '26.3'  # required by the pinned iOS workload 26.2.10233
     defaults:
       run:
         # bash -eo pipefail: a failing script must fail the step even when piped into tee.
@@ -70,13 +81,12 @@ jobs:
         working-directory: iOS App Store Submission
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode ${{ env.XCODE_VERSION }}
+      - name: Select the Xcode version pinned in toolchain.props
         run: |
+          XCODE_VERSION="$(sed -n 's:.*<HcgRequiredXcode>\(.*\)</HcgRequiredXcode>.*:\1:p' toolchain.props)"
           echo "Installed:"; ls -d /Applications/Xcode* || true
           app="/Applications/Xcode_${XCODE_VERSION}.app"
-          if [ ! -d "$app" ]; then
-            echo "Xcode ${XCODE_VERSION} is not installed on this runner. Installed:"; ls -d /Applications/Xcode* ; exit 1
-          fi
+          if [ ! -d "$app" ]; then echo "Xcode ${XCODE_VERSION} is not installed on this runner."; exit 1; fi
           sudo xcode-select -s "$app/Contents/Developer"
           xcodebuild -version
       - uses: actions/setup-dotnet@v4
@@ -84,8 +94,8 @@ jobs:
           dotnet-version: '10.0.1xx'
       - name: Install the pinned iOS workload
         run: scripts/install-workload.sh
-      - name: Toolchain
-        run: scripts/check-prerequisites.sh
+      - name: Build doctor (sources, host, SDK, workload, Xcode, deployment, signing)
+        run: scripts/doctor.sh
       - name: Build for the simulator (Debug)
         run: scripts/build-simulator.sh Debug | tee "$RUNNER_TEMP/app-path.txt"
       - name: Self-test on an iPhone simulator (Keychain, sandbox, sanitizer, configuration)
@@ -112,16 +122,19 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 150
     env:
-      XCODE_VERSION: '26.3'
     defaults:
       run:
         shell: bash
         working-directory: iOS App Store Submission
     steps:
       - uses: actions/checkout@v4
-      - name: Select Xcode ${{ env.XCODE_VERSION }}
+      - name: Select the Xcode version pinned in toolchain.props
         run: |
-          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          XCODE_VERSION="$(sed -n 's:.*<HcgRequiredXcode>\(.*\)</HcgRequiredXcode>.*:\1:p' toolchain.props)"
+          echo "Installed:"; ls -d /Applications/Xcode* || true
+          app="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$app" ]; then echo "Xcode ${XCODE_VERSION} is not installed on this runner."; exit 1; fi
+          sudo xcode-select -s "$app/Contents/Developer"
           xcodebuild -version
       - uses: actions/setup-dotnet@v4
         with:

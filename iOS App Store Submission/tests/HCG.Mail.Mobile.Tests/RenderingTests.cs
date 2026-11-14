@@ -23,13 +23,12 @@ namespace HCG.Mail.Mobile.Tests;
 /// </summary>
 public sealed class RenderingTests
 {
-    private static string FixtureDir()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "Windows-executable-Application", "tests", "fixtures", "mail")))
-            dir = dir.Parent;
-        return Path.Combine(dir!.FullName, "Windows-executable-Application", "tests", "fixtures", "mail");
-    }
+    internal static string FixtureDir() => Path.Combine(SharedDir(), "tests", "fixtures", "mail");
+
+    /// <summary>The shared HCG Mail folder as resolved by the build (HcgSharedDir in Directory.Build.props).</summary>
+    internal static string SharedDir() =>
+        typeof(RenderingTests).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), false)
+            .Cast<System.Reflection.AssemblyMetadataAttribute>().Single(a => a.Key == "HcgSharedDir").Value!;
 
     private static MessageContent Fixture(string file) =>
         MimeConverter.ToContent(MimeMessage.Load(file), new MessageRef("INBOX", 1, 1), default, new HtmlToTextConverter());

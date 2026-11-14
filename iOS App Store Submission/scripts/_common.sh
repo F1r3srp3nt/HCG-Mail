@@ -10,13 +10,19 @@ BUNDLE_ID="${HCG_IOS_BUNDLE_ID:-com.hakmicapitalgroup.hcgmail}"
 # Build output stays out of the repository (artifacts/ is ignored by git).
 OUT_ROOT="$REPO_ROOT/artifacts/ios"
 
+# Pinned toolchain, read from the single source of truth (toolchain.props).
+toolchain_value() { sed -n "s:.*<$1>\(.*\)</$1>.*:\1:p" "$IOS_ROOT/toolchain.props"; }
+REQUIRED_XCODE="$(toolchain_value HcgRequiredXcode)"
+IOS_WORKLOAD_MANIFEST="$(toolchain_value HcgIosWorkloadManifest)"
+MINIMUM_IOS="$(toolchain_value HcgMinimumIos)"
+
 simulator_rid() {
   if [[ "$(uname -m)" == "arm64" ]]; then echo "iossimulator-arm64"; else echo "iossimulator-x64"; fi
 }
 
 require_macos() {
   if [[ "$(uname -s)" != "Darwin" ]]; then
-    echo "error: building the iOS app needs macOS with Xcode (Apple's iOS SDK and simulator only exist there)." >&2
+    echo "error HCG002: building the iOS app needs macOS with Xcode $REQUIRED_XCODE (Apple's iOS SDK and simulators only exist there)." >&2
     echo "       The shared code and the mobile UI tests run anywhere: dotnet test \"$IOS_ROOT/tests/HCG.Mail.Mobile.Tests\"" >&2
     exit 2
   fi
