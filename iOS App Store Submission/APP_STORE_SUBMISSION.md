@@ -33,7 +33,7 @@ The project uses Xcode *External Build System* targets. They run `scripts/xcode-
 | In Xcode | Works? | What happens |
 |---|---|---|
 | Scheme **HCG Mail**, destination an iPhone/iPad **simulator**, **Build** (⌘B) | ✅ | Builds the app. Debug: `artifacts/ios/simulator/Debug/HCGMail.iOS.app`; Release: `…/Release/`. |
-| Scheme **HCG Mail Simulator**, **Build** (⌘B) | ✅ | Builds, opens Simulator, then installs and starts HCG Mail on the newest iPhone simulator in the background. The build finishes first; a cold simulator boot can take a few minutes. Progress: `artifacts/ios/simulator/launch.log`. |
+| Scheme **HCG Mail Simulator**, **Build** (⌘B) | ✅ | Builds, opens Simulator, then installs and starts HCG Mail on the newest iPhone simulator in the background. The build finishes within seconds. The app appears once the simulator has booted: seconds if it is already running, longer from cold. Progress: `artifacts/ios/simulator/launch.log`. |
 | Scheme **HCG Mail**, destination **Any iOS Device (arm64)**, **Build** | ✅ compile check | Builds an unsigned `ios-arm64` app in `artifacts/ios/device/<config>/`. Release is the full AOT App Store configuration and takes about 15 minutes. It cannot be installed, because it is unsigned. |
 | **Product › Clean Build Folder** | ✅ | Removes this configuration's build output. |
 | **Run** (⌘R), **Test**, **Profile**, debugger | ❌ | Xcode cannot run the product of an External Build System target. Use the `HCG Mail Simulator` scheme. On a device, use `dotnet build … -t:Run` (README, *Run on your own iPhone or iPad*). |
@@ -211,6 +211,6 @@ Note anything unexpected before you submit. A build that crashes on launch is th
 | Product › Archive from the scheme | same | ✅ refused with "Product › Archive is not supported… Run scripts/export-ipa.sh" |
 | The build leaves the checkout clean (no `xcuserdata`, no generated files) | same | ✅ |
 | Scheme `HCG Mail` builds the simulator app, which passes the checks | both runs, simulator job | ✅ |
-| Scheme `HCG Mail Simulator` builds, installs and starts the app | run 44864611757 (simulator already booted) | ✅. In the PR run, starting a cold simulator from inside the build step never returned. The scheme now starts the app after the build returns, and CI waits for the launch log; see the PR's latest run. |
+| Scheme `HCG Mail Simulator` builds, installs and starts the app | runs [44864611757](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44864611757), [44871366880](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44871366880), [44876023674](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44876023674) | ✅ The Xcode build returns in about 14 s ("BUILD SUCCEEDED"). The app then starts in the background and `launch.log` reports `HCG-LAUNCH: started`. On GitHub's macOS runners, a cold simulator boot took up to about 20 minutes. A simulator that is already booted is reused, which is the usual case on a Mac. |
 | Signing preflight, signed `.ipa`, entitlements, embedded profile, `.xcarchive` | your Mac (`export-ipa.sh`) | **not yet run**: needs your certificate |
 | Real-device test, upload, TestFlight, review | you | not yet done |

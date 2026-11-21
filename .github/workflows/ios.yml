@@ -109,15 +109,15 @@ jobs:
       - name: Check the simulator app (bundle ID, versions, icon, launch screen, privacy manifest)
         run: python3 -I scripts/verify-ios-build.py app ../artifacts/ios/simulator/Debug/HCGMail.iOS.app --kind simulator
       - name: Xcode scheme "HCG Mail Simulator" builds, installs and starts the app
-        timeout-minutes: 25
+        timeout-minutes: 35
         run: |
           start=$SECONDS
           xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail Simulator" -sdk iphonesimulator -configuration Debug build
           echo "xcodebuild returned after $((SECONDS - start)) s"
-          # The scheme returns after the build and starts the app in the background (a cold simulator boot takes
-          # minutes); wait for its verdict.
+          # The scheme returns after the build and starts the app in the background; wait for its verdict. A cold
+          # simulator boot on a hosted runner has taken up to ~20 minutes, so the limit is wall-clock time.
           log=../artifacts/ios/simulator/launch.log
-          for _ in $(seq 1 900); do grep -q 'HCG-LAUNCH:' "$log" 2>/dev/null && break; sleep 1; done
+          while (( SECONDS - start < 1800 )); do grep -q 'HCG-LAUNCH:' "$log" 2>/dev/null && break; sleep 5; done
           echo "launch finished after $((SECONDS - start)) s:"
           cat "$log"
           grep -q 'HCG-LAUNCH: started' "$log"
