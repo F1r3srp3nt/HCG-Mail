@@ -26,11 +26,18 @@ nothing is copied. [`../iOS Executable/`](../iOS%20Executable/) only describes d
 HCG Mail for iOS is a **.NET for iOS application** that hosts the shared **Avalonia** user interface. It is compiled
 with Apple's toolchain — the iOS SDK from Xcode, `actool` for the icon asset catalog, `ibtool` for the launch screen,
 Apple's linker and `codesign` — driven by the .NET iOS workload (`dotnet build` / `dotnet publish`). It is **not** a
-SwiftUI app and **not** an Xcode project: there is intentionally no `.xcodeproj` (an empty one would build nothing).
-Xcode is still required on the Mac because it provides the SDK, simulators and signing tools.
+SwiftUI app. Xcode is required on the Mac because it provides the SDK, simulators and signing tools.
+
+**`HCGMail.xcodeproj`** is an Xcode entry point to that same build: its schemes **HCG Mail** (build for a simulator,
+or an unsigned compile for devices) and **HCG Mail Simulator** (build, install and start in the Simulator) run
+`scripts/xcode-build.sh`, which calls the .NET build. It contains no second copy of the app. *Product › Archive* is
+not supported from it; the App Store archive and `.ipa` come from `scripts/export-ipa.sh`. Exactly what works from
+Xcode, and the release steps, are in **[APP_STORE_SUBMISSION.md](APP_STORE_SUBMISSION.md)**.
 
 ```
 iOS App Store Submission/
+  HCGMail.xcodeproj                Xcode entry point (schemes "HCG Mail", "HCG Mail Simulator") → scripts/xcode-build.sh
+  APP_STORE_SUBMISSION.md          release and submission handoff
   HCG.Mail.iOS.sln                 shared projects + the three iOS-side projects
   Directory.Build.props            finds the shared code (HcgSharedRoot / HCG_SHARED_ROOT), imports the desktop settings
   Directory.Build.targets          build diagnostics HCG001–HCG004
@@ -166,13 +173,19 @@ dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Debug -f net10.0-ios -r ios
 export HCG_IOS_SIGNING_IDENTITY="Apple Distribution: Hakmi Capital Group (<TEAMID>)"
 export HCG_IOS_PROVISIONING_PROFILE="<App Store profile name or UUID>"
 export HCG_IOS_BUILD_NUMBER=1            # increase for every upload
+export HCG_IOS_MARKETING_VERSION=1.0.0   # optional: the App Store version (default: 0.1.0 from Directory.Build.props)
 export HCG_MICROSOFT_CLIENT_ID=<GUID>    # optional: enables Microsoft sign-in
-scripts/export-ipa.sh                    # → artifacts/ios/ipa/HCGMail.iOS.ipa (+ an Xcode archive)
+scripts/export-ipa.sh
+#   → artifacts/ios/ipa/HCGMail.iOS.ipa                      signed .ipa (upload this with Transporter)
+#   → artifacts/ios/archive/HCG Mail <version> (<build>).xcarchive   (+ the original in Xcode's Organizer)
+#   → artifacts/ios/verification.txt                         every check, for the release record
 ```
 
-The script stops after producing and verifying the signed `.ipa`. Uploading (Transporter or Xcode Organizer) and
-submitting for review are manual, founder-approved steps. Certificates, `.p12`/`.p8` files and provisioning profiles
-must stay in the Mac's keychain / `~/Library` — `.gitignore` blocks them and build output from being committed.
+Before building, the script checks that the identity and the provisioning profile belong together and to the bundle
+ID `com.hakmicapitalgroup.hcgmail`; afterwards it checks the signed app (`scripts/verify-ios-build.py`). It stops
+after producing the files. Uploading and submitting for review are manual, founder-approved steps — see
+[APP_STORE_SUBMISSION.md](APP_STORE_SUBMISSION.md). Certificates, `.p12`/`.p8` files and provisioning profiles must
+stay in the Mac's keychain / `~/Library` — `.gitignore` blocks them and build output from being committed.
 
 ## App icon
 
@@ -244,6 +257,8 @@ Reduce Motion stops the only animation (the refresh spinner); the keyboard and s
 VoiceOver has not been tested on a device yet.
 
 ## App Store notes (for the founder)
+
+The full checklist is [APP_STORE_SUBMISSION.md](APP_STORE_SUBMISSION.md). In short:
 
 * Export compliance: the app only uses standard TLS from the operating system. Answer the encryption question in
   App Store Connect accordingly; `ITSAppUsesNonExemptEncryption` is deliberately not set without that decision.

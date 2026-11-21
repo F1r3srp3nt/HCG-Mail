@@ -26,6 +26,12 @@ The `.ipa` is written to `artifacts/ios/ipa/` (not committed). Ad-hoc builds are
 or Xcode (Window → Devices and Simulators); TestFlight builds are uploaded manually with Transporter.
 Nothing is uploaded or distributed automatically; every distribution requires founder approval.
 
+## From Xcode
+
+`../iOS App Store Submission/HCGMail.xcodeproj` builds the same app from Xcode (simulator, or an unsigned compile for
+devices). Signed builds — development, ad hoc or App Store — come from `scripts/export-ipa.sh`; see
+[APP_STORE_SUBMISSION.md](../iOS%20App%20Store%20Submission/APP_STORE_SUBMISSION.md).
+
 ## Building with HCG Executable Maker
 
 See [HCG_EXECUTABLE_MAKER.md](HCG_EXECUTABLE_MAKER.md): which project Maker must select when the whole repository

@@ -73,7 +73,9 @@ jobs:
   simulator:
     name: iOS build, simulator self-test and screenshots (macOS)
     runs-on: macos-26
-    timeout-minutes: 90
+    # Hosted runners sometimes take 20+ minutes for one cold simulator boot (and once 51 minutes for the screenshot
+    # step), so the job needs room beyond the steps' own limits.
+    timeout-minutes: 150
     defaults:
       run:
         # bash -eo pipefail: a failing script must fail the step even when piped into tee.
@@ -98,6 +100,29 @@ jobs:
         run: scripts/doctor.sh
       - name: Build for the simulator (Debug)
         run: scripts/build-simulator.sh Debug | tee "$RUNNER_TEMP/app-path.txt"
+      # Through Xcode before the simulator steps below: xcodebuild enumerates simulator devices and is much slower once
+      # they have been booted and used.
+      - name: Xcode project opens from a fresh checkout (targets and shared schemes)
+        timeout-minutes: 10
+        run: xcodebuild -list -project HCGMail.xcodeproj
+      - name: Xcode scheme "HCG Mail" builds the app for the simulator
+        timeout-minutes: 20
+        run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail" -sdk iphonesimulator -configuration Debug build
+      - name: Check the simulator app (bundle ID, versions, icon, launch screen, privacy manifest)
+        run: python3 -I scripts/verify-ios-build.py app ../artifacts/ios/simulator/Debug/HCGMail.iOS.app --kind simulator
+      - name: Xcode scheme "HCG Mail Simulator" builds, installs and starts the app
+        timeout-minutes: 35
+        run: |
+          start=$SECONDS
+          xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail Simulator" -sdk iphonesimulator -configuration Debug build
+          echo "xcodebuild returned after $((SECONDS - start)) s"
+          # The scheme returns after the build and starts the app in the background; wait for its verdict. A cold
+          # simulator boot on a hosted runner has taken up to ~20 minutes, so the limit is wall-clock time.
+          log=../artifacts/ios/simulator/launch.log
+          while (( SECONDS - start < 1800 )); do grep -q 'HCG-LAUNCH:' "$log" 2>/dev/null && break; sleep 5; done
+          echo "launch finished after $((SECONDS - start)) s:"
+          cat "$log"
+          grep -q 'HCG-LAUNCH: started' "$log"
       - name: Self-test on an iPhone simulator (Keychain, sandbox, sanitizer, configuration)
         run: |
           mkdir -p ../artifacts/ios-screenshots
@@ -107,6 +132,15 @@ jobs:
           export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
           scripts/run-simulator.sh --preview --screenshot ../artifacts/ios-screenshots/iphone.png
           scripts/run-simulator.sh --ipad --preview --screenshot ../artifacts/ios-screenshots/ipad.png
+      - name: The builds left the checkout clean
+        run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
+      - name: Shut down the simulators (leave nothing running for the runner's clean-up)
+        if: always()
+        timeout-minutes: 10
+        run: |
+          xcrun simctl shutdown all || true
+          killall Simulator 2>/dev/null || true
+          pkill -f 'scripts/run-simulator.sh' 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -117,7 +151,8 @@ jobs:
 
   device-aot:
     # The App Store build is fully AOT-compiled; this takes much longer than a simulator build, so it runs as its own
-    # job in parallel. Unsigned: CI holds no certificates, so this proves the code compiles for devices, nothing more.
+    # job in parallel, through the Xcode scheme. Unsigned: CI holds no certificates, so this proves the App Store
+    # configuration compiles and is packaged correctly; signing and the archive are scripts/export-ipa.sh on the owner's Mac.
     name: Compile for devices (ios-arm64, Release, AOT, unsigned)
     runs-on: macos-26
     timeout-minutes: 150
@@ -140,5 +175,37 @@ jobs:
           dotnet-version: '10.0.1xx'
       - name: Install the pinned iOS workload
         run: scripts/install-workload.sh
-      - name: Release build for ios-arm64 (AOT), without code signing
-        run: dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:EnableCodeSigning=false
+      - name: Xcode project opens from a fresh checkout (targets and shared schemes)
+        timeout-minutes: 10
+        run: xcodebuild -list -project HCGMail.xcodeproj
+      - name: Xcode scheme "HCG Mail", Any iOS Device, Release (ios-arm64, AOT, unsigned)
+        run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail" -sdk iphoneos -configuration Release build
+      - name: Check the Release device app (bundle ID, versions, SDK, icon, launch screen, privacy manifest)
+        run: |
+          mkdir -p ../artifacts/ios-release-check
+          app=../artifacts/ios/device/Release/HCGMail.iOS.app
+          python3 -I scripts/verify-ios-build.py app "$app" --kind device | tee ../artifacts/ios-release-check/verification.txt
+          plutil -convert xml1 -o ../artifacts/ios-release-check/Info.plist "$app/Info.plist"
+          cp "$app/PrivacyInfo.xcprivacy" ../artifacts/ios-release-check/
+          xcrun --sdk iphoneos assetutil --info "$app/Assets.car" > ../artifacts/ios-release-check/assets.json
+      - name: Product › Archive from the scheme stops and points to scripts/export-ipa.sh
+        run: |
+          set +e
+          xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail" -sdk iphoneos -configuration Release archive \
+            -archivePath "$RUNNER_TEMP/scheme.xcarchive" > "$RUNNER_TEMP/archive.log" 2>&1
+          rc=$?
+          tail -25 "$RUNNER_TEMP/archive.log"
+          if [ $rc -ne 0 ] && grep -q "Product › Archive is not supported" "$RUNNER_TEMP/archive.log"; then
+            echo "Archive from the scheme is refused with directions, as documented."
+          else
+            echo "Unexpected: xcodebuild archive exited $rc without the documented message."; exit 1
+          fi
+      - name: The build left the checkout clean
+        run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-release-check
+          path: artifacts/ios-release-check
+          if-no-files-found: ignore
+          retention-days: 30
