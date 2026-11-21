@@ -8,5 +8,8 @@
     <HcgIosWorkloadManifest>26.2.10233</HcgIosWorkloadManifest>
     <HcgMinimumIos>16.0</HcgMinimumIos>
     <HcgMinimumDotnetSdk>10.0.100</HcgMinimumDotnetSdk>
+    <!-- Apple's minimum for App Store Connect uploads (since 28 April 2026: built with Xcode 26 and the iOS 26 SDK or
+         later; https://developer.apple.com/news/upcoming-requirements/). scripts/verify-ios-build.py checks DTSDKName. -->
+    <HcgAppStoreMinimumSdk>26.0</HcgAppStoreMinimumSdk>
   </PropertyGroup>
 </Project>

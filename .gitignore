@@ -31,6 +31,9 @@ coverage*/
 *.p8
 *.cer
 *.dSYM/
+# Xcode per-user state (HCGMail.xcodeproj keeps only the project and shared schemes)
+xcuserdata/
+*.xcuserstate
 
 # Local OAuth client values (may contain the Google desktop client secret) — never commit
 oauth-clients.local.props

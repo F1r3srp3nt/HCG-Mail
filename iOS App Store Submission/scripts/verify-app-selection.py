@@ -44,6 +44,21 @@ else:
     for key in ("solution", "toolchain", "check"):
         if not (root / app[key]).exists():
             errors.append(f"hcg-apps.json: {key} '{app[key]}' does not exist")
+    # The Xcode project is only an entry point to the .NET build: it must exist with its shared schemes, call the
+    # build wrapper, and must be the only Xcode project (a tool picking "the .xcodeproj" finds this one).
+    xcodeproj = root / app.get("xcodeProject", "")
+    if not (xcodeproj / "project.pbxproj").is_file():
+        errors.append(f"hcg-apps.json: xcodeProject '{app.get('xcodeProject')}' has no project.pbxproj")
+    else:
+        if "scripts/xcode-build.sh" not in (xcodeproj / "project.pbxproj").read_text(encoding="utf-8"):
+            errors.append(f"{app['xcodeProject']}: targets do not call scripts/xcode-build.sh")
+        for scheme in app.get("xcodeSchemes", {}):
+            if not (xcodeproj / "xcshareddata" / "xcschemes" / f"{scheme}.xcscheme").is_file():
+                errors.append(f"{app['xcodeProject']}: shared scheme '{scheme}' is missing")
+    others = [p.relative_to(root).as_posix() for p in root.rglob("*.xcodeproj")
+              if p != xcodeproj and not any(part in ("obj", "bin", "artifacts", ".git") for part in p.relative_to(root).parts)]
+    if others:
+        errors.append(f"unexpected Xcode projects: {others}")
     if not (root / app["sharedRoot"] / "src").is_dir():
         errors.append(f"hcg-apps.json: sharedRoot '{app['sharedRoot']}/src' does not exist")
 

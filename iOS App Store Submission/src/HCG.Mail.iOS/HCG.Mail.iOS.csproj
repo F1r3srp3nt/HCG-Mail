@@ -2,8 +2,9 @@
   <!--
     HCG Mail for iPhone and iPad: a .NET for iOS app that hosts the shared Avalonia interface (HCG.Mail.Mobile) and
     the shared mail engine (HCG.Mail.Core / HCG.Mail.Email). It is built with Apple's toolchain (Xcode's SDK, actool
-    for the asset catalog, ibtool for the launch screen, codesign) through the .NET iOS workload; it is not a SwiftUI
-    or Xcode project and there is deliberately no .xcodeproj. See ../../README.md for versions and commands.
+    for the asset catalog, ibtool for the launch screen, codesign) through the .NET iOS workload. This project is the
+    build; ../../HCGMail.xcodeproj is only an Xcode entry point that runs it (scripts/xcode-build.sh). See
+    ../../README.md for versions and commands.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0-ios</TargetFramework>

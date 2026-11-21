@@ -30,12 +30,19 @@
       "sharedRoot": "Windows-executable-Application",
       "sharedRootOverride": "-p:HcgSharedRoot=<absolute path to Windows-executable-Application> or environment HCG_SHARED_ROOT",
       "check": "iOS App Store Submission/scripts/doctor.sh",
+      "xcodeProject": "iOS App Store Submission/HCGMail.xcodeproj",
+      "xcodeSchemes": {
+        "HCG Mail": "builds the app through the .NET build (simulator, or unsigned compile for devices); Archive is not supported",
+        "HCG Mail Simulator": "builds, installs and starts the app in the iOS Simulator"
+      },
       "build": {
         "simulator": "iOS App Store Submission/scripts/build-simulator.sh Debug",
         "device": "dotnet build \"iOS App Store Submission/src/HCG.Mail.iOS/HCG.Mail.iOS.csproj\" -c Release -f net10.0-ios -r ios-arm64 -p:CodesignKey=<identity> -p:CodesignProvision=<profile>",
         "ipa": "iOS App Store Submission/scripts/export-ipa.sh"
       },
-      "docs": "iOS App Store Submission/README.md"
+      "verify": "python3 \"iOS App Store Submission/scripts/verify-ios-build.py\" app <.app or .ipa>",
+      "docs": "iOS App Store Submission/README.md",
+      "submission": "iOS App Store Submission/APP_STORE_SUBMISSION.md"
     }
   ],
   "libraries": [
