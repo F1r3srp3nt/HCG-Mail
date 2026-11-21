@@ -28,6 +28,9 @@ public partial class MobileShellView : UserControl
     {
         InitializeComponent();
         Root.SizeChanged += (_, e) => _shell?.UpdateSize(e.NewSize.Width, e.NewSize.Height);
+        // The host may already place this view inside part of the safe area (iOS: 62 pt measured on an iPhone 17 Pro
+        // with Avalonia 11.3, although the top level reports no padding); re-check where the view sits after layout.
+        Root.LayoutUpdated += (_, _) => UpdateSafeArea();
         SidebarScrim.PointerPressed += (_, _) => _shell?.CloseSidebarCommand.Execute(null);
         KeyDown += OnKeyDown;
         ActualThemeVariantChanged += (_, _) => UpdateSystemBar();
@@ -81,7 +84,24 @@ public partial class MobileShellView : UserControl
     private void UpdateSafeArea()
     {
         if (_shell is not null && _insets is not null)
-            _shell.SafeArea = _insets.SafeAreaPadding;
+            _shell.SafeArea = RemainingInset(_insets.SafeAreaPadding);
+    }
+
+    /// <summary>
+    /// The part of the safe area this view still has to keep clear: the reported insets minus how far the view
+    /// already sits inside the window. Applying the reported insets in full doubled them on iOS (the content started
+    /// 124 pt down on an iPhone whose top inset is 62 pt). Exactly one inset results either way.
+    /// </summary>
+    private Thickness RemainingInset(Thickness reported)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } top || Root.TranslatePoint(new Point(0, 0), top) is not { } origin
+            || Root.TranslatePoint(new Point(Root.Bounds.Width, Root.Bounds.Height), top) is not { } end)
+            return reported;
+        return new Thickness(
+            Math.Max(0, reported.Left - origin.X),
+            Math.Max(0, reported.Top - origin.Y),
+            Math.Max(0, reported.Right - (top.Bounds.Width - end.X)),
+            Math.Max(0, reported.Bottom - (top.Bounds.Height - end.Y)));
     }
 
     /// <summary>Status bar text follows the HCG skin (light text on HCG Future, dark text on HCG Classic).</summary>
