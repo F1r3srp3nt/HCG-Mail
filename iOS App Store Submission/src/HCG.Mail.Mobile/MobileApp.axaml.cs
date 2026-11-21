@@ -91,14 +91,16 @@ public partial class MobileApp : Application
 
     private static async Task OpenPreviewScreenAsync(MobileShellViewModel shell, string screen)
     {
-        for (var i = 0; i < 100 && shell.Mail.MessageList.Items.Count == 0; i++)
+        // Simulators on build machines can take a while: wait up to a minute for the sample mailbox.
+        for (var i = 0; i < 600 && (shell.Mail.MessageList.Items.Count == 0 || !shell.Mail.ComposeCommand.CanExecute(null)); i++)
             await Task.Delay(100);
         switch (screen)
         {
             case "reader" when shell.Mail.MessageList.Items.Count > 0:
                 shell.Mail.MessageList.SelectedItem = shell.Mail.MessageList.Items[0];
+                shell.OnMessageChosen(); // iPhone: show the reader page, as a tap does
                 break;
-            case "compose":
+            case "compose" when shell.Mail.ComposeCommand.CanExecute(null):
                 shell.Mail.ComposeCommand.Execute(null);
                 break;
         }

@@ -245,6 +245,8 @@ jobs:
               || { echo "Simulator '$device' is not available:"; xcrun simctl list devices available; exit 1; }
             xcrun simctl boot "$udid" 2>/dev/null || true
             xcrun simctl bootstatus "$udid" -b >/dev/null
+            # No first-run keyboard tip ("slide to type") over the composer.
+            xcrun simctl spawn "$udid" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
             # Apple's standard clean status bar for store screenshots (9:41, full signal and battery).
             xcrun simctl status_bar "$udid" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 \
               --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
