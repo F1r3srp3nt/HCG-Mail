@@ -252,8 +252,8 @@ jobs:
               --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
             name="$(echo "$device" | tr -cd '[:alnum:]')"
             for screen in inbox reader compose; do
-              arg=(); [ "$screen" != inbox ] && arg=(--screen "$screen")
-              HCG_IOS_SCREENSHOT_DELAY=20 scripts/run-simulator.sh "$device" --preview "${arg[@]}" --screenshot "$out/$name-$screen.png"
+              # Waits until the app reports the screen is open (HCG-PREVIEW: ready …); fails if it never is.
+              scripts/run-simulator.sh "$device" --preview --screen "$screen" --screenshot "$out/$name-$screen.png"
             done
             xcrun simctl shutdown "$udid" || true
           done

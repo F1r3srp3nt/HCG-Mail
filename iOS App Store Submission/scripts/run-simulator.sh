@@ -56,6 +56,25 @@ if [[ $SELFTEST -eq 1 ]]; then
   exit $?
 fi
 
+if [[ -n "$SCREEN" && -n "$SHOT" ]]; then
+  # Store screenshots: the app prints "HCG-PREVIEW: ready <screen>" once that screen is open (sample mailbox loaded);
+  # wait for it instead of a fixed delay, which is not enough on slow build machines.
+  LOG="$(mktemp)"
+  xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+  ( xcrun simctl launch --console-pty --terminate-running-process "$UDID" "$BUNDLE_ID" > "$LOG" 2>&1 & echo $! > "$LOG.pid" )
+  for _ in $(seq 1 180); do
+    grep -q 'HCG-PREVIEW: \(ready\|not ready\)' "$LOG" && break
+    sleep 1
+  done
+  grep 'HCG-PREVIEW' "$LOG" || echo "HCG-PREVIEW: no answer from the app within 3 minutes"
+  sleep 2   # let the last frame render
+  xcrun simctl io "$UDID" screenshot "$SHOT"
+  kill "$(cat "$LOG.pid")" 2>/dev/null || true
+  echo "Screenshot: $SHOT"
+  grep -q "HCG-PREVIEW: ready $SCREEN" "$LOG"
+  exit $?
+fi
+
 xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID"
 if [[ -n "$SHOT" ]]; then
   sleep "${HCG_IOS_SCREENSHOT_DELAY:-12}"
