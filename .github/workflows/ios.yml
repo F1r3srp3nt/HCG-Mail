@@ -209,3 +209,71 @@ jobs:
           path: artifacts/ios-release-check
           if-no-files-found: ignore
           retention-days: 30
+
+  store-screenshots:
+    # Real screenshots of the app for App Store Connect, at the sizes it requires (6.9" iPhone, 13" iPad), from the
+    # Debug build in preview mode: the labelled sample mailbox, no network, no account. Release pull requests only.
+    name: App Store screenshots (iPhone 6.9", iPad 13")
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/')
+    runs-on: macos-26
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+        working-directory: iOS App Store Submission
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the Xcode version pinned in toolchain.props
+        run: |
+          XCODE_VERSION="$(sed -n 's:.*<HcgRequiredXcode>\(.*\)</HcgRequiredXcode>.*:\1:p' toolchain.props)"
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          xcodebuild -version
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.1xx'
+      - name: Install the pinned iOS workload
+        run: scripts/install-workload.sh
+      - name: Build for the simulator (Debug)
+        run: scripts/build-simulator.sh Debug | tee "$RUNNER_TEMP/app-path.txt"
+      - name: Take screenshots (inbox, message, compose) on iPhone 17 Pro Max and iPad Pro 13-inch
+        timeout-minutes: 120
+        run: |
+          export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
+          out=../artifacts/app-store-screenshots; mkdir -p "$out"
+          for device in "iPhone 17 Pro Max" "iPad Pro 13-inch (M5)"; do
+            udid="$(xcrun simctl list devices available -j | DEVICE="$device" python3 -c 'import json,os,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in sorted(d, reverse=True) if "iOS" in r for x in d[r] if x["name"]==os.environ["DEVICE"]))')" \
+              || { echo "Simulator '$device' is not available:"; xcrun simctl list devices available; exit 1; }
+            xcrun simctl boot "$udid" 2>/dev/null || true
+            xcrun simctl bootstatus "$udid" -b >/dev/null
+            # Apple's standard clean status bar for store screenshots (9:41, full signal and battery).
+            xcrun simctl status_bar "$udid" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 \
+              --cellularMode active --cellularBars 4 --batteryState charged --batteryLevel 100
+            name="$(echo "$device" | tr -cd '[:alnum:]')"
+            for screen in inbox reader compose; do
+              arg=(); [ "$screen" != inbox ] && arg=(--screen "$screen")
+              HCG_IOS_SCREENSHOT_DELAY=20 scripts/run-simulator.sh "$device" --preview "${arg[@]}" --screenshot "$out/$name-$screen.png"
+            done
+            xcrun simctl shutdown "$udid" || true
+          done
+          # App Store Connect accepts 1320×2868 / 1290×2796 (6.9") and 2064×2752 / 2048×2732 (13").
+          python3 - "$out" <<'PY'
+          import struct, sys, pathlib
+          ok = {(1320, 2868), (1290, 2796), (2064, 2752), (2048, 2732)}
+          bad = 0
+          for p in sorted(pathlib.Path(sys.argv[1]).glob("*.png")):
+              w, h = struct.unpack(">II", p.read_bytes()[16:24])
+              good = (w, h) in ok
+              bad += not good
+              print(f"{'OK  ' if good else 'BAD '} {p.name} {w}x{h}")
+          sys.exit(1 if bad else 0)
+          PY
+      - name: Shut down the simulators
+        if: always()
+        run: xcrun simctl shutdown all || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-store-screenshots
+          path: artifacts/app-store-screenshots
+          if-no-files-found: ignore
+          retention-days: 90

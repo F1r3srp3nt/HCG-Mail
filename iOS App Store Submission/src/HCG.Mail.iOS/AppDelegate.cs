@@ -22,6 +22,9 @@ public partial class AppDelegate : AvaloniaAppDelegate<MobileApp>
         var platform = new IosPlatform();
         MobileApp.Platform = platform;
         MobileApp.Mode = new AppMode(IsPreview: PreviewRequested());
+#if DEBUG
+        MobileApp.PreviewScreen = Environment.GetEnvironmentVariable("HCG_MAIL_PREVIEW_SCREEN");
+#endif
         return base.CustomizeAppBuilder(builder)
             .WithInterFont()
             .AfterSetup((Action<AppBuilder>)(_ready =>

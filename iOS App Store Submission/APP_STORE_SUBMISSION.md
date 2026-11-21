@@ -115,7 +115,8 @@ What the script does, in order:
 | `artifacts/ios/ipa/HCGMail.iOS.ipa` | **Upload this** with Transporter |
 | `artifacts/ios/archive/HCG Mail <version> (<build>).xcarchive` | Copy of the archive, for your records |
 | `~/Library/Developer/Xcode/Archives/<date>/….xcarchive` (path printed by the script) | The same archive as listed in Xcode › Window › Organizer |
-| `artifacts/ios/verification.txt` | Every preflight and build check from this run; keep it with the release |
+| `artifacts/ios/ipa/HCGMail.iOS.ipa.sha256` | SHA-256 of the `.ipa`; re-check before upload with `shasum -a 256 -c HCGMail.iOS.ipa.sha256` (in that folder) |
+| `artifacts/ios/verification.txt` | Every preflight and build check from this run, plus the SHA-256; keep it with the release |
 
 ## 3. Upload: use Transporter
 
@@ -132,73 +133,25 @@ uploaded would not be the one that was checked. Organizer is still useful to loo
 
 ## 4. Test on a real device before submitting
 
-Test the exact uploaded build. Add yourself as an **internal tester** in TestFlight (no Beta App Review needed) and
-install it with the TestFlight app on an iPhone and on an iPad.
-
-To test before uploading, build with a development identity and profile that include the device. Set
-`HCG_IOS_DISTRIBUTION=other` and run `export-ipa.sh`, then install the `.ipa` from Xcode › Window › Devices and
-Simulators (**+**).
-
-Use a **dedicated test mailbox**, never a real HCG mailbox, and send only to your own test addresses. It takes about
-15 minutes:
-
-1. **First start:**
-   * the icon and name "HCG Mail" are on the home screen;
-   * the launch screen appears;
-   * the app opens to the welcome screen, with no sample data.
-2. **Mailbox setup:**
-   * *Add email account* with the test mailbox's IMAP/SMTP details. *Test connection* shows every step passing.
-   * A wrong password shows a clear error, and nothing is saved.
-3. **Reading:**
-   * The Inbox loads. Pull to refresh works.
-   * Open an HTML newsletter (remote images stay blocked until *Load images*) and a plain-text message.
-   * On iPad, rotate, and use Split View or Slide Over with another app.
-4. **Sending:**
-   * Compose to your own second test address and send. It appears in *Sent* and arrives.
-   * Reply to it. Save a draft, reopen it, and send it.
-5. **Attachments:**
-   * Open a received PDF and image (Quick Look or the share sheet).
-   * Attach a file from Files to a new message, send it, and open it on arrival.
-6. **Relaunch:**
-   * Force-quit, reopen: the account is still there with **no password prompt** (Keychain), and the Inbox loads.
-   * Turn on Airplane Mode: an offline notice appears and the loaded list stays. Turn it off and refresh.
-   * Remove the account in Settings: it is gone after the next relaunch.
-
-Note anything unexpected before you submit. A build that crashes on launch is the most common rejection.
+Test the exact uploaded build with internal TestFlight testers (no Beta App Review needed). The step-by-step plan,
+14 areas on iPhone and iPad, is in **[TESTFLIGHT_PLAN.md](TESTFLIGHT_PLAN.md)**. A build that crashes on launch is the
+most common rejection.
 
 ## 5. App Store Connect: still needed before *Submit for Review*
 
-* **App Information:**
-  * name and subtitle;
-  * category (suggestion: *Productivity*);
-  * content rights;
-  * age rating questionnaire (no objectionable content; mail content is the user's own).
-* **Pricing and Availability:** price (free?) and countries.
-* **App Privacy:**
-  * **Privacy Policy URL** (required). It should say that mail, passwords and settings stay on the device and go
-    only to the user's own mail servers (and Microsoft for Microsoft accounts).
-  * Data collection: **"Data Not Collected"**. This matches `PrivacyInfo.xcprivacy`, since HCG receives nothing.
-    Confirm that this is true for HCG's policy before answering.
-* **Version page (the version must equal the build's marketing version):**
-  * Screenshots for **iPhone 6.9"** and **iPad 13"** (required because the app runs on iPad).
-    `scripts/run-simulator.sh --preview --screenshot …` produces sample-mailbox screens on simulators of those sizes.
-  * Description, keywords, support URL, copyright ("© 2026 Hakmi Capital Group").
-  * Select the uploaded build.
-* **Export compliance** (asked for each build, since `ITSAppUsesNonExemptEncryption` is not set): HCG Mail uses
-  only the encryption built into iOS and .NET for TLS connections to mail servers, and DKIM signature checks. This is
-  usually answered as exempt, but it is HCG's legal declaration to make. Once decided, the key can be added to
-  `Info.plist` so the question stops appearing.
-* **App Review Information:**
-  * contact details;
-  * **Sign-in required: yes**, and in the notes a **test mailbox** that Apple can use (IMAP host, port and security,
-    SMTP host, port and security, username, password). Use a mailbox created for review, not a real one.
-  * One sentence: "HCG Mail connects to the user's own existing mailbox over IMAP/SMTP; no HCG account is needed."
-* **Review risk to decide first: Microsoft sign-in.** A build without a Microsoft client ID shows *Add Microsoft
-  account*, but sign-in is "not set up". A reviewer may treat a visible, non-working feature as incomplete
-  (Guideline 2.1). Before submitting, either:
-  * register the app with Microsoft and build with `HCG_MICROSOFT_CLIENT_ID` (and test it); or
-  * hide the Microsoft button in builds without a client ID. This is a small code change.
-* Then **Add for Review → Submit**. This is manual, and yours to approve.
+The complete package is in **[APP_STORE_CONNECT.md](APP_STORE_CONNECT.md)**:
+* store text (subtitle, description, keywords), category and URLs;
+* screenshots at the required sizes;
+* the App Privacy answers, checked against the app's actual data flows;
+* age-rating guidance and the export-compliance checklist;
+* App Review notes and the demo-mailbox requirements;
+* the final checklist.
+
+**Microsoft sign-in is hidden in this build.** Without a Microsoft client ID, the iPhone/iPad app no longer shows
+*Add Microsoft account*, its account-setup banner, or any text advertising Microsoft accounts.
+* `SignInPresentation` is set in `MobileServices`, and mobile tests cover both states.
+* The implementation is unchanged. A build with a configured client ID shows the button again.
+* Only test and advertise it after it has been verified with a real account (`docs/OAUTH_ACTIVATION_CHECKLIST.md`).
 
 ## What has been verified
 

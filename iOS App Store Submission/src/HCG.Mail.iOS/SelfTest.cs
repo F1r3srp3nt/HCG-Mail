@@ -80,11 +80,32 @@ public static class SelfTest
             Report("Microsoft sign-in configuration", true, microsoft.IsConfigured ? "configured" : "pending — " + microsoft.ConfigurationProblem);
 
             Report("TLS revocation fallback enabled", new HCG.Mail.Email.MailClientFactory().RevocationFallback is not null);
+
+            // Layout: the shell must be inset by the safe area (notch/Dynamic Island, home indicator) exactly once.
+            await Task.Delay(1500); // let the first layout pass finish
+            var layout = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync<(bool Ok, string Detail)>(MeasureSafeAreaLayout);
+            Report("Safe area applied once", layout.Ok, layout.Detail);
         }
         catch (Exception ex)
         {
             Report("unexpected exception", false, ex.GetType().Name + ": " + ex.Message);
         }
         Console.WriteLine(failures == 0 ? "HCG-SELFTEST: PASS" : $"HCG-SELFTEST: FAIL ({failures})");
+    }
+
+    /// <summary>Where the mail area actually sits in the window, compared with the safe area iOS reports.</summary>
+    private static (bool Ok, string Detail) MeasureSafeAreaLayout()
+    {
+        if (Avalonia.Application.Current?.ApplicationLifetime is not Avalonia.Controls.ApplicationLifetimes.ISingleViewApplicationLifetime { MainView: { } view }
+            || Avalonia.Controls.TopLevel.GetTopLevel(view) is not { } top
+            || Avalonia.Controls.ControlExtensions.FindControl<Avalonia.Controls.Control>(view, "MailArea") is not { } mailArea
+            || Avalonia.VisualExtensions.TranslatePoint(mailArea, new Avalonia.Point(0, 0), top) is not { } origin)
+            return (false, "main view or mail area not found");
+        var safe = top.InsetsManager?.SafeAreaPadding ?? default;
+        var end = Avalonia.VisualExtensions.TranslatePoint(mailArea, new Avalonia.Point(0, mailArea.Bounds.Height), top) ?? origin;
+        var bottomGap = top.Bounds.Height - end.Y;
+        var detail = FormattableString.Invariant(
+            $"reported top {safe.Top:0.#} bottom {safe.Bottom:0.#}; mail area top {origin.Y:0.#} bottom gap {bottomGap:0.#}; window {top.Bounds.Width:0.#}×{top.Bounds.Height:0.#}, top-level padding {top.Padding}, edge-to-edge {top.InsetsManager?.DisplayEdgeToEdgePreference}");
+        return (Math.Abs(origin.Y - safe.Top) <= 1 && Math.Abs(bottomGap - safe.Bottom) <= 1, detail);
     }
 }

@@ -6,17 +6,19 @@
 #   scripts/run-simulator.sh --preview               Debug builds: sample mailbox, no network (for screenshots)
 #   scripts/run-simulator.sh --self-test             Keychain / sandbox / sanitizer checks; exits non-zero on failure
 #   scripts/run-simulator.sh --screenshot out.png    save a screenshot after start-up
+#   scripts/run-simulator.sh --preview --screen reader|compose   preview only: open that screen (store screenshots)
 # Never signs in to or sends from a real account.
 source "$(dirname "$0")/_common.sh"
 require_macos
 
-DEVICE=""; FAMILY="iPhone"; PREVIEW=0; SELFTEST=0; SHOT=""; CONFIG="${HCG_IOS_CONFIGURATION:-Debug}"
+DEVICE=""; FAMILY="iPhone"; PREVIEW=0; SELFTEST=0; SHOT=""; SCREEN=""; CONFIG="${HCG_IOS_CONFIGURATION:-Debug}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --ipad) FAMILY="iPad" ;;
     --preview) PREVIEW=1 ;;
     --self-test) SELFTEST=1 ;;
     --screenshot) SHOT="$2"; shift ;;
+    --screen) SCREEN="$2"; shift ;;
     *) DEVICE="$1" ;;
   esac
   shift
@@ -36,6 +38,7 @@ xcrun simctl install "$UDID" "$APP"
 
 export SIMCTL_CHILD_HCG_MAIL_PREVIEW="$PREVIEW"
 export SIMCTL_CHILD_HCG_MAIL_SELF_TEST="$SELFTEST"
+export SIMCTL_CHILD_HCG_MAIL_PREVIEW_SCREEN="$SCREEN"
 
 if [[ $SELFTEST -eq 1 ]]; then
   LOG="$(mktemp)"

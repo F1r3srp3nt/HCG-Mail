@@ -25,6 +25,12 @@ public partial class MobileApp : Application
     public static AppMode Mode { get; set; } = new(false);
     public static IServiceProvider? Services { get; private set; }
 
+    /// <summary>
+    /// Preview mode only (sample mailbox, Debug builds): the screen to open after start-up for store screenshots —
+    /// "reader" (first message) or "compose". Ignored in normal use; the iOS host sets it from HCG_MAIL_PREVIEW_SCREEN.
+    /// </summary>
+    public static string? PreviewScreen { get; set; }
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -77,8 +83,25 @@ public partial class MobileApp : Application
                 return;
             started = true;
             await shell.Mail.InitializeAsync();
+            if (mode.IsPreview && PreviewScreen is { Length: > 0 } screen)
+                await OpenPreviewScreenAsync(shell, screen);
         };
         return (shell, view);
+    }
+
+    private static async Task OpenPreviewScreenAsync(MobileShellViewModel shell, string screen)
+    {
+        for (var i = 0; i < 100 && shell.Mail.MessageList.Items.Count == 0; i++)
+            await Task.Delay(100);
+        switch (screen)
+        {
+            case "reader" when shell.Mail.MessageList.Items.Count > 0:
+                shell.Mail.MessageList.SelectedItem = shell.Mail.MessageList.Items[0];
+                break;
+            case "compose":
+                shell.Mail.ComposeCommand.Execute(null);
+                break;
+        }
     }
 
     private static bool _errorHandlersInstalled;
