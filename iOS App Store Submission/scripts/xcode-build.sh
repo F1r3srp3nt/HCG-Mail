@@ -77,10 +77,25 @@ case "$action" in
           log="$OUT_ROOT/simulator/launch.log"
           mkdir -p "$(dirname "$log")"
           open -a "$DEVELOPER_DIR/Applications/Simulator.app" 2>/dev/null || true   # show the window, not just a headless device
-          HCG_IOS_APP="$app" HCG_IOS_CONFIGURATION="$configuration" nohup /bin/bash -c \
-            '"$1" && echo "HCG-LAUNCH: started" || echo "HCG-LAUNCH: failed ($?)"' _ "$here/run-simulator.sh" \
-            > "$log" 2>&1 < /dev/null &
-          disown
+          # Fully detached (new session, double fork, no inherited file descriptors): xcodebuild waits for every process
+          # that still holds one of its descriptors or belongs to the build's process group.
+          HCG_IOS_APP="$app" HCG_IOS_CONFIGURATION="$configuration" /usr/bin/python3 -I -c '
+import os, sys
+log, script = sys.argv[1], sys.argv[2]
+if os.fork(): sys.exit(0)
+os.setsid()
+if os.fork(): os._exit(0)
+out = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+null = os.open(os.devnull, os.O_RDONLY)
+for target, source in ((0, null), (1, out), (2, out)):
+    if source != target:
+        os.dup2(source, target)
+    os.set_inheritable(target, True)
+os.closerange(3, 1024)
+cmd = "echo \"[$(date +%T)] boot, install, start\"; \"$0\"; rc=$?; " \
+      "if [ $rc -eq 0 ]; then echo \"[$(date +%T)] HCG-LAUNCH: started\"; else echo \"[$(date +%T)] HCG-LAUNCH: failed ($rc)\"; fi"
+os.execv("/bin/bash", ["/bin/bash", "-c", cmd, script])
+' "$log" "$here/run-simulator.sh"
           echo "HCG Mail is being installed and started in the Simulator (progress: $log)."
         fi
         ;;
