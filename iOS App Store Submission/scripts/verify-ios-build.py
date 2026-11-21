@@ -242,8 +242,12 @@ def run_app_checks(r, app, args):
             binary = executable.read_bytes()
             for category, marker in (("UserDefaults", b"NSUserDefaults"), ("ActiveKeyboards", b"activeInputModes")):
                 if marker in binary and category not in declared:
-                    r.warn("privacy manifest", f"the executable references {marker.decode()} but {category} is not declared — "
-                                               "check Apple's required-reason API list before upload")
+                    # App Store Connect rejects such uploads (ITMS-91053); on a simulator build it is only a warning.
+                    (r.fail if kind == "device" else r.warn)(
+                        "privacy manifest", f"the executable uses {marker.decode()} but NSPrivacyAccessedAPICategory{category} is not "
+                                            "declared in PrivacyInfo.xcprivacy — App Store Connect rejects this (ITMS-91053)")
+                elif marker in binary:
+                    r.ok("privacy manifest", f"{marker.decode()} used and {category} declared")
 
     schemes = [s for t in info.get("CFBundleURLTypes", []) for s in t.get("CFBundleURLSchemes", [])]
     r.expect(f"msauth.{BUNDLE_ID}" in schemes, "URL scheme", f"msauth.{BUNDLE_ID} (Microsoft sign-in)", f"msauth.{BUNDLE_ID} missing: {schemes}")

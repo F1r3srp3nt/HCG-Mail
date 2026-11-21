@@ -37,6 +37,27 @@
 				<string>E174.1</string>
 			</array>
 		</dict>
+		<!-- Found in the Release binary by scripts/verify-ios-build.py; each comes from a library compiled into the app.
+		     UserDefaults: Microsoft.Identity.Client (MSAL, Microsoft sign-in) uses NSUserDefaults.StandardUserDefaults,
+		     which only this app can read (CA92.1). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+		<!-- ActiveKeyboards: Avalonia's text input (TextInputResponder) reads UITextInputMode.activeInputModes to give
+		     the app's text fields the input mode of the keyboard in use (54BD.1). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryActiveKeyboards</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>54BD.1</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

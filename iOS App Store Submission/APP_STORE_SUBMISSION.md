@@ -204,9 +204,12 @@ Note anything unexpected before you submit. A build that crashes on launch is th
 
 | Check | Where | Result |
 |---|---|---|
-| `HCGMail.xcodeproj` opens from a fresh checkout (`xcodebuild -list`: targets, configurations, shared schemes) | GitHub Actions, macOS 26, Xcode 26.3 | see the PR's CI run |
-| Scheme `HCG Mail` builds the simulator app; scheme `HCG Mail Simulator` builds, installs and starts it | same | see the PR's CI run |
-| Scheme `HCG Mail`, Any iOS Device, Release: unsigned AOT build; the resulting app passes `verify-ios-build.py` (bundle ID, versions, SDK, icon, launch screen, privacy manifest, URL scheme) | same; report in the `ios-release-check` workflow artifact | see the PR's CI run |
-| Archive from the scheme is refused with directions | same | see the PR's CI run |
+| `HCGMail.xcodeproj` opens from a fresh checkout (`xcodebuild -list`: targets, configurations, shared schemes) | GitHub Actions run [44864611757](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44864611757), macOS 26, Xcode 26.3 (17C529) | ✅ |
+| Scheme `HCG Mail`, Any iOS Device, **Release**: unsigned ios-arm64 AOT build | same | ✅ `** BUILD SUCCEEDED **` (15½ min) |
+| That Release app checked by `verify-ios-build.py` | same; report and `Info.plist`, privacy manifest and asset list in the `ios-release-check` artifact | ✅ bundle `com.hakmicapitalgroup.hcgmail`, version 0.1.0 (1), iOS 16.0+, iPhone + iPad, **SDK iphoneos26.2**, Xcode 2630, AppIcon compiled (4 renditions, source 1024×1024 opaque), `LaunchScreen.storyboardc`, privacy manifest present, `msauth.` URL scheme |
+| Privacy manifest against the binary | same | ⚠️→ fixed: the binary uses `NSUserDefaults` (from MSAL) and `activeInputModes` (from Avalonia's text input), which the manifest did not declare. Apple would have rejected the upload (ITMS-91053). Now declared (UserDefaults CA92.1, ActiveKeyboards 54BD.1), and the check fails device builds if this happens again. |
+| Product › Archive from the scheme | same | ✅ refused with "Product › Archive is not supported… Run scripts/export-ipa.sh" |
+| The build leaves the checkout clean (no `xcuserdata`, no generated files) | same | ✅ |
+| Scheme `HCG Mail` builds the simulator app; scheme `HCG Mail Simulator` builds, installs and starts it | same, simulator job | see the PR's CI run |
 | Signing preflight, signed `.ipa`, entitlements, embedded profile, `.xcarchive` | your Mac (`export-ipa.sh`) | **not yet run**: needs your certificate |
 | Real-device test, upload, TestFlight, review | you | not yet done |
