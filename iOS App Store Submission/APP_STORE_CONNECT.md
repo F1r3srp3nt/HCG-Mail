@@ -91,7 +91,8 @@ All screenshots must be real captures of HCG Mail.
 * The job checks every image's pixel size.
 
 **What they show:** the app's built-in **sample mailbox**, which is labelled "[Sample]" and has example senders.
-It is the real interface with demonstration content, not a mock-up. If you prefer more natural content, take the same
+It is the real interface with demonstration content, not a mock-up. The composer screenshots show the on-screen
+keyboard, because the To field has focus, as it does when a user opens the composer. If you prefer more natural content, take the same
 three screens from the TestFlight build with your dedicated test mailbox: Side button + Volume Up on an iPhone 17 Pro
 Max / iPad Pro 13″. Never use a real customer mailbox.
 
