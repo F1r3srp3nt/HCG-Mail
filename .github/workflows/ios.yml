@@ -98,6 +98,19 @@ jobs:
         run: scripts/doctor.sh
       - name: Build for the simulator (Debug)
         run: scripts/build-simulator.sh Debug | tee "$RUNNER_TEMP/app-path.txt"
+      # Through Xcode before the simulator steps below: xcodebuild enumerates simulator devices and is much slower once
+      # they have been booted and used.
+      - name: Xcode project opens from a fresh checkout (targets and shared schemes)
+        timeout-minutes: 10
+        run: xcodebuild -list -project HCGMail.xcodeproj
+      - name: Xcode scheme "HCG Mail" builds the app for the simulator
+        timeout-minutes: 20
+        run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail" -sdk iphonesimulator -configuration Debug build
+      - name: Check the simulator app (bundle ID, versions, icon, launch screen, privacy manifest)
+        run: python3 -I scripts/verify-ios-build.py app ../artifacts/ios/simulator/Debug/HCGMail.iOS.app --kind simulator
+      - name: Xcode scheme "HCG Mail Simulator" builds, installs and starts the app
+        timeout-minutes: 20
+        run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail Simulator" -sdk iphonesimulator -configuration Debug build
       - name: Self-test on an iPhone simulator (Keychain, sandbox, sanitizer, configuration)
         run: |
           mkdir -p ../artifacts/ios-screenshots
@@ -107,14 +120,6 @@ jobs:
           export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
           scripts/run-simulator.sh --preview --screenshot ../artifacts/ios-screenshots/iphone.png
           scripts/run-simulator.sh --ipad --preview --screenshot ../artifacts/ios-screenshots/ipad.png
-      - name: Xcode project opens from a fresh checkout (targets and shared schemes)
-        run: xcodebuild -list -project HCGMail.xcodeproj
-      - name: Xcode scheme "HCG Mail" builds the app for the simulator
-        run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail" -sdk iphonesimulator -configuration Debug build
-      - name: Check the simulator app (bundle ID, versions, icon, launch screen, privacy manifest)
-        run: python3 -I scripts/verify-ios-build.py app ../artifacts/ios/simulator/Debug/HCGMail.iOS.app --kind simulator
-      - name: Xcode scheme "HCG Mail Simulator" builds, installs and starts the app
-        run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail Simulator" -sdk iphonesimulator -configuration Debug build
       - name: The builds left the checkout clean
         run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
       - uses: actions/upload-artifact@v4
@@ -152,6 +157,7 @@ jobs:
       - name: Install the pinned iOS workload
         run: scripts/install-workload.sh
       - name: Xcode project opens from a fresh checkout (targets and shared schemes)
+        timeout-minutes: 10
         run: xcodebuild -list -project HCGMail.xcodeproj
       - name: Xcode scheme "HCG Mail", Any iOS Device, Release (ios-arm64, AOT, unsigned)
         run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail" -sdk iphoneos -configuration Release build
