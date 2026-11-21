@@ -73,7 +73,9 @@ jobs:
   simulator:
     name: iOS build, simulator self-test and screenshots (macOS)
     runs-on: macos-26
-    timeout-minutes: 90
+    # Hosted runners sometimes take 20+ minutes for one cold simulator boot (and once 51 minutes for the screenshot
+    # step), so the job needs room beyond the steps' own limits.
+    timeout-minutes: 150
     defaults:
       run:
         # bash -eo pipefail: a failing script must fail the step even when piped into tee.
@@ -132,6 +134,13 @@ jobs:
           scripts/run-simulator.sh --ipad --preview --screenshot ../artifacts/ios-screenshots/ipad.png
       - name: The builds left the checkout clean
         run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
+      - name: Shut down the simulators (leave nothing running for the runner's clean-up)
+        if: always()
+        timeout-minutes: 10
+        run: |
+          xcrun simctl shutdown all || true
+          killall Simulator 2>/dev/null || true
+          pkill -f 'scripts/run-simulator.sh' 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
