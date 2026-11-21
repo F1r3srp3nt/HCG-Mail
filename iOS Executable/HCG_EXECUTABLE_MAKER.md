@@ -14,6 +14,7 @@ and was not available to the session that wrote this. Steps 1–4 are what to ve
 | Framework / output | `net10.0-ios`, `OutputType Exe`, bundle `com.hakmicapitalgroup.hcgmail` |
 | Build host | **macOS only** (Xcode 26.3 + .NET 10 + .NET iOS workload 26.2.10233, see `iOS App Store Submission/toolchain.props`) |
 | Must not be selected | `Windows-executable-Application/src/HCG.Mail.App` (desktop, `WinExe`), any library, any test project |
+| Xcode project | `iOS App Store Submission/HCGMail.xcodeproj` is only an entry point that runs the same .NET build (`scripts/xcode-build.sh`). Maker should keep building the `.csproj` above; if it drives `xcodebuild`, use scheme `HCG Mail` for builds — `archive` is refused by design, signed builds come from `scripts/export-ipa.sh` |
 
 The repository describes this machine-readably in **`hcg-apps.json`** (repository root, schema `hcg-apps/1`):
 applications with project, solution, framework, build host, toolchain file and build commands; plus the lists of

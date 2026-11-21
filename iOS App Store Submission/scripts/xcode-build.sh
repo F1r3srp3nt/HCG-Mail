@@ -72,6 +72,7 @@ case "$action" in
         app="$("$here/build-simulator.sh" "$configuration" 2> >(xcode_errors >&2) | tail -1)"
         echo "HCG Mail app (simulator): $app"
         if [[ $launch -eq 1 ]]; then
+          open -a "$DEVELOPER_DIR/Applications/Simulator.app" 2>/dev/null || true   # show the window, not just a headless device
           HCG_IOS_APP="$app" HCG_IOS_CONFIGURATION="$configuration" "$here/run-simulator.sh"
         fi
         ;;
