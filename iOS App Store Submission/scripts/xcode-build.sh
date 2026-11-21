@@ -72,8 +72,16 @@ case "$action" in
         app="$("$here/build-simulator.sh" "$configuration" 2> >(xcode_errors >&2) | tail -1)"
         echo "HCG Mail app (simulator): $app"
         if [[ $launch -eq 1 ]]; then
+          # Boot, install and start after the build has returned: a simulator booted from inside an Xcode build step
+          # can wait on the build itself, and a cold boot takes minutes. Progress and result go to launch.log.
+          log="$OUT_ROOT/simulator/launch.log"
+          mkdir -p "$(dirname "$log")"
           open -a "$DEVELOPER_DIR/Applications/Simulator.app" 2>/dev/null || true   # show the window, not just a headless device
-          HCG_IOS_APP="$app" HCG_IOS_CONFIGURATION="$configuration" "$here/run-simulator.sh"
+          HCG_IOS_APP="$app" HCG_IOS_CONFIGURATION="$configuration" nohup /bin/bash -c \
+            '"$1" && echo "HCG-LAUNCH: started" || echo "HCG-LAUNCH: failed ($?)"' _ "$here/run-simulator.sh" \
+            > "$log" 2>&1 < /dev/null &
+          disown
+          echo "HCG Mail is being installed and started in the Simulator (progress: $log)."
         fi
         ;;
       iphoneos)

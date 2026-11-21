@@ -110,7 +110,13 @@ jobs:
         run: python3 -I scripts/verify-ios-build.py app ../artifacts/ios/simulator/Debug/HCGMail.iOS.app --kind simulator
       - name: Xcode scheme "HCG Mail Simulator" builds, installs and starts the app
         timeout-minutes: 20
-        run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail Simulator" -sdk iphonesimulator -configuration Debug build
+        run: |
+          xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail Simulator" -sdk iphonesimulator -configuration Debug build
+          # The scheme returns after the build and starts the app in the background; wait for its verdict.
+          log=../artifacts/ios/simulator/launch.log
+          for _ in $(seq 1 600); do grep -q 'HCG-LAUNCH:' "$log" 2>/dev/null && break; sleep 1; done
+          cat "$log"
+          grep -q 'HCG-LAUNCH: started' "$log"
       - name: Self-test on an iPhone simulator (Keychain, sandbox, sanitizer, configuration)
         run: |
           mkdir -p ../artifacts/ios-screenshots

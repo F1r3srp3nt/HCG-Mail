@@ -33,7 +33,7 @@ The project uses Xcode *External Build System* targets. They run `scripts/xcode-
 | In Xcode | Works? | What happens |
 |---|---|---|
 | Scheme **HCG Mail**, destination an iPhone/iPad **simulator**, **Build** (⌘B) | ✅ | Builds the app. Debug: `artifacts/ios/simulator/Debug/HCGMail.iOS.app`; Release: `…/Release/`. |
-| Scheme **HCG Mail Simulator**, **Build** (⌘B) | ✅ | Builds, opens Simulator, installs and starts HCG Mail on the newest iPhone simulator. |
+| Scheme **HCG Mail Simulator**, **Build** (⌘B) | ✅ | Builds, opens Simulator, then installs and starts HCG Mail on the newest iPhone simulator in the background. The build finishes first; a cold simulator boot can take a few minutes. Progress: `artifacts/ios/simulator/launch.log`. |
 | Scheme **HCG Mail**, destination **Any iOS Device (arm64)**, **Build** | ✅ compile check | Builds an unsigned `ios-arm64` app in `artifacts/ios/device/<config>/`. Release is the full AOT App Store configuration and takes about 15 minutes. It cannot be installed, because it is unsigned. |
 | **Product › Clean Build Folder** | ✅ | Removes this configuration's build output. |
 | **Run** (⌘R), **Test**, **Profile**, debugger | ❌ | Xcode cannot run the product of an External Build System target. Use the `HCG Mail Simulator` scheme. On a device, use `dotnet build … -t:Run` (README, *Run on your own iPhone or iPad*). |
@@ -207,9 +207,10 @@ Note anything unexpected before you submit. A build that crashes on launch is th
 | `HCGMail.xcodeproj` opens from a fresh checkout (`xcodebuild -list`: targets, configurations, shared schemes) | GitHub Actions run [44864611757](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44864611757), macOS 26, Xcode 26.3 (17C529) | ✅ |
 | Scheme `HCG Mail`, Any iOS Device, **Release**: unsigned ios-arm64 AOT build | same | ✅ `** BUILD SUCCEEDED **` (15½ min) |
 | That Release app checked by `verify-ios-build.py` | same; report and `Info.plist`, privacy manifest and asset list in the `ios-release-check` artifact | ✅ bundle `com.hakmicapitalgroup.hcgmail`, version 0.1.0 (1), iOS 16.0+, iPhone + iPad, **SDK iphoneos26.2**, Xcode 2630, AppIcon compiled (4 renditions, source 1024×1024 opaque), `LaunchScreen.storyboardc`, privacy manifest present, `msauth.` URL scheme |
-| Privacy manifest against the binary | same | ⚠️→ fixed: the binary uses `NSUserDefaults` (from MSAL) and `activeInputModes` (from Avalonia's text input), which the manifest did not declare. Apple would have rejected the upload (ITMS-91053). Now declared (UserDefaults CA92.1, ActiveKeyboards 54BD.1), and the check fails device builds if this happens again. |
+| Privacy manifest against the binary | same; re-checked in the PR run [44867647403](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44867647403) | ✅ after a fix: the binary uses `NSUserDefaults` (from MSAL) and `activeInputModes` (from Avalonia's text input), which the manifest did not declare. Apple would have rejected the upload (ITMS-91053). Now declared (UserDefaults CA92.1, ActiveKeyboards 54BD.1); the PR run reports both "used and declared" on the Release binary, and the check fails device builds if this happens again. |
 | Product › Archive from the scheme | same | ✅ refused with "Product › Archive is not supported… Run scripts/export-ipa.sh" |
 | The build leaves the checkout clean (no `xcuserdata`, no generated files) | same | ✅ |
-| Scheme `HCG Mail` builds the simulator app; scheme `HCG Mail Simulator` builds, installs and starts it | same, simulator job | see the PR's CI run |
+| Scheme `HCG Mail` builds the simulator app, which passes the checks | both runs, simulator job | ✅ |
+| Scheme `HCG Mail Simulator` builds, installs and starts the app | run 44864611757 (simulator already booted) | ✅. In the PR run, starting a cold simulator from inside the build step never returned. The scheme now starts the app after the build returns, and CI waits for the launch log; see the PR's latest run. |
 | Signing preflight, signed `.ipa`, entitlements, embedded profile, `.xcarchive` | your Mac (`export-ipa.sh`) | **not yet run**: needs your certificate |
 | Real-device test, upload, TestFlight, review | you | not yet done |
