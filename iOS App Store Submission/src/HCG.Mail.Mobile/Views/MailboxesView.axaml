@@ -28,8 +28,8 @@
             <TextBlock Text="Add email account" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding Mail.AddMicrosoftAccountCommand}"
-                Content="Add Microsoft account" />
+        <Button x:Name="AddMicrosoftAccountButton" Classes="ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding Mail.AddMicrosoftAccountCommand}"
+                Content="Add Microsoft account" IsVisible="{Binding Mail.ShowMicrosoftSignIn}" />
       </StackPanel>
 
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">

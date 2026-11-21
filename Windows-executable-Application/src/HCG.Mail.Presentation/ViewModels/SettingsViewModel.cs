@@ -74,6 +74,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     ];
 
     public string MicrosoftSignInStatus => _main.MicrosoftSignInStatus;
+    public bool ShowMicrosoftSignIn => _main.ShowMicrosoftSignIn;
     public string GoogleSignInStatus => _main.GoogleSignInStatus;
 
     public IReadOnlyList<ThemeOption> Themes { get; } =
