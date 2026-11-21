@@ -128,6 +128,8 @@ jobs:
           mkdir -p ../artifacts/ios-screenshots
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" scripts/run-simulator.sh --self-test
       - name: Screenshots in preview mode (sample mailbox, no network)
+        # A simulator boot that hangs must not consume the whole job (main run 44932100847 waited 2 h here).
+        timeout-minutes: 60
         run: |
           export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
           scripts/run-simulator.sh --preview --screenshot ../artifacts/ios-screenshots/iphone.png
