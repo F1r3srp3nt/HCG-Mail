@@ -127,13 +127,24 @@ jobs:
         run: |
           mkdir -p ../artifacts/ios-screenshots
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" scripts/run-simulator.sh --self-test
-      - name: Screenshots in preview mode (sample mailbox, no network)
-        # A simulator boot that hangs must not consume the whole job (main run 44932100847 waited 2 h here).
-        timeout-minutes: 60
+      # Preview mode: sample mailbox, no network. Each device is its own step, and run-simulator.sh limits and logs
+      # every stage (boot, install, launch, ready, screenshot), so a stall names its stage well before the step limit.
+      # --exclusive shuts the iPhone down before the iPad boots: in run 44953152990 the iPad boot, started while the
+      # iPhone, its app and Simulator.app were still running, made no progress for 58 minutes.
+      - name: Screenshot in preview mode on iPhone (the app reports the inbox is open)
+        timeout-minutes: 40
+        env:
+          HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
         run: |
-          export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
-          scripts/run-simulator.sh --preview --screenshot ../artifacts/ios-screenshots/iphone.png
-          scripts/run-simulator.sh --ipad --preview --screenshot ../artifacts/ios-screenshots/ipad.png
+          HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" \
+            scripts/run-simulator.sh --exclusive --preview --screen inbox --screenshot ../artifacts/ios-screenshots/iphone.png
+      - name: Screenshot in preview mode on iPad (the app reports the inbox is open)
+        timeout-minutes: 40
+        env:
+          HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
+        run: |
+          HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" \
+            scripts/run-simulator.sh --ipad --exclusive --preview --screen inbox --screenshot ../artifacts/ios-screenshots/ipad.png
       - name: The builds left the checkout clean
         run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
       - name: Shut down the simulators (leave nothing running for the runner's clean-up)
@@ -147,7 +158,9 @@ jobs:
         if: always()
         with:
           name: ios-simulator-screenshots
-          path: artifacts/ios-screenshots
+          path: |
+            artifacts/ios-screenshots
+            artifacts/ios-sim-logs
           if-no-files-found: ignore
           retention-days: 14
 
@@ -239,14 +252,15 @@ jobs:
         run: scripts/build-simulator.sh Debug | tee "$RUNNER_TEMP/app-path.txt"
       - name: Take screenshots (inbox, message, compose) on iPhone 17 Pro Max and iPad Pro 13-inch
         timeout-minutes: 120
+        env:
+          HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
         run: |
           export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
           out=../artifacts/app-store-screenshots; mkdir -p "$out"
           for device in "iPhone 17 Pro Max" "iPad Pro 13-inch (M5)"; do
-            udid="$(xcrun simctl list devices available -j | DEVICE="$device" python3 -c 'import json,os,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in sorted(d, reverse=True) if "iOS" in r for x in d[r] if x["name"]==os.environ["DEVICE"]))')" \
-              || { echo "Simulator '$device' is not available:"; xcrun simctl list devices available; exit 1; }
-            xcrun simctl boot "$udid" 2>/dev/null || true
-            xcrun simctl bootstatus "$udid" -b >/dev/null
+            # Boots only this simulator (others shut down), with a time limit and diagnostics if it stalls.
+            scripts/run-simulator.sh "$device" --exclusive --boot-only
+            udid="$(xcrun simctl list devices available -j | DEVICE="$device" python3 -c 'import json,os,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in sorted(d, reverse=True) if "iOS" in r for x in d[r] if x["name"]==os.environ["DEVICE"]))')"
             # No first-run keyboard tip ("slide to type") over the composer.
             xcrun simctl spawn "$udid" defaults write com.apple.keyboard.preferences DidShowContinuousPathIntroduction -bool true || true
             # Apple's standard clean status bar for store screenshots (9:41, full signal and battery).
@@ -273,7 +287,17 @@ jobs:
           PY
       - name: Shut down the simulators
         if: always()
-        run: xcrun simctl shutdown all || true
+        timeout-minutes: 10
+        run: |
+          xcrun simctl shutdown all || true
+          pkill -f 'scripts/run-simulator.sh' 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: app-store-screenshot-logs
+          path: artifacts/ios-sim-logs
+          if-no-files-found: ignore
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         if: always()
         with:
