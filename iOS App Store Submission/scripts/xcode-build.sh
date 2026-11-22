@@ -76,7 +76,8 @@ case "$action" in
           # can wait on the build itself, and a cold boot takes minutes. Progress and result go to launch.log.
           log="$OUT_ROOT/simulator/launch.log"
           mkdir -p "$(dirname "$log")"
-          open -a "$DEVELOPER_DIR/Applications/Simulator.app" 2>/dev/null || true   # show the window, not just a headless device
+          # run-simulator.sh --show opens Simulator.app once the device has booted, on that device. Opened earlier,
+          # Simulator.app cold-boots its own default device next to ours (CI run 45063307048: load average 541).
           # Fully detached (new session, double fork, no inherited file descriptors): xcodebuild waits for every process
           # that still holds one of its descriptors or belongs to the build's process group.
           HCG_IOS_APP="$app" HCG_IOS_CONFIGURATION="$configuration" /usr/bin/python3 -I -c '
@@ -92,7 +93,7 @@ for target, source in ((0, null), (1, out), (2, out)):
         os.dup2(source, target)
     os.set_inheritable(target, True)
 os.closerange(3, 1024)
-cmd = "echo \"[$(date +%T)] boot, install, start\"; \"$0\"; rc=$?; " \
+cmd = "echo \"[$(date +%T)] boot, install, start\"; \"$0\" --show; rc=$?; " \
       "if [ $rc -eq 0 ]; then echo \"[$(date +%T)] HCG-LAUNCH: started\"; else echo \"[$(date +%T)] HCG-LAUNCH: failed ($rc)\"; fi"
 os.execv("/bin/bash", ["/bin/bash", "-c", cmd, script])
 ' "$log" "$here/run-simulator.sh"

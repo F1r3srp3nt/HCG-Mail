@@ -11,18 +11,21 @@
 #   scripts/run-simulator.sh --exclusive …           shut down every other booted simulator first (CI: two booted
 #                                                    simulators on a small build machine can stall the second boot)
 #   scripts/run-simulator.sh --boot-only …           only boot the simulator (and stop there)
+#   scripts/run-simulator.sh --show …                open Simulator.app on this device once it has booted
+# Without a device name it uses a simulator that is already booted (or booting), if one of the right kind is, rather
+# than boot a second one; otherwise the first available one.
 # Never signs in to or sends from a real account.
 #
 # Every stage (find, boot, install, launch, ready, screenshot) has its own time limit and is logged with a timestamp
 # ("HCG-SIM: <stage> …"). When a stage fails or runs out of time the script prints the simulator's state, the
 # CoreSimulator logs and the machine's load and memory, stops what it started, and exits non-zero.
-# Time limits in seconds (environment): HCG_IOS_BOOT_TIMEOUT (1500: a cold boot on a hosted CI runner has taken
-# ~18 minutes), HCG_IOS_INSTALL_TIMEOUT (300), HCG_IOS_LAUNCH_TIMEOUT (180), HCG_IOS_READY_TIMEOUT (180),
+# Time limits in seconds (environment): HCG_IOS_FIND_TIMEOUT (300: listing the simulators took ~100 s on a busy CI
+# runner), HCG_IOS_BOOT_TIMEOUT (1500: a cold boot on a hosted CI runner has taken ~18 minutes), HCG_IOS_INSTALL_TIMEOUT (300), HCG_IOS_LAUNCH_TIMEOUT (180), HCG_IOS_READY_TIMEOUT (180),
 # HCG_IOS_SCREENSHOT_TIMEOUT (120). HCG_IOS_SIM_LOG_DIR keeps each stage's full output (default: a temporary folder).
 source "$(dirname "$0")/_common.sh"
 require_macos
 
-DEVICE=""; FAMILY="iPhone"; PREVIEW=0; SELFTEST=0; SHOT=""; SCREEN=""; EXCLUSIVE=0; BOOT_ONLY=0
+DEVICE=""; FAMILY="iPhone"; PREVIEW=0; SELFTEST=0; SHOT=""; SCREEN=""; EXCLUSIVE=0; BOOT_ONLY=0; SHOW=0
 CONFIG="${HCG_IOS_CONFIGURATION:-Debug}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -33,11 +36,13 @@ while [[ $# -gt 0 ]]; do
     --screen) SCREEN="$2"; shift ;;
     --exclusive) EXCLUSIVE=1 ;;
     --boot-only) BOOT_ONLY=1 ;;
+    --show) SHOW=1 ;;
     *) DEVICE="$1" ;;
   esac
   shift
 done
 
+FIND_TIMEOUT="${HCG_IOS_FIND_TIMEOUT:-300}"
 BOOT_TIMEOUT="${HCG_IOS_BOOT_TIMEOUT:-1500}"
 INSTALL_TIMEOUT="${HCG_IOS_INSTALL_TIMEOUT:-300}"
 LAUNCH_TIMEOUT="${HCG_IOS_LAUNCH_TIMEOUT:-180}"
@@ -79,12 +84,12 @@ stage_done() { echo "[$(now)] HCG-SIM: $STAGE done in $((SECONDS - STAGE_START))
 # or 124 if it is still running after LIMIT seconds (it is then stopped). Prints a heartbeat once a minute.
 bounded() {
   "$@" >> "$STAGE_LOG" 2>&1 &
-  local pid=$! waited=0
+  local pid=$! start=$SECONDS beat=60
   BACKGROUND+=("$pid")
   while kill -0 "$pid" 2>/dev/null; do
-    if (( waited >= LIMIT )); then stop_process "$pid"; wait "$pid" 2>/dev/null || true; return 124; fi
-    sleep 1; waited=$((waited + 1))
-    (( waited % 60 == 0 )) && echo "[$(now)] HCG-SIM: $STAGE still running after ${waited} s"
+    if (( SECONDS - start >= LIMIT )); then stop_process "$pid"; wait "$pid" 2>/dev/null || true; return 124; fi
+    sleep 1
+    if (( SECONDS - start >= beat )); then echo "[$(now)] HCG-SIM: $STAGE still running after $((SECONDS - start)) s"; beat=$((beat + 60)); fi
   done
   wait "$pid"
 }
@@ -127,19 +132,21 @@ fail() {   # fail STATUS [WHAT]
 # --- find the app and the simulator ------------------------------------------------------------------------------
 APP="${HCG_IOS_APP:-$("$IOS_ROOT/scripts/build-simulator.sh" "$CONFIG" | tail -1)}"
 
-stage find 60
+stage find "$FIND_TIMEOUT"
 devices_json="$LOG_DIR/devices.json"
-LIMIT=60 bounded sh -c 'xcrun simctl list devices available -j > "$0"' "$devices_json" || fail $? "xcrun simctl list devices"
+bounded sh -c 'xcrun simctl list devices available -j > "$0"' "$devices_json" || fail $? "xcrun simctl list devices"
 pick() { FAMILY="$FAMILY" DEVICE="$DEVICE" python3 -I -c '
 import json, os, sys
 d = json.load(open(sys.argv[1]))["devices"]
 want = os.environ["DEVICE"]
-for runtime in sorted(d, reverse=True):
-    if "iOS" not in runtime: continue
-    for x in d[runtime]:
-        if (x["name"] == want) if want else x["name"].startswith(os.environ["FAMILY"]):
-            print(x["name"]); print(x["udid"]); sys.exit(0)
-sys.exit(1)' "$devices_json"; }
+devices = [x for r in sorted(d, reverse=True) if "iOS" in r for x in d[r]]
+if want:
+    match = [x for x in devices if x["name"] == want]
+else:
+    family = [x for x in devices if x["name"].startswith(os.environ["FAMILY"])]
+    match = [x for x in family if x.get("state") in ("Booted", "Booting")] + family
+if not match: sys.exit(1)
+print(match[0]["name"]); print(match[0]["udid"])' "$devices_json"; }
 found="$(pick)" || { echo "No available simulator matches '${DEVICE:-$FAMILY}'. Installed:" >&2; xcrun simctl list devices available >&2; exit 1; }
 DEVICE="$(echo "$found" | sed -n 1p)"; UDID="$(echo "$found" | sed -n 2p)"
 echo "Simulator: $DEVICE ($UDID)"
@@ -164,6 +171,12 @@ boot_device() {
 }
 bounded boot_device || fail $? "$DEVICE"
 stage_done
+if [[ $SHOW -eq 1 ]]; then
+  # On the device just booted: Simulator.app then shows it instead of booting its own default device.
+  stage show 60
+  bounded open -a "${DEVELOPER_DIR:-$(xcode-select -p)}/Applications/Simulator.app" --args -CurrentDeviceUDID "$UDID" || true
+  stage_done
+fi
 [[ $BOOT_ONLY -eq 1 ]] && exit 0
 
 stage install "$INSTALL_TIMEOUT"
@@ -189,22 +202,22 @@ launch_and_wait() {   # launch_and_wait PATTERN
   APP_LOG="$LOG_DIR/$(echo "$DEVICE" | tr -cd '[:alnum:]')-app.log"
   : > "$APP_LOG"
   xcrun simctl launch --console-pty --terminate-running-process "$UDID" "$BUNDLE_ID" > "$APP_LOG" 2>&1 &
-  local pid=$! w=0
+  local pid=$! start=$SECONDS
   BACKGROUND+=("$pid")
   # The launch is done once the app says it has started ("HCG-PREVIEW: started", "HCG-SELFTEST: start"). With
   # --console-pty simctl prints no "<bundle id>: <pid>" line; it is accepted too in case a later simctl does.
   until grep -q "HCG-PREVIEW: started\|HCG-SELFTEST: start\|$BUNDLE_ID: [0-9]" "$APP_LOG" 2>/dev/null; do
     kill -0 "$pid" 2>/dev/null || { STAGE_LOG="$APP_LOG"; fail 1 "simctl launch exited"; }
-    (( w >= LAUNCH_TIMEOUT )) && { STAGE_LOG="$APP_LOG"; fail 124; }
-    sleep 1; w=$((w + 1))
+    (( SECONDS - start >= LAUNCH_TIMEOUT )) && { STAGE_LOG="$APP_LOG"; fail 124; }
+    sleep 1
   done
   stage_done
   stage ready "$READY_TIMEOUT"
-  STAGE_LOG="$APP_LOG"; w=0
+  STAGE_LOG="$APP_LOG"; start=$SECONDS
   until grep -q "$1" "$APP_LOG" 2>/dev/null; do
     kill -0 "$pid" 2>/dev/null || return 1
-    (( w >= READY_TIMEOUT )) && return 124
-    sleep 1; w=$((w + 1))
+    (( SECONDS - start >= READY_TIMEOUT )) && return 124
+    sleep 1
   done
   stage_done
 }
