@@ -100,12 +100,14 @@ diagnose() {
   echo "--- this simulator"; [[ -n "$UDID" ]] && probe 30 xcrun simctl list devices | grep -F "$UDID" || true
   echo "--- booted simulators"; probe 30 xcrun simctl list devices booted
   echo "--- load and memory"; uptime; probe 10 memory_pressure -Q | tail -3; probe 10 vm_stat | head -6
-  echo "--- simulator processes (top CPU)"; ps -Ao pid,pcpu,rss,etime,comm | grep -iE 'simulator|launchd_sim|CoreSimulator|HCGMail|simctl' | sort -k2 -nr | head -15 || true
+  echo "--- simulator processes (top CPU)"; ps -Ao pid,pcpu,rss,etime,comm | grep -iE 'simulator|launchd_sim|CoreSimulator|HCGMail|simctl' | sort -k2 -nr 2>/dev/null | head -15 || true
   if [[ -n "$UDID" && -f "$HOME/Library/Logs/CoreSimulator/$UDID/system.log" ]]; then
     echo "--- device system.log (last 30 lines)"; tail -30 "$HOME/Library/Logs/CoreSimulator/$UDID/system.log"
   fi
   if [[ -f "$HOME/Library/Logs/CoreSimulator/CoreSimulator.log" ]]; then
-    echo "--- CoreSimulator.log (last 30 lines)"; tail -30 "$HOME/Library/Logs/CoreSimulator/CoreSimulator.log"
+    # Without the "device identity" errors CoreSimulatorService logs continuously on hosted runners.
+    echo "--- CoreSimulator.log (last 30 other lines)"
+    tail -3000 "$HOME/Library/Logs/CoreSimulator/CoreSimulator.log" | grep -v 'Failed to get a device identity' | tail -30 || true
   fi
   [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::endgroup::"
   return 0
@@ -189,8 +191,9 @@ launch_and_wait() {   # launch_and_wait PATTERN
   xcrun simctl launch --console-pty --terminate-running-process "$UDID" "$BUNDLE_ID" > "$APP_LOG" 2>&1 &
   local pid=$! w=0
   BACKGROUND+=("$pid")
-  # The launch is done once simctl prints "<bundle id>: <pid>".
-  until grep -q "$BUNDLE_ID: [0-9]" "$APP_LOG" 2>/dev/null; do
+  # The launch is done once the app says it has started ("HCG-PREVIEW: started", "HCG-SELFTEST: start"). With
+  # --console-pty simctl prints no "<bundle id>: <pid>" line; it is accepted too in case a later simctl does.
+  until grep -q "HCG-PREVIEW: started\|HCG-SELFTEST: start\|$BUNDLE_ID: [0-9]" "$APP_LOG" 2>/dev/null; do
     kill -0 "$pid" 2>/dev/null || { STAGE_LOG="$APP_LOG"; fail 1 "simctl launch exited"; }
     (( w >= LAUNCH_TIMEOUT )) && { STAGE_LOG="$APP_LOG"; fail 124; }
     sleep 1; w=$((w + 1))

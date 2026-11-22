@@ -124,9 +124,14 @@ jobs:
           cat "$log"
           grep -q 'HCG-LAUNCH: started' "$log"
       - name: Self-test on an iPhone simulator (Keychain, sandbox, sanitizer, configuration)
+        # --exclusive: Simulator.app, opened by the step above, boots its own default device ("iPhone 17") next to the
+        # one the app runs on; run 45058813099 had both booted and a load average above 300.
+        timeout-minutes: 40
+        env:
+          HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
         run: |
           mkdir -p ../artifacts/ios-screenshots
-          HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" scripts/run-simulator.sh --self-test
+          HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" scripts/run-simulator.sh --exclusive --self-test
       # Preview mode: sample mailbox, no network. Each device is its own step, and run-simulator.sh limits and logs
       # every stage (boot, install, launch, ready, screenshot), so a stall names its stage well before the step limit.
       # --exclusive shuts the iPhone down before the iPad boots: in run 44953152990 the iPad boot, started while the
