@@ -145,8 +145,15 @@ public static class SelfTest
         var safe = top.InsetsManager?.SafeAreaPadding ?? default;
         var end = Avalonia.VisualExtensions.TranslatePoint(mailArea, new Avalonia.Point(0, mailArea.Bounds.Height), top) ?? origin;
         var bottomGap = top.Bounds.Height - end.Y;
+        // The shell itself must fill the window (its bars reach under the status bar and home indicator) and keep the
+        // safe area on its own: if Avalonia also padded it, the inset would still be applied once, but the keyboard
+        // padding (measured from the screen edge) would leave a gap the height of the home indicator.
+        var shellOrigin = Avalonia.VisualExtensions.TranslatePoint(view, new Avalonia.Point(0, 0), top) ?? new Avalonia.Point(-1, -1);
+        var shellPadding = (view as Avalonia.Controls.Primitives.TemplatedControl)?.Padding ?? default;
+        var fills = Math.Abs(shellOrigin.X) <= 1 && Math.Abs(shellOrigin.Y) <= 1 && Math.Abs(view.Bounds.Height - top.Bounds.Height) <= 1
+                    && shellPadding == default;
         var detail = FormattableString.Invariant(
-            $"reported top {safe.Top:0.#} bottom {safe.Bottom:0.#}; mail area top {origin.Y:0.#} bottom gap {bottomGap:0.#}; window {top.Bounds.Width:0.#}×{top.Bounds.Height:0.#}, top-level padding {top.Padding}, edge-to-edge {top.InsetsManager?.DisplayEdgeToEdgePreference}");
-        return (Math.Abs(origin.Y - safe.Top) <= 1 && Math.Abs(bottomGap - safe.Bottom) <= 1, detail);
+            $"reported top {safe.Top:0.#} bottom {safe.Bottom:0.#}; mail area top {origin.Y:0.#} bottom gap {bottomGap:0.#}; window {top.Bounds.Width:0.#}×{top.Bounds.Height:0.#}, shell at {shellOrigin.Y:0.#} height {view.Bounds.Height:0.#} padding {shellPadding}, top-level padding {top.Padding}, edge-to-edge {top.InsetsManager?.DisplayEdgeToEdgePreference}");
+        return (fills && Math.Abs(origin.Y - safe.Top) <= 1 && Math.Abs(bottomGap - safe.Bottom) <= 1, detail);
     }
 }

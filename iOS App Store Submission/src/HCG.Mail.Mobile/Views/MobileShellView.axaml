@@ -7,7 +7,11 @@
              x:Class="HCG.Mail.Mobile.Views.MobileShellView"
              x:DataType="vm:MobileShellViewModel"
              Background="{DynamicResource Hcg.Bg.TitleBar}"
-             FontFamily="{DynamicResource Hcg.Font}">
+             FontFamily="{DynamicResource Hcg.Font}"
+             TopLevel.AutoSafeAreaPadding="False">
+  <!-- The shell keeps the safe area itself (MobileShellView.axaml.cs: UpdateSafeArea): its bars reach under the status
+       bar and home indicator, and the keyboard padding is measured from the screen edge. Avalonia 12 would otherwise
+       pad the top level's content by the safe area as well (TopLevel.AutoSafeAreaPadding, on by default). -->
   <UserControl.Styles>
     <Style Selector="Border.bannerCard">
       <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Elevated}" />

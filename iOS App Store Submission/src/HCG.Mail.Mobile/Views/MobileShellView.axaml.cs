@@ -60,7 +60,8 @@ public partial class MobileShellView : UserControl
         _insets = top?.InsetsManager;
         if (_insets is not null)
         {
-            // HCG Mail draws its own bars, so it handles the safe area itself instead of being letter-boxed.
+            // HCG Mail draws its own bars, so it handles the safe area itself instead of being letter-boxed (with
+            // TopLevel.AutoSafeAreaPadding="False" in the XAML, so Avalonia 12 does not pad this view as well).
             _insets.DisplayEdgeToEdgePreference = true;
             _insets.SafeAreaChanged += OnSafeAreaChanged;
             UpdateSafeArea();
