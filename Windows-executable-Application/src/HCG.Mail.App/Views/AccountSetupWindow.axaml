@@ -66,24 +66,24 @@
           <Grid ColumnDefinitions="*,16,*">
             <StackPanel Classes="field">
               <TextBlock Classes="label" Text="Email address" />
-              <TextBox Text="{Binding EmailAddress}" Watermark="you@yourdomain.no" Classes.invalid="{Binding EmailError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBox Text="{Binding EmailAddress}" PlaceholderText="you@yourdomain.no" Classes.invalid="{Binding EmailError, Converter={x:Static ObjectConverters.IsNotNull}}" />
               <TextBlock Classes="error" Text="{Binding EmailError}" IsVisible="{Binding EmailError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
             </StackPanel>
             <StackPanel Grid.Column="2" Classes="field">
               <TextBlock Classes="label" Text="Display name" />
-              <TextBox Text="{Binding DisplayName}" Watermark="Name shown to recipients" />
+              <TextBox Text="{Binding DisplayName}" PlaceholderText="Name shown to recipients" />
               <TextBlock Classes="error" Text="{Binding DisplayNameError}" IsVisible="{Binding DisplayNameError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
             </StackPanel>
           </Grid>
           <Grid ColumnDefinitions="*,16,*">
             <StackPanel Classes="field">
               <TextBlock Classes="label" Text="Username" />
-              <TextBox Text="{Binding Username}" Watermark="Usually your full email address" Classes.invalid="{Binding UsernameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBox Text="{Binding Username}" PlaceholderText="Usually your full email address" Classes.invalid="{Binding UsernameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
               <TextBlock Classes="error" Text="{Binding UsernameError}" IsVisible="{Binding UsernameError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
             </StackPanel>
             <StackPanel Grid.Column="2" Classes="field">
               <TextBlock Classes="label" Text="Password" />
-              <TextBox Text="{Binding Password}" PasswordChar="●" Watermark="{Binding PasswordWatermark}" RevealPassword="False"
+              <TextBox Text="{Binding Password}" PasswordChar="●" PlaceholderText="{Binding PasswordWatermark}" RevealPassword="False"
                        Classes.invalid="{Binding PasswordError, Converter={x:Static ObjectConverters.IsNotNull}}" />
               <TextBlock Classes="error" Text="{Binding PasswordError}" IsVisible="{Binding PasswordError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
             </StackPanel>
@@ -93,7 +93,7 @@
           <Grid ColumnDefinitions="*,12,96,12,200">
             <StackPanel Classes="field">
               <TextBlock Classes="label" Text="Server" />
-              <TextBox Text="{Binding ImapHost}" Watermark="e.g. imap.yourprovider.no" Classes.invalid="{Binding ImapHostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBox Text="{Binding ImapHost}" PlaceholderText="e.g. imap.yourprovider.no" Classes.invalid="{Binding ImapHostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
               <TextBlock Classes="error" Text="{Binding ImapHostError}" IsVisible="{Binding ImapHostError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
             </StackPanel>
             <StackPanel Grid.Column="2" Classes="field">
@@ -111,7 +111,7 @@
           <Grid ColumnDefinitions="*,12,96,12,200">
             <StackPanel Classes="field">
               <TextBlock Classes="label" Text="Server" />
-              <TextBox Text="{Binding SmtpHost}" Watermark="e.g. smtp.yourprovider.no" Classes.invalid="{Binding SmtpHostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBox Text="{Binding SmtpHost}" PlaceholderText="e.g. smtp.yourprovider.no" Classes.invalid="{Binding SmtpHostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
               <TextBlock Classes="error" Text="{Binding SmtpHostError}" IsVisible="{Binding SmtpHostError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
             </StackPanel>
             <StackPanel Grid.Column="2" Classes="field">

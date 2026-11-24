@@ -104,7 +104,7 @@
                            Text="These checks read your domain's public DNS records and this device's send history. HCG Mail cannot change DNS records or your provider's sending servers, and it does not estimate deliverability scores or inbox placement. Each result is Verified, Warning, Failed or Not tested." />
                 <StackPanel Spacing="4">
                   <TextBlock Text="DKIM selector(s)" />
-                  <TextBox Text="{Binding DkimSelectors}" Watermark="Found automatically, or from your provider" TextInputOptions.AutoCapitalization="False" />
+                  <TextBox Text="{Binding DkimSelectors}" PlaceholderText="Found automatically, or from your provider" TextInputOptions.AutoCapitalization="False" />
                 </StackPanel>
               </StackPanel>
             </Border>
@@ -142,7 +142,7 @@
                 <TextBlock Classes="detail"
                            Text="Send a message from HCG Mail to a Gmail or Outlook.com address you own. Open it there and copy the original message — Gmail: ⋮ → Show original → Copy to clipboard (or Download original); Outlook.com: … → View → View message source; Apple Mail: View → Message → Raw Source. Paste it below or open the saved .eml file. The recipient's own SPF, DKIM and DMARC results are shown as recorded; nothing is uploaded anywhere." />
                 <TextBox x:Name="RawMessageBox" Text="{Binding RawMessage}" AcceptsReturn="True" TextWrapping="NoWrap" Height="180"
-                         FontFamily="Menlo, Consolas, monospace" FontSize="12" Watermark="Paste the original message (headers) here" />
+                         FontFamily="Menlo, Consolas, monospace" FontSize="12" PlaceholderText="Paste the original message (headers) here" />
                 <WrapPanel>
                   <Button Classes="primary" Content="Analyze" Margin="0,0,8,8" Command="{Binding AnalyzeCommand}" />
                   <Button Classes="toolbar" Content="Open .eml file…" Command="{Binding OpenMessageFileCommand}" Margin="0,0,8,8" />

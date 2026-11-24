@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using HCG.Mail.App.Services;
 using HCG.Mail.App.ViewModels;
@@ -59,7 +60,7 @@ internal sealed class UiHarness : IAsyncDisposable
             return null;
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, name + ".png");
-        frame!.Save(path);
+        frame!.Save(path, PngBitmapEncoderOptions.Default);
         return path;
     }
 

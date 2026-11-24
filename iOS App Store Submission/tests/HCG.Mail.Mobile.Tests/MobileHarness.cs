@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using HCG.Mail.App.ViewModels;
 using HCG.Mail.Mobile.ViewModels;
@@ -131,7 +132,7 @@ public sealed class MobileHarness : IAsyncDisposable
             return null;
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, "mobile-" + name + ".png");
-        frame!.Save(path);
+        frame!.Save(path, PngBitmapEncoderOptions.Default);
         return path;
     }
 

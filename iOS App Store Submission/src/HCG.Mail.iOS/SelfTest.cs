@@ -1,7 +1,9 @@
-using HCG.Mail.Email.Html;
+using Foundation;
 using HCG.Mail.Core.Services;
-using HCG.Mail.iOS.Platform;
+using HCG.Mail.Email.Html;
 using HCG.Mail.Infrastructure;
+using HCG.Mail.iOS.Platform;
+using UIKit;
 
 namespace HCG.Mail.iOS;
 
@@ -9,6 +11,7 @@ namespace HCG.Mail.iOS;
 /// On-device/simulator checks of what headless tests cannot cover: the real iOS Keychain, the app sandbox, the HTML
 /// sanitizer under the iOS runtime (AOT/interpreter) and the Microsoft sign-in configuration. Runs only when the
 /// process is started with HCG_MAIL_SELF_TEST=1; prints "HCG-SELFTEST: PASS" or "HCG-SELFTEST: FAIL" to the console.
+/// Also checks the UIScene life cycle (the window comes from a connected window scene) and the safe-area layout.
 /// Uses a throw-away Keychain item and touches no account, password or mailbox.
 /// </summary>
 public static class SelfTest
@@ -81,6 +84,11 @@ public static class SelfTest
 
             Report("TLS revocation fallback enabled", new HCG.Mail.Email.MailClientFactory().RevocationFallback is not null);
 
+            // UIScene life cycle (iOS 27 SDK): the window comes from a connected window scene, not from the app delegate.
+            // The scene connects after launch, so wait for it before looking at the layout.
+            var scene = await WaitForSceneWindowAsync(TimeSpan.FromSeconds(60));
+            Report("Scene life cycle", scene.Ok, scene.Detail);
+
             // Layout: the shell must be inset by the safe area (notch/Dynamic Island, home indicator) exactly once.
             await Task.Delay(1500); // let the first layout pass finish
             var layout = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync<(bool Ok, string Detail)>(MeasureSafeAreaLayout);
@@ -91,6 +99,39 @@ public static class SelfTest
             Report("unexpected exception", false, ex.GetType().Name + ": " + ex.Message);
         }
         Console.WriteLine(failures == 0 ? "HCG-SELFTEST: PASS" : $"HCG-SELFTEST: FAIL ({failures})");
+    }
+
+    /// <summary>Polls (on the main thread) until the scene's window shows the Avalonia view, or the time runs out.</summary>
+    private static async Task<(bool Ok, string Detail)> WaitForSceneWindowAsync(TimeSpan timeout)
+    {
+        var started = DateTime.UtcNow;
+        while (true)
+        {
+            var result = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync<(bool Ok, string Detail)>(DescribeSceneWindow);
+            if (result.Ok || DateTime.UtcNow - started > timeout)
+                return result;
+            await Task.Delay(250);
+        }
+    }
+
+    /// <summary>
+    /// Info.plist declares the scene manifest, exactly one window scene is connected, its window shows Avalonia's
+    /// view controller, and the main view is inside that window (a top level exists).
+    /// </summary>
+    private static (bool Ok, string Detail) DescribeSceneWindow()
+    {
+        var manifest = NSBundle.MainBundle.ObjectForInfoDictionary("UIApplicationSceneManifest") is NSDictionary;
+        var scenes = UIApplication.SharedApplication.ConnectedScenes.OfType<UIWindowScene>().ToArray();
+        var windows = scenes.SelectMany(scene => scene.Windows).ToArray();
+        var window = windows.FirstOrDefault(w => w.IsKeyWindow) ?? windows.FirstOrDefault();
+        var controller = window?.RootViewController;
+        var attached = Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.ISingleViewApplicationLifetime { MainView: { } view }
+                       && Avalonia.Controls.TopLevel.GetTopLevel(view) is not null;
+        var ok = manifest && scenes.Length == 1 && window?.WindowScene is not null
+                 && controller is Avalonia.iOS.DefaultAvaloniaViewController && attached;
+        var detail = FormattableString.Invariant(
+            $"scene manifest {(manifest ? "present" : "missing")}; {scenes.Length} window scene(s) {string.Join(", ", scenes.Select(scene => scene.ActivationState))}; window {(window is null ? "none" : $"{controller?.GetType().Name ?? "without controller"}{(window.IsKeyWindow ? ", key" : ", not key")}")}; main view {(attached ? "shown" : "not shown")}");
+        return (ok, detail);
     }
 
     /// <summary>Where the mail area actually sits in the window, compared with the safe area iOS reports.</summary>
@@ -104,8 +145,15 @@ public static class SelfTest
         var safe = top.InsetsManager?.SafeAreaPadding ?? default;
         var end = Avalonia.VisualExtensions.TranslatePoint(mailArea, new Avalonia.Point(0, mailArea.Bounds.Height), top) ?? origin;
         var bottomGap = top.Bounds.Height - end.Y;
+        // The shell itself must fill the window (its bars reach under the status bar and home indicator) and keep the
+        // safe area on its own: if Avalonia also padded it, the inset would still be applied once, but the keyboard
+        // padding (measured from the screen edge) would leave a gap the height of the home indicator.
+        var shellOrigin = Avalonia.VisualExtensions.TranslatePoint(view, new Avalonia.Point(0, 0), top) ?? new Avalonia.Point(-1, -1);
+        var shellPadding = (view as Avalonia.Controls.Primitives.TemplatedControl)?.Padding ?? default;
+        var fills = Math.Abs(shellOrigin.X) <= 1 && Math.Abs(shellOrigin.Y) <= 1 && Math.Abs(view.Bounds.Height - top.Bounds.Height) <= 1
+                    && shellPadding == default;
         var detail = FormattableString.Invariant(
-            $"reported top {safe.Top:0.#} bottom {safe.Bottom:0.#}; mail area top {origin.Y:0.#} bottom gap {bottomGap:0.#}; window {top.Bounds.Width:0.#}×{top.Bounds.Height:0.#}, top-level padding {top.Padding}, edge-to-edge {top.InsetsManager?.DisplayEdgeToEdgePreference}");
-        return (Math.Abs(origin.Y - safe.Top) <= 1 && Math.Abs(bottomGap - safe.Bottom) <= 1, detail);
+            $"reported top {safe.Top:0.#} bottom {safe.Bottom:0.#}; mail area top {origin.Y:0.#} bottom gap {bottomGap:0.#}; window {top.Bounds.Width:0.#}×{top.Bounds.Height:0.#}, shell at {shellOrigin.Y:0.#} height {view.Bounds.Height:0.#} padding {shellPadding}, top-level padding {top.Padding}, edge-to-edge {top.InsetsManager?.DisplayEdgeToEdgePreference}");
+        return (fills && Math.Abs(origin.Y - safe.Top) <= 1 && Math.Abs(bottomGap - safe.Bottom) <= 1, detail);
     }
 }

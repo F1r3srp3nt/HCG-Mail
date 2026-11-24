@@ -13,10 +13,11 @@ nothing is copied. [`../iOS Executable/`](../iOS%20Executable/) only describes d
 | | State |
 |---|---|
 | **Implemented** | Account setup with connection diagnostics and Keychain storage · accounts, folders, message list with paging, pull-to-refresh and search · HTML and plain-text reading with inline (cid) images · compose, drafts, reply, reply all, forward, attachments (document picker / share sheet) · read/unread, flag, archive, delete · iPhone navigation and adaptive iPad layouts (split view, slide-over, rotation) · settings, Mail Health, banners and explicit failure states · safe area, keyboard, Dynamic Type and Reduce Motion · background suspend/resume · Microsoft accounts through the shared MSAL code with an iOS adapter |
-| **Compiled** | **Simulator (Debug): yes** — built by the `iOS` GitHub Actions workflow on macOS 26 with Xcode 26.3, .NET SDK 10.0.403 and the iOS workload 26.2.10233 (0 errors; `Assets.car` with the app icon present). **Device (ios-arm64, Release, full AOT): yes** — the App Store configuration compiles without errors in its own CI job (about 20 minutes); it is built unsigned because CI holds no certificates. Mobile library and tests also build on Linux. |
+| **Toolchain** | **Xcode 27.2, the iOS 27.2 SDK, workload 27.2.10000 and Avalonia 12.2** (UIScene life cycle, required from the iOS 27 SDK). Confirmed by the `iOS` workflow on GitHub's `xcode-27` runner (run [45467617023](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/45467617023), pull request #20): Xcode 27.2 (27B52), .NET SDK 10.0.403. |
+| **Compiled** | **Simulator (Debug): yes**, by the scripts and by the Xcode schemes. **Device (ios-arm64, Release, full AOT): yes** — the App Store configuration compiles in its own CI job (about 20 minutes) and its check passes: `iphoneos27.2` SDK, scene manifest, icon, launch screen, privacy manifest, URL scheme. It is built unsigned because CI holds no certificates. Mobile library and tests also build on Linux. |
 | **Tested (headless)** | 44 tests render the real mobile views at iPhone, iPhone SE and iPad sizes (preview mailbox, no network): layouts, rotation, split view, text size (100/130/150 %), safe area, keyboard, nothing clipped on iPhone SE, 44-point touch targets, VoiceOver names on icon buttons, navigation, compose/send/draft, reply/forward, message actions, attachments → share sheet, link confirmation, account setup, Microsoft "pending" state, settings, suspend/resume, all 13 rendering fixtures at iPhone width |
 | **Tested against a real mail server** | **Yes, on a local test server** (Dovecot IMAP + Postfix SMTP over TLS with a CRL-checked certificate, disposable test mailboxes `ola@`/`kari@hcgmail.test`; delivery is local only). With production services and the mobile UI: add an account through the setup sheet and its connection test → connect → folders and inbox → open an HTML message (scripts and tracker removed, remote content blocked) → compose and send → refresh shows it in Inbox and Sent → **relaunch** reconnects with the stored password → remove the account: confirmation, account, stored password and history gone, mail on the server untouched → relaunch shows the welcome screen. A second test cuts the connection mid-session: the list stays readable with an offline notice and Retry, then recovers. Log files are checked to contain neither the password nor the address. Run on Linux (headless UI) — **not yet on a simulator or a device, and not against a public provider (e.g. Domene.no)**. |
-| **Simulator-tested** | **Yes, automatically, in CI** (iPhone 17 Pro simulator, iOS 26.5): the app installs and starts; the self-test passed — Keychain save/replace/read/delete, app data directory, settings and account list saved and reloaded as JSON, sanitizer, Microsoft configuration (reported as not set up), TLS revocation fallback. Preview-mode screenshots were taken on an iPhone and an iPad simulator (workflow artifact `ios-simulator-screenshots`). The first simulator run found and led to the fix of a Keychain bug (replacing an existing password). **Not yet used interactively by a person.** |
+| **Simulator-tested** | **Yes, automatically, in CI** (iPhone 18 Pro simulator, iOS 27.2): the app installs and starts; the self-test passed — Keychain save/replace/read/delete, app data directory, settings and account list saved and reloaded as JSON, sanitizer, Microsoft configuration (reported as not set up), TLS revocation fallback, **scene life cycle** (one window scene, Avalonia's view controller, main view shown) and **safe area applied once** (Dynamic Island 62 pt and home indicator 34 pt, the shell filling the screen). Preview-mode screenshots on the iPhone 18 Pro and an iPad, and App Store screenshots on the iPhone 18 Pro Max (1320×2868). **Not yet used interactively by a person.** |
 | **Device-tested** | **No.** Needs HCG's Apple Developer account, a signing certificate and a provisioning profile. |
 | **Microsoft sign-in** | **Pending.** The code is in place; builds without a client ID show Microsoft sign-in as "not set up" (no fake login). Needs the Entra app registration to include an iOS redirect URI (below). |
 | **App Store** | Not submitted. Nothing is uploaded automatically. |
@@ -68,10 +69,10 @@ iOS App Store Submission/
 | Component | Version | Where it is pinned |
 |---|---|---|
 | .NET SDK | .NET 10 (`10.0.100` or newer: `global.json` rolls forward to the newest installed 10.0 SDK; CI used 10.0.403) | `global.json` |
-| .NET iOS workload | `Microsoft.NET.Sdk.iOS` manifest **26.2.10233** (iOS 26.2 SDK bindings) | `HcgIosWorkloadManifest` in `toolchain.props`, installed by `scripts/install-workload.sh` |
-| Xcode | **26.3** (the workload refuses to build with older Xcode) | `HcgRequiredXcode` in `toolchain.props`; CI selects `/Applications/Xcode_26.3.app` |
+| .NET iOS workload | `Microsoft.NET.Sdk.iOS` manifest **27.2.10000** (iOS 27.2 SDK bindings) | `HcgIosWorkloadManifest` in `toolchain.props`, installed by `scripts/install-workload.sh` |
+| Xcode | **27.2** (the workload builds only with Xcode 27.2) | `HcgRequiredXcode` in `toolchain.props`; CI runs on GitHub's `xcode-27` image and selects `/Applications/Xcode_27.2.app` |
 | Minimum iOS | 16.0 (iPhone and iPad) | `HcgMinimumIos` in `toolchain.props` → `SupportedOSPlatformVersion` |
-| Avalonia / Avalonia.iOS | 11.3.22 | `../Windows-executable-Application/Directory.Packages.props` + `Directory.Packages.props` here |
+| Avalonia / Avalonia.iOS | 12.2.0 (UIScene life cycle: `AvaloniaAppDelegate` + `UIApplicationSceneManifest` in `Info.plist`) | `../Windows-executable-Application/Directory.Packages.props` + `Directory.Packages.props` here |
 | MailKit / MimeKit, HtmlSanitizer, MSAL.NET | 4.18.2, 9.2.1039, 4.91.1 | `../Windows-executable-Application/Directory.Packages.props` |
 
 All package versions are central; the iOS projects cannot drift from the desktop app. When you move to a newer
@@ -89,16 +90,16 @@ Each cause has its own message, so a missing workload is never mistaken for a si
 | Deployment target | `error HCG003` — `SupportedOSPlatformVersion` below 16.0 | Keep `HcgMinimumIos` |
 | Signing (devices only) | `HCG004` message, then the SDK's "No valid iOS code signing keys" if none is installed | Pass `CodesignKey`/`CodesignProvision` or use `scripts/export-ipa.sh`; simulators need none |
 | .NET iOS workload | SDK `NETSDK1147` / doctor `[workload]` | `scripts/install-workload.sh` |
-| Xcode | "builds with Xcode 26.3, and none is installed" / doctor `[xcode]` | Put Xcode 26.3 next to your Xcode as `/Applications/Xcode_26.3.app` (DEVICE_INSTALL.md §1); your default Xcode stays selected |
+| Xcode | "builds with Xcode 27.2, and none is installed" / doctor `[xcode]` | Install and select Xcode 27.2 (DEVICE_INSTALL.md §1). If you must keep another Xcode selected, put 27.2 next to it as `/Applications/Xcode_27.2.app`: the scripts use it for the .NET compile step only |
 
 Paths are never machine-specific: the shared code is found relative to `Directory.Build.props`.
 
 ## Set up a Mac
 
 ```bash
-# 1. Xcode 26.3 (developer.apple.com/download/all) as /Applications/Xcode_26.3.app, next to any newer Xcode, then once:
-sudo DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer xcodebuild -license accept
-#    The .NET compile step uses it; your selected Xcode (e.g. 27.2) still runs Simulator and installs on devices.
+# 1. Xcode 27.2 (App Store or developer.apple.com/download/all), selected, licence accepted once:
+sudo xcode-select -s /Applications/Xcode.app && sudo xcodebuild -license accept
+#    No second Xcode is needed any more (Xcode 26.3 was, until the move to Avalonia 12 and the UIScene life cycle).
 
 # 2. .NET 10 SDK (https://dotnet.microsoft.com/download/dotnet/10.0 or: brew install --cask dotnet-sdk)
 

@@ -41,7 +41,7 @@
               <TextBlock Classes="formLabel" Text="To" VerticalAlignment="Bottom" />
               <Button Grid.Column="1" Classes="link" Content="Cc / Bcc" Command="{Binding ToggleCcBccCommand}" />
             </Grid>
-            <TextBox x:Name="ToBox" Text="{Binding To}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" Watermark="name@example.com" AutomationProperties.Name="To" />
+            <TextBox x:Name="ToBox" Text="{Binding To}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" PlaceholderText="name@example.com" AutomationProperties.Name="To" />
           </StackPanel>
           <StackPanel IsVisible="{Binding ShowCcBcc}">
             <TextBlock Classes="formLabel" Text="Cc" />
@@ -49,7 +49,7 @@
           </StackPanel>
           <StackPanel IsVisible="{Binding ShowCcBcc}">
             <TextBlock Classes="formLabel" Text="Bcc" />
-            <TextBox Text="{Binding Bcc}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" Watermark="Hidden from other recipients" AutomationProperties.Name="Bcc" />
+            <TextBox Text="{Binding Bcc}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" PlaceholderText="Hidden from other recipients" AutomationProperties.Name="Bcc" />
           </StackPanel>
           <StackPanel>
             <TextBlock Classes="formLabel" Text="Subject" />
@@ -83,7 +83,7 @@
 
           <Border Classes="card" BoxShadow="{DynamicResource Hcg.Shadow.None}" Padding="2">
             <TextBox x:Name="BodyBox" Classes="bare multiline" Text="{Binding Body}" AcceptsReturn="True" TextWrapping="Wrap"
-                     MinHeight="260" Padding="12,10" Watermark="Write your message…" AutomationProperties.Name="Message" />
+                     MinHeight="260" Padding="12,10" PlaceholderText="Write your message…" AutomationProperties.Name="Message" />
           </Border>
         </StackPanel>
       </ScrollViewer>

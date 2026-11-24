@@ -213,8 +213,8 @@
   <Style Selector="TextBox:pointerover, TextBox:focus">
     <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Primary}" />
   </Style>
-  <Style Selector="TextBox /template/ TextBlock#PART_Watermark, TextBox /template/ TextBlock#PART_FloatingWatermark">
-    <Setter Property="Foreground" Value="{DynamicResource Hcg.Text.Tertiary}" />
+  <Style Selector="TextBox">
+    <Setter Property="PlaceholderForeground" Value="{DynamicResource Hcg.Text.Tertiary}" />
   </Style>
   <Style Selector="TextBox:disabled /template/ Border#PART_BorderElement">
     <Setter Property="Background" Value="{DynamicResource Hcg.Bg.Input}" />

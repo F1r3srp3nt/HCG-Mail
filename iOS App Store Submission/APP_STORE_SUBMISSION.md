@@ -10,7 +10,7 @@ Upload, TestFlight and submission for review are manual steps; nothing in this r
 |---|---|
 | Bundle ID | `com.hakmicapitalgroup.hcgmail` (iPhone and iPad, iOS 16.0 or later) |
 | Version / build | marketing version **0.1.0** (shared `<Version>` in `Windows-executable-Application/Directory.Build.props`, overridable with `HCG_IOS_MARKETING_VERSION`), build number from `HCG_IOS_BUILD_NUMBER` |
-| Toolchain | Xcode **26.3** + .NET 10 + .NET iOS workload **26.2.10233** (`toolchain.props`) |
+| Toolchain | Xcode **27.2** (iOS 27.2 SDK, UIScene life cycle) + .NET 10 + .NET iOS workload **27.2.10000** (`toolchain.props`) |
 | Apple's upload minimum | Since 28 April 2026, uploads must be built with Xcode 26 and the iOS 26 SDK or later ([Apple](https://developer.apple.com/news/upcoming-requirements/)). The pinned toolchain meets it. `verify-ios-build.py` fails any build whose SDK is older. |
 | Verified in CI (macOS, fresh checkout, no signing) | See [What has been verified](#what-has-been-verified). |
 | Not yet done | Signing, `.xcarchive` and App Store `.ipa`. These need HCG's distribution certificate, which exists only on your Mac ([step 2](#2-build-the-signed-archive-and-ipa-on-your-mac)). |
@@ -23,7 +23,7 @@ Upload, TestFlight and submission for review are manual steps; nothing in this r
 
 Setup, once per Mac:
 
-1. Install Xcode 26.3.
+1. Install Xcode 27.2 and select it.
 2. Install the .NET 10 SDK.
 3. Run `scripts/install-workload.sh` in this folder.
 
@@ -47,14 +47,14 @@ Notes:
 * Xcode does not read your shell's environment when started from the Dock. Microsoft sign-in therefore reaches an
   Xcode build only through `oauth-clients.props` or `oauth-clients.local.props`.
 * `xcodebuild` from Terminal passes `HCG_*` variables through.
-* Building in Xcode other than 26.3 stops with an explicit error, because the pinned .NET workload requires 26.3.
+* Building without an Xcode 27.2 stops with an explicit error, because the pinned .NET workload requires 27.2.
 
 ## 2. Build the signed archive and .ipa on your Mac
 
 This is the step that could not be done here: it needs HCG's private signing key.
 
 **The Mac:** any Apple silicon Mac (for example the M4 Max) with:
-* Xcode **26.3** selected (`xcode-select`);
+* Xcode **27.2** selected (`xcode-select`);
 * the .NET 10 SDK for Arm64;
 * `scripts/install-workload.sh` run once;
 * `scripts/doctor.sh` reporting *Ready*.
@@ -97,7 +97,7 @@ scripts/export-ipa.sh
 
 What the script does, in order:
 
-1. **Toolchain** (`doctor.sh`): Xcode 26.3, workload 26.2.10233.
+1. **Toolchain** (`doctor.sh`): Xcode 27.2, workload 27.2.10000.
 2. **Signing preflight**, before anything is built. It checks that:
    * the identity is in the keychain;
    * the profile's App ID is exactly `<TEAMID>.com.hakmicapitalgroup.hcgmail`;

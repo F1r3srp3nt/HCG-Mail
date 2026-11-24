@@ -74,7 +74,9 @@ jobs:
 
   simulator:
     name: iOS build, simulator self-test and screenshots (macOS)
-    runs-on: macos-26
+    # GitHub's xcode-27 image (macOS 27, arm64) has Xcode 27.2 at /Applications/Xcode_27.2.app and iOS 27.2 simulators
+    # (its default Xcode is 27.1, so the step below selects the pinned one). The macos-26 image has no Xcode 27.
+    runs-on: xcode-27
     # Hosted runners sometimes take 20+ minutes for one cold simulator boot (and once 51 minutes for the screenshot
     # step), so the job needs room beyond the steps' own limits.
     timeout-minutes: 150
@@ -179,7 +181,7 @@ jobs:
     # job in parallel, through the Xcode scheme. Unsigned: CI holds no certificates, so this proves the App Store
     # configuration compiles and is packaged correctly; signing and the archive are scripts/export-ipa.sh on the owner's Mac.
     name: Compile for devices (ios-arm64, Release, AOT, unsigned)
-    runs-on: macos-26
+    runs-on: xcode-27   # Xcode 27.2, see the simulator job
     timeout-minutes: 150
     defaults:
       run:
@@ -240,7 +242,7 @@ jobs:
     # Debug build in preview mode: the labelled sample mailbox, no network, no account. Release pull requests only.
     name: App Store screenshots (iPhone 6.9", iPad 13")
     if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/')
-    runs-on: macos-26
+    runs-on: xcode-27   # Xcode 27.2, see the simulator job
     timeout-minutes: 150
     defaults:
       run:
@@ -260,14 +262,21 @@ jobs:
         run: scripts/install-workload.sh
       - name: Build for the simulator (Debug)
         run: scripts/build-simulator.sh Debug | tee "$RUNNER_TEMP/app-path.txt"
-      - name: Take screenshots (inbox, message, compose) on iPhone 17 Pro Max and iPad Pro 13-inch
+      - name: Take screenshots (inbox, message, compose) on the newest iPhone Pro Max and iPad Pro 13-inch
         timeout-minutes: 120
         env:
           HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
         run: |
           export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
           out=../artifacts/app-store-screenshots; mkdir -p "$out"
-          for device in "iPhone 17 Pro Max" "iPad Pro 13-inch (M5)"; do
+          # The 6.9" iPhone changes name with each simulator generation (iOS 27.2 has the iPhone 18 Pro Max); the size
+          # check below still decides whether App Store Connect accepts the screenshots.
+          iphone="$(xcrun simctl list devices available -j | python3 -I -c 'import json, re, sys
+          d = json.load(sys.stdin)["devices"]
+          names = {x["name"] for r in d if "iOS" in r for x in d[r] if re.fullmatch(r"iPhone \d+ Pro Max", x["name"])}
+          print(max(names, key=lambda n: int(re.search(r"\d+", n).group())))')"
+          echo "iPhone for 6.9-inch screenshots: $iphone"
+          for device in "$iphone" "iPad Pro 13-inch (M5)"; do
             # Boots only this simulator (others shut down), with a time limit and diagnostics if it stalls.
             scripts/run-simulator.sh "$device" --exclusive --boot-only
             udid="$(xcrun simctl list devices available -j | DEVICE="$device" python3 -c 'import json,os,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in sorted(d, reverse=True) if "iOS" in r for x in d[r] if x["name"]==os.environ["DEVICE"]))')"

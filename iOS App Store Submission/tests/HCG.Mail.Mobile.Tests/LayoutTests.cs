@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using HCG.Mail.Mobile.ViewModels;
@@ -115,6 +116,18 @@ public sealed class LayoutTests
 
         ui.Shell.KeyboardHeight = 0;
         Assert.Equal(34, ui.Shell.ContentPadding.Bottom);
+    }
+
+    [AvaloniaFact]
+    public async Task Shell_handles_the_safe_area_itself_and_opts_out_of_Avalonia_padding()
+    {
+        // On iOS the shell is the top level's content. Avalonia 12 pads that content by the safe area unless it opts
+        // out; together with the shell's own inset the keyboard gap would grow by the home-indicator height. The
+        // headless platform reports no insets, so the opt-out itself is what is checked here (the simulator self-test
+        // measures the result: "Safe area applied once").
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone);
+        Assert.False(TopLevel.GetAutoSafeAreaPadding(ui.View));
+        Assert.Equal(default, ui.View.Padding);
     }
 
     [AvaloniaFact]

@@ -17,23 +17,20 @@ Start with **A**. It gets the app working on your iPhone today, and nothing leav
 
 ## 1. The Mac, once
 
-1. **Xcode 26.3 next to your Xcode** (keep Xcode 27.2 as your Xcode; nothing is switched):
-   * Download **Xcode 26.3** from <https://developer.apple.com/download/all/>.
-   * Double-click the `.xip`, rename the result **`Xcode_26.3.app`** and move it to **/Applications**.
-   * Accept its licence once:
-     ```bash
-     sudo DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer xcodebuild -license accept
-     ```
-   * Only the .NET compile step uses it, because HCG Mail must be built with the iOS 26 SDK for now (see
-     `toolchain.props`). Xcode 27.2 stays your Xcode: it opens the project, runs Simulator and installs on the iPhone.
+1. **Xcode 27.2**, selected (`xcode-select -p` shows it), with its licence accepted once:
+   ```bash
+   sudo xcodebuild -license accept
+   ```
+   That one Xcode builds the app, opens the project, runs Simulator and installs on the iPhone. An Xcode 26.3 that
+   you installed next to it for earlier HCG Mail builds is no longer used and can be deleted.
 2. **.NET 10 SDK** for Arm64 from <https://dotnet.microsoft.com/download/dotnet/10.0>. `global.json` accepts
    10.0.100 or newer.
 3. **The repository**, at the commit you want on the phone:
    ```bash
    git clone https://github.com/F1r3srp3nt/HCG-Mail.git   # or: cd HCG-Mail && git switch main && git pull
    cd "HCG-Mail/iOS App Store Submission"
-   scripts/install-workload.sh      # the pinned .NET iOS workload 26.2.10233 (asks for your password)
-   scripts/doctor.sh                # "builds with Xcode 26.3 …; Xcode 27.2 stays selected" means ready
+   scripts/install-workload.sh      # the pinned .NET iOS workload 27.2.10000 (asks for your password)
+   scripts/doctor.sh                # "[xcode] OK Xcode 27.2 at …" means ready
    ```
 
 ## 2. The iPhone, once
@@ -94,7 +91,7 @@ What it does, and where it stops if something is wrong:
 4. **Check** (`verify-ios-build.py`), the same checks as the App Store build, except those that only apply to
    distribution:
    * bundle ID and build number;
-   * minimum iOS, iPhone + iPad, the iOS 26 SDK;
+   * minimum iOS, iPhone + iPad, the iOS 27 SDK and its scene manifest;
    * the compiled icon and the launch screen;
    * the privacy manifest;
    * a valid signature;
@@ -142,7 +139,7 @@ The full 14-area plan, which is also what TestFlight testers follow, is **[TESTF
 | `the device is not paired with this Mac` | Connect it by cable, unlock it, tap **Trust**. |
 | `no usable development profile … does not include this device` | Run the throwaway Xcode project once more on this iPhone (§3). Xcode adds the device to the profile. |
 | `no Apple Development certificate` / `made for another certificate` | The certificate's private key is not on this Mac. Run §3 on this Mac; Xcode creates a certificate here and a matching profile. |
-| `error: … requires Xcode 26.3` | Select Xcode 26.3 (§1.1). |
+| `error: … requires Xcode 27.2` | Select Xcode 27.2 (§1.1). |
 | Install fails: *Developer Mode disabled* | §2.3. |
 | Install fails: *unable to verify app* / *untrusted* | Trust the developer profile on the phone (§4). Check the phone's date and time are set automatically. |
 | Install fails: *a different signature* | A TestFlight or older build of `com.hakmicapitalgroup.hcgmail` is installed. Delete it from the phone first. Its local data (account list, settings) is removed with it; mail on the server is not. |

@@ -14,6 +14,15 @@ namespace HCG.Mail.iOS;
 /// class only supplies the iOS platform (Keychain, Microsoft sign-in, share sheet, Dynamic Type), forwards the
 /// Microsoft redirect URL to MSAL and starts the optional self-test.
 /// </summary>
+/// <remarks>
+/// UIScene life cycle (required from the iOS 27 SDK, Apple TN3187): Info.plist declares UIApplicationSceneManifest,
+/// and Avalonia 12's <see cref="AvaloniaAppDelegate{TApp}"/> answers application:configurationForConnectingSceneSession:
+/// with its scene delegate (AvaloniaSceneDelegate). Avalonia starts at launch, in application:didFinishLaunching (so
+/// <see cref="CustomizeAppBuilder"/> and AfterSetup run before any window exists); the window and the Avalonia view are
+/// created when iOS connects the scene, and MobileApp's main view is placed in it then. URLs opened while the app runs
+/// (scene:openURLContexts:) and the URL that launched it (the scene's connection options) both reach
+/// <see cref="OnActivated"/> through IActivatableLifetime.Activated, so the Microsoft redirect works either way.
+/// </remarks>
 [Register("AppDelegate")]
 public partial class AppDelegate : AvaloniaAppDelegate<MobileApp>
 {
@@ -39,7 +48,10 @@ public partial class AppDelegate : AvaloniaAppDelegate<MobileApp>
             }));
     }
 
-    /// <summary>Returns from the Microsoft sign-in page (msauth.&lt;bundle id&gt;://auth) to MSAL.</summary>
+    /// <summary>
+    /// Returns from the Microsoft sign-in page (msauth.&lt;bundle id&gt;://auth) to MSAL. Avalonia raises it for
+    /// scene:openURLContexts: and for a URL in the scene's connection options (cold launch).
+    /// </summary>
     private static void OnActivated(object? sender, ActivatedEventArgs e)
     {
         if (e is ProtocolActivatedEventArgs { Kind: ActivationKind.OpenUri } protocol

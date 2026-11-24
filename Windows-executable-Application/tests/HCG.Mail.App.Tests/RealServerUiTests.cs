@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Avalonia.Headless;
 using HCG.Mail.App.Services;
 using HCG.Mail.App.ViewModels;
@@ -9,18 +10,20 @@ using HCG.Mail.Core.Security;
 using HCG.Mail.Core.Settings;
 using HCG.Mail.Infrastructure.Credentials;
 using HCG.Mail.Infrastructure.Storage;
-using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Security;
+using MailKit;
 using Microsoft.Extensions.DependencyInjection;
-using MimeKit;
 using MimeKit.Utils;
+using MimeKit;
 
 namespace HCG.Mail.App.Tests;
 
 public sealed class LocalMailServerFactAttribute : FactAttribute
 {
-    public LocalMailServerFactAttribute()
+    // xUnit v3 reports where a test is declared through these caller-info parameters.
+    public LocalMailServerFactAttribute([CallerFilePath] string? sourceFilePath = null, [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (Environment.GetEnvironmentVariable("HCG_MAIL_E2E") != "1")
             Skip = "Set HCG_MAIL_E2E=1 and start tests/integration-server/setup-local-mail-server.sh to run end-to-end tests.";

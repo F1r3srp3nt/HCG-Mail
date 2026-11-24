@@ -3,16 +3,18 @@
     The toolchain HCG Mail for iOS is built and verified with. scripts/doctor.sh, the build scripts and CI read
     these values; change them here only (scripts/install-workload.sh builds its rollback file from them).
 
-    Xcode 27: Microsoft's .NET iOS workload 27.2.10000 supports Xcode 27.2, but it builds with the iOS 27 SDK, and apps
-    built with that SDK must use the UIScene life cycle or iOS will not launch them (Apple TN3187). Avalonia 11 (the UI
-    framework) has no scene support; Avalonia 12 adds it. Until HCG Mail moves to Avalonia 12, it builds with the Xcode
-    26.3 SDK. Apps built with it run on iOS 27. That Xcode can stay next to a newer default Xcode: the scripts and the
-    Xcode project use it only for the .NET compile step (scripts/_common.sh: find_build_xcode). verify-ios-build.py
-    rejects an iOS 27 SDK build without a scene manifest.
+    Xcode 27: Microsoft's .NET iOS workload 27.2.10000 requires Xcode 27.2 (WorkloadDependencies.json: [27.2,)) and
+    builds with the iOS 27.2 SDK. Apps built with the iOS 27 SDK must use the UIScene life cycle or iOS stops them at
+    launch (Apple TN3187). HCG Mail does, through Avalonia 12 (AvaloniaAppDelegate and its scene delegate) and the
+    UIApplicationSceneManifest in src/HCG.Mail.iOS/Info.plist; verify-ios-build.py rejects an iOS 27 SDK build without
+    that manifest, and the simulator self-test checks the window comes from a connected scene. The selected Xcode 27.2
+    is the one that builds; scripts/_common.sh (find_build_xcode) still accepts an Xcode 27.2 installed next to a
+    different selected Xcode, or one named by HCG_BUILD_XCODE. CI uses GitHub's xcode-27 runner image
+    (/Applications/Xcode_27.2.app). Xcode 26.3 and workload 26.2.10233 are no longer used.
   -->
   <PropertyGroup>
-    <HcgRequiredXcode>26.3</HcgRequiredXcode>
-    <HcgIosWorkloadManifest>26.2.10233</HcgIosWorkloadManifest>
+    <HcgRequiredXcode>27.2</HcgRequiredXcode>
+    <HcgIosWorkloadManifest>27.2.10000</HcgIosWorkloadManifest>
     <HcgMinimumIos>16.0</HcgMinimumIos>
     <HcgMinimumDotnetSdk>10.0.100</HcgMinimumDotnetSdk>
     <!-- Apple's minimum for App Store Connect uploads (since 28 April 2026: built with Xcode 26 and the iOS 26 SDK or

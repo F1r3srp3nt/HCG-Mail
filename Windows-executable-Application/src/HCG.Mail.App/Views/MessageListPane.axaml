@@ -62,7 +62,7 @@
 
       <!-- Search -->
       <TextBox Grid.Row="1" x:Name="SearchBox" Margin="14,0,14,10" Text="{Binding MessageList.SearchText}"
-               Watermark="Filter loaded messages (Enter: search the whole folder)" IsEnabled="{Binding MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
+               PlaceholderText="Filter loaded messages (Enter: search the whole folder)" IsEnabled="{Binding MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
         <TextBox.KeyBindings>
           <KeyBinding Gesture="Enter" Command="{Binding MessageList.SearchServerCommand}" />
         </TextBox.KeyBindings>
