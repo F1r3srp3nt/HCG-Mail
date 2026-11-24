@@ -40,6 +40,7 @@ if [[ -z "${HCG_XCODE_CLEAN_ENV:-}" ]]; then
         DEVELOPER_DIR="$developer_dir" MD_APPLE_SDK_ROOT="${developer_dir%/Contents/Developer}"
         ACTION="$action" CONFIGURATION="$configuration" PLATFORM_NAME="$platform" HCG_XCODE_CLEAN_ENV=1
         TARGET_DEVICE_IDENTIFIER="${TARGET_DEVICE_IDENTIFIER:-}" TARGET_DEVICE_PLATFORM_NAME="${TARGET_DEVICE_PLATFORM_NAME:-}"
+        CI="${CI:-}"
         DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 AVALONIA_TELEMETRY_OPTOUT=1)
   [[ -n "${DOTNET_ROOT:-}" ]] && keep+=(DOTNET_ROOT="$DOTNET_ROOT")
   # Optional inputs from the caller's environment: HCG_* (OAuth client IDs, HCG_SHARED_ROOT, …), NuGet and proxies.
@@ -107,10 +108,26 @@ os.execv("/bin/bash", ["/bin/bash", "-c", cmd, script])
         fi
         # A connected iPhone/iPad chosen as the run destination: build signed for development, check, install and
         # start it there (scripts/install-device.sh finds the signing; DEVICE_INSTALL.md §3 if it has none).
-        if [[ -n "${TARGET_DEVICE_IDENTIFIER:-}" && "${TARGET_DEVICE_PLATFORM_NAME:-iphoneos}" == "iphoneos" ]]; then
-          echo "HCG Mail: installing on the device chosen in Xcode ($TARGET_DEVICE_IDENTIFIER)"
-          HCG_BUILD_XCODE="$BUILD_XCODE_APP" HCG_IOS_CONFIGURATION="$configuration" \
-            "$here/install-device.sh" "$TARGET_DEVICE_IDENTIFIER"
+        # If Xcode does not pass the destination, the one connected iPhone/iPad is used. CI (no devices) and
+        # "Any iOS Device" with nothing connected keep the unsigned compile check below.
+        target="${TARGET_DEVICE_IDENTIFIER:-}"
+        [[ "${TARGET_DEVICE_PLATFORM_NAME:-iphoneos}" == "iphoneos" ]] || target=""
+        if [[ -z "$target" && -z "${CI:-}" ]]; then
+          list="$(mktemp "${TMPDIR:-/tmp}/hcg-devices.XXXXXX")"
+          xcrun devicectl list devices --json-output "$list" >/dev/null 2>&1 || true
+          target="$(python3 -I -c '
+import json, sys
+try: devices = json.load(open(sys.argv[1])).get("result", {}).get("devices", [])
+except (OSError, ValueError): devices = []
+ok = [d.get("hardwareProperties", {}).get("udid", "") for d in devices
+      if d.get("hardwareProperties", {}).get("platform") == "iOS"
+      and d.get("connectionProperties", {}).get("tunnelState") == "connected"]
+print(ok[0] if len(ok) == 1 else "")' "$list" || true)"
+          rm -f "$list"
+        fi
+        if [[ -n "$target" ]]; then
+          echo "HCG Mail: build, sign, install and start on the iPhone/iPad $target"
+          HCG_BUILD_XCODE="$BUILD_XCODE_APP" HCG_IOS_CONFIGURATION="$configuration" "$here/install-device.sh" "$target"
           exit 0
         fi
         out="$OUT_ROOT/device/$configuration"

@@ -29,7 +29,7 @@ def main():
     ids = [(sha, name) for sha, name in re.findall(r'\)\s+([0-9A-F]{40})\s+"([^"]+)"', sys.stdin.read())
            if name.startswith(("Apple Development", "iPhone Developer")) and (not want_id or want_id in (sha, name))]
     if not ids:
-        print("no Apple Development certificate (with its private key) in this Mac's keychain"
+        print("error: no Apple Development certificate (with its private key) in this Mac's keychain"
               + (f' matching "{want_id}"' if want_id else ""), file=sys.stderr)
         return 1
 
@@ -65,7 +65,7 @@ def main():
             best = (match[0], p.get("UUID"), p.get("Name"), expires)
 
     if best is None:
-        print(f"no usable development profile for {bundle}"
+        print(f"error: no usable development profile for {bundle}"
               + (" — found: " + "; ".join(candidates) if candidates else " is installed"), file=sys.stderr)
         return 1
     print(best[0])

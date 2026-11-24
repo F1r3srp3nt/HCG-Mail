@@ -58,13 +58,30 @@ ios_dotnet() {
 require_ios_workload() {
   local installed
   installed="$(cd "$IOS_ROOT" && dotnet workload list 2>/dev/null | awk '$1=="ios"{print $2}')"
-  if [[ "$installed" != "$IOS_WORKLOAD_MANIFEST"/* ]]; then
-    echo "error: the .NET iOS workload $IOS_WORKLOAD_MANIFEST is needed (installed: ${installed:-none}). In Terminal, once: \"$IOS_ROOT/scripts/install-workload.sh\"" >&2
-    exit 1
+  [[ "$installed" == "$IOS_WORKLOAD_MANIFEST"/* ]] && return 0
+  if [[ -t 0 && -t 1 ]]; then   # in Terminal: install it now (asks for the Mac password if .NET is in a system folder)
+    echo "The .NET iOS workload $IOS_WORKLOAD_MANIFEST is needed (installed: ${installed:-none}); installing it now."
+    "$IOS_ROOT/scripts/install-workload.sh" >&2
+    installed="$(cd "$IOS_ROOT" && dotnet workload list 2>/dev/null | awk '$1=="ios"{print $2}')"
+    [[ "$installed" == "$IOS_WORKLOAD_MANIFEST"/* ]] && return 0
   fi
+  echo "error: the .NET iOS workload $IOS_WORKLOAD_MANIFEST is needed (installed: ${installed:-none}). In Terminal, once: \"$IOS_ROOT/scripts/install-workload.sh\"" >&2
+  exit 1
+}
+# A newly added Xcode's licence must be accepted once before its tools run.
+require_xcode_license() {
+  local dev="$BUILD_XCODE_APP/Contents/Developer"
+  DEVELOPER_DIR="$dev" xcodebuild -license check >/dev/null 2>&1 && return 0
+  if [[ -t 0 && -t 1 ]]; then
+    echo "Accepting the Xcode $BUILD_XCODE_VERSION licence (once; your Mac password is needed)."
+    sudo env DEVELOPER_DIR="$dev" xcodebuild -license accept && return 0
+  fi
+  echo "error: the Xcode $BUILD_XCODE_VERSION licence has not been accepted. In Terminal, once: sudo env DEVELOPER_DIR=\"$dev\" xcodebuild -license accept" >&2
+  exit 1
 }
 require_build_xcode() {
   find_build_xcode || { echo "error: $BUILD_XCODE_PROBLEM" >&2; exit 1; }
+  require_xcode_license
   require_ios_workload
 }
 

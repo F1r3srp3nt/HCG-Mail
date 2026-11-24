@@ -38,11 +38,13 @@ BUILD_NUMBER="${HCG_IOS_BUILD_NUMBER:-1}"
 OUT="$OUT_ROOT/device-signed/$CONFIG"
 VERIFY=(python3 -I "$IOS_ROOT/scripts/verify-ios-build.py")
 DEVICECTL=(xcrun devicectl)
-step() { echo; echo "== $*"; }
+CURRENT_STEP="checking the device"
+step() { CURRENT_STEP="$*"; echo; echo "== $*"; }
 
 # --- the device ----------------------------------------------------------------------------------------------------
 devices_json="$(mktemp "${TMPDIR:-/tmp}/hcg-devices.XXXXXX")"
-trap 'rm -f "$devices_json"' EXIT
+# On failure, end with one line Xcode lists as an error (the reason is printed above it).
+trap 'status=$?; rm -f "$devices_json"; [[ $status -eq 0 ]] || echo "error: HCG Mail was not installed: \"$CURRENT_STEP\" failed (details above)." >&2' EXIT
 "${DEVICECTL[@]}" list devices --json-output "$devices_json" >/dev/null 2>&1 \
   || { echo "error: \`xcrun devicectl list devices\` failed — Xcode 15 or later is needed (this project pins Xcode $REQUIRED_XCODE)." >&2; exit 1; }
 # One line per iPhone/iPad: identifier, UDID, name, model, OS, pairing state, tunnel state.
