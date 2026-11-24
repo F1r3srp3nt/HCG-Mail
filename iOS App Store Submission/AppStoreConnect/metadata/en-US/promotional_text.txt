@@ -1,0 +1,1 @@
+Connect the mailbox you already have. Encrypted connections only, passwords in the iOS Keychain, remote images blocked until you allow them — and no HCG account needed.

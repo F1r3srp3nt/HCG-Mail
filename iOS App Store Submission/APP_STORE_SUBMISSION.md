@@ -14,6 +14,8 @@ Upload, TestFlight and submission for review are manual steps; nothing in this r
 | Apple's upload minimum | Since 28 April 2026, uploads must be built with Xcode 26 and the iOS 26 SDK or later ([Apple](https://developer.apple.com/news/upcoming-requirements/)). The pinned toolchain meets it. `verify-ios-build.py` fails any build whose SDK is older. |
 | Verified in CI (macOS, fresh checkout, no signing) | See [What has been verified](#what-has-been-verified). |
 | Not yet done | Signing, `.xcarchive` and App Store `.ipa`. These need HCG's distribution certificate, which exists only on your Mac ([step 2](#2-build-the-signed-archive-and-ipa-on-your-mac)). |
+| On your own iPhone first | [DEVICE_INSTALL.md](DEVICE_INSTALL.md): `scripts/install-device.sh` builds the same Release configuration signed for development, checks it, installs it by cable or Wi-Fi and starts it. No upload. |
+| App Store Connect | Every field, the screenshots and the checklists: [AppStoreConnect/](AppStoreConnect/README.md) |
 
 ## 1. Open and build in Xcode
 
@@ -50,6 +52,15 @@ Notes:
 ## 2. Build the signed archive and .ipa on your Mac
 
 This is the step that could not be done here: it needs HCG's private signing key.
+
+**The Mac:** any Apple silicon Mac (for example the M4 Max) with:
+* Xcode **26.3** selected (`xcode-select`);
+* the .NET 10 SDK for Arm64;
+* `scripts/install-workload.sh` run once;
+* `scripts/doctor.sh` reporting *Ready*.
+
+The steps are in [DEVICE_INSTALL.md §1](DEVICE_INSTALL.md#1-the-mac-once). The same setup serves the
+development install and this release build.
 
 ### 2a. One-time Apple setup (developer.apple.com and App Store Connect)
 
@@ -107,6 +118,26 @@ What the script does, in order:
    * entitlements exactly `application-identifier`, team and Keychain groups
      `<TEAMID>.com.hakmicapitalgroup.hcgmail` + `<TEAMID>.com.microsoft.adalcache`, with `get-task-allow` false;
    * an App Store profile embedded.
+
+**The six things to confirm before you upload.** `export-ipa.sh` checks each of them on the `.ipa` itself and
+writes the result to `artifacts/ios/verification.txt`. Every line must read `OK`; the script exits non-zero
+otherwise.
+
+| Required | `verification.txt` lines |
+|---|---|
+| Bundle identifier `com.hakmicapitalgroup.hcgmail` | `bundle ID`; `app identifier` (`<TEAMID>.com.hakmicapitalgroup.hcgmail`); `profile app ID` |
+| Version 0.1.0 | `marketing version … matches 0.1.0` (with `HCG_IOS_MARKETING_VERSION=0.1.0`) |
+| Build number | `build number … matches 1` (with `HCG_IOS_BUILD_NUMBER`); it must be higher than any build already uploaded for 0.1.0 |
+| Icon | `icon (Info.plist)`, `icon (Assets.car) AppIcon compiled`, `icon (source) 1024×1024 without alpha` |
+| Privacy manifest | `privacy manifest`: no tracking, no collected data, and every required-reason API the binary uses is declared |
+| Entitlements | `Keychain groups` (exactly the two groups), `entitlements` (nothing else), `get-task-allow false`, `signing identity Apple Distribution`, `profile type App Store distribution`, `signature valid` |
+
+You can re-check any `.ipa` on its own:
+
+```bash
+python3 -I scripts/verify-ios-build.py app ../artifacts/ios/ipa/HCGMail.iOS.ipa --kind device --app-store \
+  --marketing-version 0.1.0 --build-number 1
+```
 
 ### Artifacts (not committed; `artifacts/` is ignored by git)
 
@@ -168,5 +199,11 @@ The complete package is in **[APP_STORE_CONNECT.md](APP_STORE_CONNECT.md)**:
 | Safe area (notch/Dynamic Island, home indicator) applied once, measured by the simulator self-test | run [44932364266](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44932364266); again in [44946277608](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44946277608) | ✅ after a fix: iOS reports 62/34 pt and the mail area now starts at 62 pt. Before the fix it started at 124 pt, because the inset was applied twice. |
 | Microsoft sign-in is neither offered nor mentioned when it is not configured (the case for this build); it appears when it is | Linux job, `FlowTests` (`Unconfigured_microsoft_sign_in_is_neither_offered_nor_advertised`, `Configured_microsoft_sign_in_is_offered`), run [44946277608](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44946277608) | ✅ |
 | App Store screenshots: inbox, message, composer on iPhone 17 Pro Max (1320×2868) and iPad Pro 13-inch M5 (2064×2752) | run [44946277608](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/44946277608), artifact `app-store-screenshots` (until 19 Feb 2027) | ✅ all six checked by eye: each shows the intended screen with the sample mailbox. The PNGs carry an alpha channel that is fully opaque. If App Store Connect refuses them for that, export them without alpha first (Preview › Export, untick *Alpha*). |
+| **Release candidate, all four jobs on one commit:** Linux tests; device Release build (unsigned, AOT) and its checks; simulator build, Xcode launch, self-test and preview screenshots; App Store screenshots | run [45068033617](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/45068033617) on `8ac5d50`, the head merged as PR #18 (`54fa493`) | ✅ all success |
+| Scheme `HCG Mail Simulator`: boot, install, launch, every stage logged and time-limited (`run-simulator.sh`) | same | ✅ boot 142 s, install 54 s, launch 89 s; Simulator.app opened afterwards on that device (no second simulator) |
+| Self-test on the iPhone simulator, alone (`--exclusive`) | same | ✅ `HCG-SELFTEST: PASS`; safe area: reported 62/34, mail area at 62, bottom gap 34 |
+| Preview screenshots: the app reports the inbox is open, then the capture | same, artifact `ios-simulator-screenshots` | ✅ iPhone 17 Pro: ready in 3 s. iPad Pro 13-inch (M5), after the iPhone was shut down: boot 214 s, install 98 s, launch 21 s, ready 3 s, screenshot 19 s. Earlier runs stalled here for 58 minutes while two or three simulators ran at once ([SIMULATOR_CI.md](SIMULATOR_CI.md)). |
+| App Store screenshots (6), each taken after the app reported the screen open | same, artifact `app-store-screenshots` (until 20 Feb 2027) | ✅ all six checked by eye; sizes 1320×2868 and 2064×2752. iPad: boot 86 s, install 19 s, launch 14 s, ready 3 s |
 | Signing preflight, signed `.ipa`, entitlements, embedded profile, `.xcarchive` | your Mac (`export-ipa.sh`) | **not yet run**: needs your certificate |
+| Development install on a physical iPhone | your Mac (`install-device.sh`, [DEVICE_INSTALL.md](DEVICE_INSTALL.md)) | **not yet run**: needs your device and development certificate |
 | Real-device test, upload, TestFlight, review | you | not yet done |

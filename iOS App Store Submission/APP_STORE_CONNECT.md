@@ -15,52 +15,27 @@
 | Platforms / devices | iPhone and iPad, iOS 16.0 or later |
 | Primary language | English (U.S.) — the interface is in English only |
 
-## 1. Store text (draft — check before use)
+## 1. Store text
 
-Apple's limits are noted. Nothing here mentions Microsoft or Google sign-in. Those are not available in this build,
-so their buttons are hidden and the store text must not advertise them.
+Each field is a file in **[AppStoreConnect/metadata/en-US/](AppStoreConnect/metadata/en-US/)**. Paste the file's whole
+content into the App Store Connect field of the same name. Don't retype it.
 
-**Subtitle** (30 characters max): `Private email for your mailbox` (30)
+CI runs `scripts/check-store-metadata.py` on every change. It checks Apple's limits, that no placeholder is left,
+and that no field mentions Microsoft or Google sign-in. Those sign-ins are hidden in this build, so the store text
+must not advertise them.
 
-**Promotional text** (170 max, can be changed without a new build):
-> Connect the mailbox you already have. Encrypted connections only, passwords in the iOS Keychain, remote images blocked until you allow them — and no HCG account needed.
+| App Store Connect field | File | Length / limit |
+|---|---|---|
+| Name (App Information) | `name.txt` | 8 / 30 |
+| Subtitle (App Information) | `subtitle.txt` | 30 / 30 |
+| Promotional text (version page; can be changed without a new build) | `promotional_text.txt` | 168 / 170 |
+| Description (version page) | `description.txt` | 1,771 / 4,000 |
+| Keywords (version page) | `keywords.txt` | 88 / 100 |
+| Copyright (version page) | `copyright.txt` | confirm the exact legal entity name |
+| App Review notes (version page → App Review Information) | `review_notes.txt` | 576 / 4,000 |
 
-**Description** (4,000 max):
-> HCG Mail is a focused email client for the mailbox you already have. Connect any standard IMAP/SMTP account — for example your company's domain email — and read, write and organise your mail on iPhone and iPad.
->
-> PRIVATE BY DESIGN
-> • Encrypted connections only, with full certificate checks.
-> • Your password is stored in the iOS Keychain on your device.
-> • HCG Mail talks only to your own mail provider's servers. There is no HCG server, no analytics, no advertising and no tracking.
-> • Remote images in messages are blocked until you choose to load them, so senders can't see when you open their email.
-> • Links show their real destination before they open.
->
-> EVERYTHING YOU NEED FOR DAILY EMAIL
-> • Inbox, folders, drafts, sent mail, archive, spam and trash.
-> • Read HTML and plain-text messages, with a Readable view for hard-to-read layouts.
-> • Compose, reply, reply all and forward, with attachments.
-> • Flag, mark as read or unread, archive, move and delete.
-> • Search loaded messages, or search the whole folder on the server.
-> • Open and share attachments through the iOS share sheet; files that can run code are clearly marked.
->
-> MADE FOR IPHONE AND IPAD
-> • iPad split view, Slide Over and every orientation.
-> • Dynamic Type, VoiceOver labels and Reduce Motion are respected.
-> • Two looks: HCG Future (dark) and HCG Classic (light).
->
-> SET UP IN MINUTES
-> A step-by-step connection test checks the server name, network, encryption and sign-in for incoming and outgoing mail, and explains any problem in plain language. No HCG account or HCG Connect is required.
->
-> MAIL HEALTH
-> Check your domain's SPF, DKIM and DMARC records and see the history of what your outgoing server accepted.
->
-> HCG Mail checks for new mail when you open it or pull to refresh; it does not run in the background.
-
-Each claim above corresponds to a feature in this build: the iOS views, the shared mail engine, and the CI-verified
-privacy manifest. Remove any line you do not want to commit to.
-
-**Keywords** (100 characters max, comma-separated, no spaces):
-`email,mail,imap,smtp,inbox,secure,private,domain,business,dkim,spf,dmarc,client,keychain` (88 characters)
+Each claim in the description corresponds to a feature in this build: the iOS views, the shared mail engine, and the
+CI-verified privacy manifest. Remove any line you do not want to commit to.
 
 **Category:**
 * Primary: **Productivity**
@@ -74,14 +49,19 @@ privacy manifest. Remove any line you do not want to commit to.
 | Support URL (required) | **⟨HCG to supply⟩**. A page with a way to contact HCG. |
 | Marketing URL (optional) | **⟨HCG to supply⟩** or leave empty |
 
-**Copyright:** `© 2026 Hakmi Capital Group`. Confirm the exact legal entity name.
+**Copyright:** `copyright.txt` (`© 2026 Hakmi Capital Group`). Confirm the exact legal entity name.
 
 ## 2. Screenshots
 
 All screenshots must be real captures of HCG Mail.
 
-**Where they come from:** CI job **"App Store screenshots"** in `.github/workflows/ios.yml`, workflow artifact
-`app-store-screenshots`, kept for 90 days.
+**Where they come from:**
+* CI job **"App Store screenshots"** in `.github/workflows/ios.yml`, workflow artifact `app-store-screenshots`,
+  kept for 90 days.
+* The set to upload is from release-candidate run
+  [45068033617](https://github.com/F1r3srp3nt/HCG-Mail/actions/runs/45068033617).
+* The submission package has the same images with the unused alpha channel removed:
+  [AppStoreConnect/README.md](AppStoreConnect/README.md#screenshots).
 
 **How they are made:**
 * Simulators: the Debug build in preview mode, on **iPhone 17 Pro Max** (6.9″, 1320×2868) and **iPad Pro 13-inch
@@ -189,8 +169,7 @@ Demo account fields:
 * SMTP host, port 465 (SSL/TLS) or 587 (STARTTLS);
 * a few messages already in it, including one HTML message and one with an attachment, so the reviewer sees content.
 
-**Notes for the reviewer** (draft):
-> HCG Mail is an email client for an existing IMAP/SMTP mailbox; it has no sign-up and no HCG account. To review: tap *Add email account*, enter the test mailbox details below (or tap *Test connection* first to see the six-step check), then open the Inbox. You can read the sample messages, open the attachment, and send a message to the same test address. Remote images are blocked until *Load remote images* is tapped. Mail Health (in the mailbox list) shows the domain's SPF/DKIM/DMARC records. The app does not run in the background and sends no data to Hakmi Capital Group.
+**Notes for the reviewer:** `AppStoreConnect/metadata/en-US/review_notes.txt`. The demo mailbox goes in the separate sign-in fields, not in the notes.
 
 ## 7. Before *Submit for Review*: checklist
 

@@ -44,6 +44,8 @@ jobs:
           dotnet-version: '10.0.1xx'
       - name: Exactly one iOS application in the repository (hcg-apps.json and a project scan agree)
         run: python3 -I "iOS App Store Submission/scripts/verify-app-selection.py"
+      - name: App Store Connect text (Apple's limits, no placeholders, nothing this build does not offer)
+        run: python3 -I "iOS App Store Submission/scripts/check-store-metadata.py"
       - name: Build diagnostics (HCG001 for a lone iOS folder, HCG002 for the iOS app on Linux)
         run: |
           set +e

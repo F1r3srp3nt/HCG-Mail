@@ -127,6 +127,7 @@ scripts/run-simulator.sh --ipad --exclusive …   # shut down other booted simul
 Each stage (find, boot, install, launch, ready, screenshot) has a time limit and is logged as `HCG-SIM: <stage> …`.
 If one fails or runs out of time, the script prints the simulator's state, the CoreSimulator logs and the Mac's load
 and memory, stops what it started, and exits non-zero. The limits are in the comment at the top of the script.
+Why the simulators run one at a time, and how to reuse this in another HCG iOS project: [SIMULATOR_CI.md](SIMULATOR_CI.md).
 
 Equivalent raw commands:
 
@@ -159,19 +160,17 @@ owner; the tests and scripts never sign in to, or send from, a real account.
 
 ## Run on your own iPhone or iPad (development signing)
 
-1. In the Apple Developer account of Hakmi Capital Group, register the App ID **`com.hakmicapitalgroup.hcgmail`**
-   with the *Keychain Sharing* capability (used for the two Keychain groups in `Entitlements.plist`).
-   If HCG chooses another bundle identifier, change `HcgBundleId` in `HCG.Mail.iOS.csproj` **and** the
-   `msauth.…` URL scheme in `Info.plist`.
-2. Create an *Apple Development* certificate and a *Development* provisioning profile that includes your device;
-   install both on the Mac (Xcode → Settings → Accounts → Download Manual Profiles).
-3. Connect the device (Developer Mode on), then:
+Step by step, including the one-time Apple account setup: **[DEVICE_INSTALL.md](DEVICE_INSTALL.md)**.
 
 ```bash
-dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Debug -f net10.0-ios -r ios-arm64 \
-  -p:CodesignKey="Apple Development: <Name> (<TEAMID>)" -p:CodesignProvision="<profile name>" \
-  -t:Run
+scripts/install-device.sh --list                                    # paired devices, their UDIDs
+export HCG_IOS_DEV_IDENTITY="Apple Development: <Name> (<TEAMID>)"  # security find-identity -v -p codesigning
+export HCG_IOS_DEV_PROFILE="HCG Mail Development"                   # Development profile that includes the device
+scripts/install-device.sh                                           # build (Release), check, install, start
 ```
+
+Before building, the script checks the identity, the profile and that the device is in the profile. It then checks
+the signed app with `verify-ios-build.py` and installs it with `xcrun devicectl`, by cable or over Wi-Fi.
 
 ## Release IPA (TestFlight / App Store) — built, never uploaded
 
