@@ -91,7 +91,7 @@ What it does, and where it stops if something is wrong:
 4. **Check** (`verify-ios-build.py`), the same checks as the App Store build, except those that only apply to
    distribution:
    * bundle ID and build number;
-   * minimum iOS, iPhone + iPad, the iOS 26 SDK;
+   * minimum iOS, iPhone + iPad, the iOS 27 SDK and its scene manifest;
    * the compiled icon and the launch screen;
    * the privacy manifest;
    * a valid signature;
