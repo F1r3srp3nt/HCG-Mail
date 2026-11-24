@@ -76,7 +76,7 @@
       <TextBlock Text="{Binding FromWarning}" Classes="error" IsVisible="{Binding FromWarning, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="64,0,0,0" />
       <Grid ColumnDefinitions="Auto,*,Auto">
         <TextBlock Classes="fieldLabel" Text="To" />
-        <TextBox x:Name="ToBox" Grid.Column="1" Text="{Binding To}" Watermark="name@example.com, Name &lt;other@example.com&gt;" />
+        <TextBox x:Name="ToBox" Grid.Column="1" Text="{Binding To}" PlaceholderText="name@example.com, Name &lt;other@example.com&gt;" />
         <Button Grid.Column="2" Classes="link" Margin="12,0,2,0" Content="Cc / Bcc" Command="{Binding ToggleCcBccCommand}" VerticalAlignment="Center" />
       </Grid>
       <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding ShowCcBcc}">
@@ -85,7 +85,7 @@
       </Grid>
       <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding ShowCcBcc}">
         <TextBlock Classes="fieldLabel" Text="Bcc" />
-        <TextBox Grid.Column="1" Text="{Binding Bcc}" Watermark="Hidden from other recipients" />
+        <TextBox Grid.Column="1" Text="{Binding Bcc}" PlaceholderText="Hidden from other recipients" />
       </Grid>
       <Grid ColumnDefinitions="Auto,*">
         <TextBlock Classes="fieldLabel" Text="Subject" />
@@ -104,7 +104,7 @@
     <!-- Body -->
     <Border Grid.Row="2" Classes="card" Margin="20,8,20,10" BoxShadow="{DynamicResource Hcg.Shadow.None}" Padding="2">
       <TextBox x:Name="BodyBox" Classes="bare" Text="{Binding Body}" AcceptsReturn="True" AcceptsTab="False" TextWrapping="Wrap"
-               FontSize="14" Padding="16,14" VerticalContentAlignment="Top" Watermark="Write your message…" />
+               FontSize="14" Padding="16,14" VerticalContentAlignment="Top" PlaceholderText="Write your message…" />
     </Border>
 
     <!-- Attachments -->

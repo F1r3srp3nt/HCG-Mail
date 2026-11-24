@@ -64,8 +64,9 @@ All screenshots must be real captures of HCG Mail.
   [AppStoreConnect/README.md](AppStoreConnect/README.md#screenshots).
 
 **How they are made:**
-* Simulators: the Debug build in preview mode, on **iPhone 17 Pro Max** (6.9″, 1320×2868) and **iPad Pro 13-inch
-  (M5)** (2064×2752). These are the sizes App Store Connect requires for an app that runs on iPhone and iPad.
+* Simulators: the Debug build in preview mode, on the newest **iPhone Pro Max** simulator (6.9″; iPhone 18 Pro Max
+  with the iOS 27.2 runtime, iPhone 17 Pro Max before) and **iPad Pro 13-inch (M5)**. App Store Connect requires a
+  6.9″ iPhone size (1320×2868 or 1290×2796) and a 13″ iPad size (2064×2752 or 2048×2732); the job rejects others.
 * Screens: inbox, an open message, and the composer.
 * Status bar: Apple's standard clean status bar (9:41, full signal), set with `simctl status_bar`.
 * The job checks every image's pixel size.
@@ -73,7 +74,7 @@ All screenshots must be real captures of HCG Mail.
 **What they show:** the app's built-in **sample mailbox**, which is labelled "[Sample]" and has example senders.
 It is the real interface with demonstration content, not a mock-up. The composer screenshots show the on-screen
 keyboard, because the To field has focus, as it does when a user opens the composer. If you prefer more natural content, take the same
-three screens from the TestFlight build with your dedicated test mailbox: Side button + Volume Up on an iPhone 17 Pro
+three screens from the TestFlight build with your dedicated test mailbox: Side button + Volume Up on a 6.9″ iPhone Pro
 Max / iPad Pro 13″. Never use a real customer mailbox.
 
 **Upload order:**

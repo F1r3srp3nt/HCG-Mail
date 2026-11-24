@@ -52,29 +52,29 @@
           <TextBlock Classes="section" Text="YOUR DETAILS" Margin="2,18,0,8" />
           <StackPanel Classes="field">
             <TextBlock Classes="formLabel" Text="Email address" />
-            <TextBox x:Name="EmailBox" Text="{Binding EmailAddress}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" Watermark="you@yourdomain.no" Classes.invalid="{Binding EmailError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Email address" />
+            <TextBox x:Name="EmailBox" Text="{Binding EmailAddress}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" PlaceholderText="you@yourdomain.no" Classes.invalid="{Binding EmailError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Email address" />
             <TextBlock Classes="error" Text="{Binding EmailError}" TextWrapping="Wrap" IsVisible="{Binding EmailError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="2,4,0,0" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="formLabel" Text="Display name" />
-            <TextBox Text="{Binding DisplayName}" Watermark="Name shown to recipients" Classes.invalid="{Binding DisplayNameError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Display name" />
+            <TextBox Text="{Binding DisplayName}" PlaceholderText="Name shown to recipients" Classes.invalid="{Binding DisplayNameError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Display name" />
             <TextBlock Classes="error" Text="{Binding DisplayNameError}" TextWrapping="Wrap" IsVisible="{Binding DisplayNameError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="2,4,0,0" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="formLabel" Text="Username" />
-            <TextBox Text="{Binding Username}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" Watermark="Usually your full email address" Classes.invalid="{Binding UsernameError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Username" />
+            <TextBox Text="{Binding Username}" TextInputOptions.ContentType="Email" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" PlaceholderText="Usually your full email address" Classes.invalid="{Binding UsernameError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Username" />
             <TextBlock Classes="error" Text="{Binding UsernameError}" TextWrapping="Wrap" IsVisible="{Binding UsernameError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="2,4,0,0" />
           </StackPanel>
           <StackPanel Classes="field">
             <TextBlock Classes="formLabel" Text="Password" />
-            <TextBox x:Name="PasswordBox" Text="{Binding Password}" TextInputOptions.ContentType="Password" TextInputOptions.IsSensitive="True" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" Watermark="{Binding PasswordWatermark}" Classes.invalid="{Binding PasswordError, Converter={x:Static ObjectConverters.IsNotNull}}" PasswordChar="●" RevealPassword="False" AutomationProperties.Name="Password" />
+            <TextBox x:Name="PasswordBox" Text="{Binding Password}" TextInputOptions.ContentType="Password" TextInputOptions.IsSensitive="True" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" PlaceholderText="{Binding PasswordWatermark}" Classes.invalid="{Binding PasswordError, Converter={x:Static ObjectConverters.IsNotNull}}" PasswordChar="●" RevealPassword="False" AutomationProperties.Name="Password" />
             <TextBlock Classes="error" Text="{Binding PasswordError}" TextWrapping="Wrap" IsVisible="{Binding PasswordError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="2,4,0,0" />
           </StackPanel>
 
           <TextBlock Classes="section" Text="INCOMING MAIL (IMAP)" Margin="2,14,0,8" />
           <StackPanel Classes="field">
             <TextBlock Classes="formLabel" Text="Server" />
-            <TextBox Text="{Binding ImapHost}" TextInputOptions.ContentType="Url" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" Watermark="e.g. imap.yourprovider.no" Classes.invalid="{Binding ImapHostError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Server" />
+            <TextBox Text="{Binding ImapHost}" TextInputOptions.ContentType="Url" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" PlaceholderText="e.g. imap.yourprovider.no" Classes.invalid="{Binding ImapHostError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Server" />
             <TextBlock Classes="error" Text="{Binding ImapHostError}" TextWrapping="Wrap" IsVisible="{Binding ImapHostError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="2,4,0,0" />
           </StackPanel>
           <Grid ColumnDefinitions="110,12,*">
@@ -92,7 +92,7 @@
           <TextBlock Classes="section" Text="OUTGOING MAIL (SMTP)" Margin="2,14,0,8" />
           <StackPanel Classes="field">
             <TextBlock Classes="formLabel" Text="Server" />
-            <TextBox Text="{Binding SmtpHost}" TextInputOptions.ContentType="Url" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" Watermark="e.g. smtp.yourprovider.no" Classes.invalid="{Binding SmtpHostError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Server" />
+            <TextBox Text="{Binding SmtpHost}" TextInputOptions.ContentType="Url" TextInputOptions.AutoCapitalization="False" TextInputOptions.ShowSuggestions="False" PlaceholderText="e.g. smtp.yourprovider.no" Classes.invalid="{Binding SmtpHostError, Converter={x:Static ObjectConverters.IsNotNull}}" AutomationProperties.Name="Server" />
             <TextBlock Classes="error" Text="{Binding SmtpHostError}" TextWrapping="Wrap" IsVisible="{Binding SmtpHostError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="2,4,0,0" />
           </StackPanel>
           <Grid ColumnDefinitions="110,12,*">

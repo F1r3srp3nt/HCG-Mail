@@ -29,7 +29,8 @@ public partial class MobileShellView : UserControl
         InitializeComponent();
         Root.SizeChanged += (_, e) => _shell?.UpdateSize(e.NewSize.Width, e.NewSize.Height);
         // The host may already place this view inside part of the safe area (iOS: 62 pt measured on an iPhone 17 Pro
-        // with Avalonia 11.3, although the top level reports no padding); re-check where the view sits after layout.
+        // with Avalonia 11.3, although the top level reports no padding; Avalonia 12 draws edge to edge by default);
+        // re-check where the view sits after layout. The simulator self-test checks the result ("Safe area applied once").
         Root.LayoutUpdated += (_, _) => UpdateSafeArea();
         SidebarScrim.PointerPressed += (_, _) => _shell?.CloseSidebarCommand.Execute(null);
         KeyDown += OnKeyDown;

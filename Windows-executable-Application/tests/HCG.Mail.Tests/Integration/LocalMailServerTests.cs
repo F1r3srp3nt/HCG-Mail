@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using HCG.Mail.Core.Accounts;
 using HCG.Mail.Core.Addresses;
@@ -6,10 +7,10 @@ using HCG.Mail.Core.Compose;
 using HCG.Mail.Core.Errors;
 using HCG.Mail.Core.Mail;
 using HCG.Mail.Core.Services;
-using HCG.Mail.Email;
 using HCG.Mail.Email.Diagnostics;
 using HCG.Mail.Email.Html;
 using HCG.Mail.Email.Imap;
+using HCG.Mail.Email;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HCG.Mail.Tests.Integration;
@@ -20,7 +21,9 @@ namespace HCG.Mail.Tests.Integration;
 /// </summary>
 public sealed class LocalMailServerFactAttribute : FactAttribute
 {
-    public LocalMailServerFactAttribute()
+    // xUnit v3 reports where a test is declared through these caller-info parameters.
+    public LocalMailServerFactAttribute([CallerFilePath] string? sourceFilePath = null, [CallerLineNumber] int sourceLineNumber = -1)
+        : base(sourceFilePath, sourceLineNumber)
     {
         if (Environment.GetEnvironmentVariable("HCG_MAIL_E2E") != "1")
             Skip = "Set HCG_MAIL_E2E=1 and start tests/integration-server/setup-local-mail-server.sh to run end-to-end tests.";

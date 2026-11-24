@@ -195,13 +195,7 @@ def run_app_checks(r, app, args):
         good = version_tuple(sdk_version) >= version_tuple(required_sdk)
         r.expect(good, "SDK", f"{sdk_name} (App Store minimum: iOS {required_sdk} SDK), Xcode build {info.get('DTXcode', '?')} ({info.get('DTXcodeBuild', '?')})",
                  f"{sdk_name} — App Store Connect requires the iOS {required_sdk} SDK or later")
-        # Apps built with the iOS 27 SDK or later must use the UIScene life cycle or iOS stops them at launch (TN3187).
-        # Avalonia 11 (the UI framework) has no scene support; Avalonia 12 adds it.
-        if version_tuple(sdk_version) >= (27,):
-            r.expect("UIApplicationSceneManifest" in info, "scene life cycle",
-                     "UIApplicationSceneManifest present (required from the iOS 27 SDK)",
-                     f"built with {sdk_name} without UIApplicationSceneManifest — iOS would not launch it. Build with the "
-                     f"Xcode {toolchain('HcgRequiredXcode')} SDK (toolchain.props) until the app adopts UIScene")
+        check_scene_manifest(r, info, sdk_name, version_tuple(sdk_version) >= (27,))
     else:
         (r.fail if kind == "device" else r.warn)("SDK", "DTSDKName missing from Info.plist")
 
@@ -266,6 +260,33 @@ def run_app_checks(r, app, args):
     check_signature(r, app, kind, args.app_store)
     print("Result:", "OK" if r.failed == 0 else f"{r.failed} check(s) failed")
     return 1 if r.failed else 0
+
+
+def check_scene_manifest(r, info, sdk_name, required):
+    """UIScene life cycle. Apps built with the iOS 27 SDK or later must adopt it or iOS stops them at launch (TN3187).
+    HCG Mail adopts it through Avalonia 12: AvaloniaAppDelegate returns its own scene configuration (with the scene
+    delegate that creates the window) and ignores sessions whose configuration has a name, so the manifest must name
+    none; the single-view lifetime has one view, so the app supports one scene."""
+    manifest = info.get("UIApplicationSceneManifest")
+    if manifest is None:
+        (r.fail if required else r.warn)(
+            "scene life cycle", f"built with {sdk_name or 'an unknown SDK'} without UIApplicationSceneManifest — "
+            + ("iOS would not launch it (TN3187). " if required else "")
+            + "src/HCG.Mail.iOS/Info.plist declares it; the build did not carry it over")
+        return
+    if not isinstance(manifest, dict):
+        r.fail("scene life cycle", f"UIApplicationSceneManifest is a {type(manifest).__name__}, not a dictionary")
+        return
+    named = [c.get("UISceneConfigurationName") for configs in manifest.get("UISceneConfigurations", {}).values()
+             for c in configs if c.get("UISceneConfigurationName")]
+    problems = []
+    if manifest.get("UIApplicationSupportsMultipleScenes") is not False:
+        problems.append("UIApplicationSupportsMultipleScenes must be false (one window: Avalonia's single-view lifetime)")
+    if named:
+        problems.append(f"named scene configurations {named} — Avalonia's scene delegate ignores them and no window appears")
+    r.expect(not problems, "scene life cycle",
+             "UIApplicationSceneManifest: one scene, configuration from AvaloniaAppDelegate"
+             + (" (required from the iOS 27 SDK)" if required else ""), "; ".join(problems))
 
 
 def entitlements_of(app):

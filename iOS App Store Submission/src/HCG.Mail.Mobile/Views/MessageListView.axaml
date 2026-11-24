@@ -61,7 +61,7 @@
 
       <!-- Search -->
       <TextBox Grid.Row="1" x:Name="SearchBox" Margin="12,10,12,6" Text="{Binding Mail.MessageList.SearchText}"
-               Watermark="Search loaded messages" AutomationProperties.Name="Search"
+               PlaceholderText="Search loaded messages" AutomationProperties.Name="Search"
                IsEnabled="{Binding Mail.MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
         <TextBox.KeyBindings>
           <KeyBinding Gesture="Enter" Command="{Binding Mail.MessageList.SearchServerCommand}" />

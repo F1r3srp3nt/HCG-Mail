@@ -34,6 +34,16 @@
 	</array>
 	<key>UIRequiresFullScreen</key>
 	<false/>
+	<!-- UIScene life cycle, required for apps built with the iOS 27 SDK (Apple TN3187). Avalonia's AvaloniaAppDelegate
+	     answers application:configurationForConnectingSceneSession:options: with its own scene delegate
+	     (AvaloniaSceneDelegate, which creates the window), so no UISceneConfigurations are listed here: Avalonia
+	     ignores sessions whose configuration has a name. One window only: the single-view lifetime has one view, and a
+	     second iPad window would take it from the first. scripts/verify-ios-build.py checks all of this. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+	</dict>
 	<!-- Microsoft sign-in redirect (msauth.<bundle id>://auth). Must match the bundle identifier and the redirect URI
 	     registered in Microsoft Entra. Without a client ID in the build, Microsoft sign-in is shown as "not set up". -->
 	<key>CFBundleURLTypes</key>

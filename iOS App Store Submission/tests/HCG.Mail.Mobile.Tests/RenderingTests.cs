@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Headless;
 using Avalonia.Media.Imaging;
 using HCG.Mail.App.Services;
 using HCG.Mail.App.ViewModels;
@@ -89,7 +89,7 @@ public sealed class RenderingTests
                 if (!string.IsNullOrEmpty(dir) && mode == ReaderBodyMode.Original)
                 {
                     Directory.CreateDirectory(dir);
-                    window.CaptureRenderedFrame()!.Save(Path.Combine(dir, $"mobile-render-{name}.png"));
+                    window.CaptureRenderedFrame()!.Save(Path.Combine(dir, $"mobile-render-{name}.png"), PngBitmapEncoderOptions.Default);
                 }
                 var state = reader.ShowHtmlView ? "html" : reader.ShowTextView ? "text" : reader.IsEmptyMessage ? "empty" : "NOTHING";
                 if (state == "html" && body.Html.Bounds.Height < 10)

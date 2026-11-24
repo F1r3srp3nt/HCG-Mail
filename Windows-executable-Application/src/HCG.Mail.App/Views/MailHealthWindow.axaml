@@ -107,7 +107,7 @@
                            Text="These checks read your domain's public DNS records and this computer's send history. HCG Mail cannot change DNS records or your provider's sending servers, and it does not estimate deliverability scores or inbox placement. Each result is Verified, Warning, Failed or Not tested." />
                 <Grid ColumnDefinitions="Auto,*">
                   <TextBlock Text="DKIM selector(s)" VerticalAlignment="Center" Margin="0,0,12,0" />
-                  <TextBox Grid.Column="1" Text="{Binding DkimSelectors}" Watermark="Found automatically when you analyze a received message, or enter the selector from your provider" />
+                  <TextBox Grid.Column="1" Text="{Binding DkimSelectors}" PlaceholderText="Found automatically when you analyze a received message, or enter the selector from your provider" />
                 </Grid>
               </StackPanel>
             </Border>
@@ -145,7 +145,7 @@
                 <TextBlock Classes="detail"
                            Text="Send a message from HCG Mail to a Gmail or Outlook.com address you own. Open it there and copy the original message — Gmail: ⋮ → Show original → Copy to clipboard (or Download original); Outlook.com: … → View → View message source; Apple Mail: View → Message → Raw Source. Paste it below or open the saved .eml file. The recipient's own SPF, DKIM and DMARC results are shown as recorded; nothing is uploaded anywhere." />
                 <TextBox x:Name="RawMessageBox" Text="{Binding RawMessage}" AcceptsReturn="True" TextWrapping="NoWrap" Height="180"
-                         FontFamily="Menlo, Consolas, monospace" FontSize="12" Watermark="Paste the original message (headers) here" />
+                         FontFamily="Menlo, Consolas, monospace" FontSize="12" PlaceholderText="Paste the original message (headers) here" />
                 <StackPanel Orientation="Horizontal" Spacing="10">
                   <Button Classes="primary" Content="Analyze" Command="{Binding AnalyzeCommand}" />
                   <Button Classes="toolbar" Content="Open .eml file…" Command="{Binding OpenMessageFileCommand}" />

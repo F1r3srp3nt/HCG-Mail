@@ -10,7 +10,6 @@
         Width="1380" Height="880" MinWidth="1000" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="PreferSystemChrome"
         ExtendClientAreaTitleBarHeightHint="38">
 
   <Window.KeyBindings>

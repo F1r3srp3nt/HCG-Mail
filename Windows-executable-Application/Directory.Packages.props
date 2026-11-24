@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <AvaloniaVersion>11.3.22</AvaloniaVersion>
+    <AvaloniaVersion>12.2.0</AvaloniaVersion>
     <MicrosoftExtensionsVersion>10.0.14</MicrosoftExtensionsVersion>
   </PropertyGroup>
   <ItemGroup Label="UI">
@@ -11,7 +11,7 @@
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
     <PackageVersion Include="Avalonia.Headless.XUnit" Version="$(AvaloniaVersion)" />
-    <PackageVersion Include="Avalonia.HtmlRenderer" Version="11.3.0" />
+    <PackageVersion Include="Avalonia.HtmlRenderer" Version="12.0.0" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
   <ItemGroup Label="Mail">
@@ -30,7 +30,7 @@
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
-    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="NSubstitute" Version="5.3.0" />
   </ItemGroup>
