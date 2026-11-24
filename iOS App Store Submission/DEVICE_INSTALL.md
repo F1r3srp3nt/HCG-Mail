@@ -52,31 +52,29 @@ Start with **A**. It gets the app working on your iPhone today, and nothing leav
    scripts/install-device.sh --list
    ```
 
-## 3. Apple Developer account, once
+## 3. Signing, once: let Xcode create it
 
-Use HCG's team on <https://developer.apple.com/account>. Never commit certificates, profiles or their passwords.
+You need an Apple Development certificate and a development profile for `com.hakmicapitalgroup.hcgmail` that
+includes this iPhone. Xcode creates both:
 
-1. **App ID:** Identifiers → `com.hakmicapitalgroup.hcgmail`, with **Keychain Sharing** enabled. It is the same App
-   ID as for the App Store; create it once.
-2. **Device:** Devices → **+** → the iPhone's name and the UDID from `--list`.
-3. **Apple Development certificate:**
-   * Xcode › Settings › Accounts → HCG's team → Manage Certificates → **+** → *Apple Development*.
-   * The private key is created in your login keychain.
-   * Check with `security find-identity -v -p codesigning`. It lists `"Apple Development: <Your Name> (<TEAMID>)"`.
-4. **Development profile:**
-   * Profiles → **+** → *iOS App Development*.
-   * App ID `com.hakmicapitalgroup.hcgmail`, the certificate from step 3, and the iPhone.
-   * Name it **`HCG Mail Development`**.
-   * Install it: Xcode › Settings › Accounts → *Download Manual Profiles*, or double-click the downloaded file.
-   * Add another device later by editing the profile and downloading it again.
+1. Xcode › Settings › Accounts: sign in with the Apple ID of HCG's developer team.
+2. Xcode › File › New › Project › iOS › **App**:
+   * Product Name `hcgmail`;
+   * Organization Identifier `com.hakmicapitalgroup`, so the Bundle Identifier reads exactly
+     `com.hakmicapitalgroup.hcgmail`;
+   * Team: HCG's team.
+3. Pick your iPhone as the run destination at the top of the window and press **Run** (⌘R). Xcode registers the
+   iPhone and creates the certificate and profile (*Automatically manage signing*). Close that project; it is only
+   needed this once.
+
+`install-device.sh` then finds the certificate and profile by itself. If it cannot, it says why: no certificate,
+the profile does not include this iPhone, it has expired, or it was made for another certificate.
 
 ## 4. Build, check, install and start
 
 ```bash
 cd "HCG-Mail/iOS App Store Submission"
-export HCG_IOS_DEV_IDENTITY="Apple Development: <Your Name> (<TEAMID>)"   # exactly as find-identity prints it
-export HCG_IOS_DEV_PROFILE="HCG Mail Development"
-scripts/install-device.sh                      # the one connected iPhone; or: scripts/install-device.sh "<name or UDID>"
+scripts/install-device.sh        # the one connected iPhone; or: scripts/install-device.sh "<name or UDID>"
 ```
 
 What it does, and where it stops if something is wrong:
@@ -84,7 +82,8 @@ What it does, and where it stops if something is wrong:
 1. **Device:**
    * It must be paired and run iOS 16.0 or later.
    * Without a name, the only connected device is used.
-2. **Signing setup, before building:**
+2. **Signing setup, before building:** it finds your Apple Development certificate and a profile that includes this
+   iPhone, then checks that:
    * the identity is in the keychain with its private key;
    * the profile is for `<TEAMID>.com.hakmicapitalgroup.hcgmail`, from the same team, not expired, allows the
      Keychain group, and contains your certificate;
@@ -139,8 +138,8 @@ The full 14-area plan, which is also what TestFlight testers follow, is **[TESTF
 | Message | Cause and fix |
 |---|---|
 | `the device is not paired with this Mac` | Connect it by cable, unlock it, tap **Trust**. |
-| `FAIL device in profile` | The UDID is not in the profile. Add the device in the developer account (Devices), edit the profile to include it, download it again. |
-| `FAIL identity` / `certificate` | The certificate's private key is not on this Mac, or the profile was made for another certificate. Create the certificate on this Mac (§3.3) and regenerate the profile with it. |
+| `no usable development profile … does not include this device` | Run the throwaway Xcode project once more on this iPhone (§3). Xcode adds the device to the profile. |
+| `no Apple Development certificate` / `made for another certificate` | The certificate's private key is not on this Mac. Run §3 on this Mac; Xcode creates a certificate here and a matching profile. |
 | `error: … requires Xcode 26.3` | Select Xcode 26.3 (§1.1). |
 | Install fails: *Developer Mode disabled* | §2.3. |
 | Install fails: *unable to verify app* / *untrusted* | Trust the developer profile on the phone (§4). Check the phone's date and time are set automatically. |

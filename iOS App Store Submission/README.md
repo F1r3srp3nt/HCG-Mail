@@ -163,13 +163,12 @@ owner; the tests and scripts never sign in to, or send from, a real account.
 Step by step, including the one-time Apple account setup: **[DEVICE_INSTALL.md](DEVICE_INSTALL.md)**.
 
 ```bash
-scripts/install-device.sh --list                                    # paired devices, their UDIDs
-export HCG_IOS_DEV_IDENTITY="Apple Development: <Name> (<TEAMID>)"  # security find-identity -v -p codesigning
-export HCG_IOS_DEV_PROFILE="HCG Mail Development"                   # Development profile that includes the device
-scripts/install-device.sh                                           # build (Release), check, install, start
+scripts/install-device.sh --list    # paired devices
+scripts/install-device.sh           # build (Release), check, install and start on the connected iPhone
 ```
 
-Before building, the script checks the identity, the profile and that the device is in the profile. It then checks
+Before building, the script finds your Apple Development certificate and a development profile that includes the
+device. If there is none, it says how to let Xcode create them. It then checks
 the signed app with `verify-ios-build.py` and installs it with `xcrun devicectl`, by cable or over Wi-Fi.
 
 ## Release IPA (TestFlight / App Store) — built, never uploaded

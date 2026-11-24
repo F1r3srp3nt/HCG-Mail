@@ -7,10 +7,11 @@
 #   scripts/install-device.sh "Yasin's iPhone"       … on this device (name, UDID or identifier from --list)
 #   scripts/install-device.sh --no-build …           install the last build again (artifacts/ios/device-signed/<config>)
 #
-# Required (from your Apple Developer account; never commit them):
+# Signing is found automatically: the Apple Development certificate in your keychain and an installed development
+# profile for com.hakmicapitalgroup.hcgmail that includes this device (scripts/find-dev-signing.py). If there is
+# none, the script says how to let Xcode create them (once, two minutes). To choose explicitly instead:
 #   HCG_IOS_DEV_IDENTITY   "Apple Development: <Name> (<TEAMID>)"   (security find-identity -v -p codesigning)
-#   HCG_IOS_DEV_PROFILE    name, UUID or path of a *Development* profile for com.hakmicapitalgroup.hcgmail that
-#                          includes this device's UDID
+#   HCG_IOS_DEV_PROFILE    name, UUID or path of the development profile
 # Optional:
 #   HCG_IOS_CONFIGURATION  Release (default: the AOT configuration that ships) or Debug (faster to build)
 #   HCG_IOS_BUILD_NUMBER   CFBundleVersion (default 1)
@@ -77,31 +78,22 @@ fi
 
 # --- signing setup (before a 10-minute build) ----------------------------------------------------------------------
 if [[ $BUILD -eq 1 ]]; then
-  : "${HCG_IOS_DEV_IDENTITY:?set HCG_IOS_DEV_IDENTITY (see the comment at the top of this script)}"
-  : "${HCG_IOS_DEV_PROFILE:?set HCG_IOS_DEV_PROFILE (see the comment at the top of this script)}"
-  step "Signing setup: identity and profile"
+  step "Signing: development certificate and a profile that includes $DEV_NAME"
+  if ! found="$(security find-identity -v -p codesigning | python3 -I "$IOS_ROOT/scripts/find-dev-signing.py" "$BUNDLE_ID" "$DEV_UDID")"; then
+    echo >&2
+    echo "Let Xcode create them (once, about two minutes):" >&2
+    echo "  1. Xcode > Settings > Accounts: sign in with the Apple ID of your developer team." >&2
+    echo "  2. Xcode > File > New > Project > iOS > App. Organization Identifier: com.hakmicapitalgroup," >&2
+    echo "     Product Name: hcgmail (so the Bundle Identifier reads exactly $BUNDLE_ID); Team: your team." >&2
+    echo "  3. Choose $DEV_NAME as the run destination and press Run (Cmd-R). Xcode registers the iPhone and creates" >&2
+    echo "     the certificate and the profile. Close that project and run this script again." >&2
+    exit 1
+  fi
+  HCG_IOS_DEV_IDENTITY="$(sed -n 1p <<<"$found")"
+  HCG_IOS_DEV_PROFILE="$(sed -n 2p <<<"$found")"
+  echo "  identity: $HCG_IOS_DEV_IDENTITY"
+  echo "  profile:  $(sed -n 3p <<<"$found") ($HCG_IOS_DEV_PROFILE), includes $DEV_NAME"
   "${VERIFY[@]}" profile --profile "$HCG_IOS_DEV_PROFILE" --identity "$HCG_IOS_DEV_IDENTITY"
-  # The profile must list this device, or iOS refuses to install the app ("unable to verify app").
-  python3 -I - "$HCG_IOS_DEV_PROFILE" "$DEV_UDID" <<'PY'
-import pathlib, plistlib, subprocess, sys
-want, udid = sys.argv[1], sys.argv[2]
-dirs = [pathlib.Path.home() / "Library/MobileDevice/Provisioning Profiles",
-        pathlib.Path.home() / "Library/Developer/Xcode/UserData/Provisioning Profiles"]
-files = [pathlib.Path(want).expanduser()] if pathlib.Path(want).expanduser().is_file() else \
-        [f for d in dirs if d.is_dir() for f in sorted(d.glob("*.mobileprovision"))]
-for f in files:
-    p = plistlib.loads(subprocess.run(["security", "cms", "-D", "-i", str(f)], capture_output=True).stdout or b"<plist><dict/></plist>")
-    if want in (p.get("Name"), p.get("UUID")) or f == pathlib.Path(want).expanduser():
-        devices = p.get("ProvisionedDevices") or []
-        if udid in devices or p.get("ProvisionsAllDevices"):
-            print(f"  OK    device in profile  {udid}")
-            sys.exit(0)
-        print(f"  FAIL  device in profile  {udid} is not in \"{p.get('Name')}\" ({len(devices)} device(s)). Register the "
-              "device in the developer account (Devices → +), add it to this Development profile, download the profile again.")
-        sys.exit(1)
-print(f"  FAIL  device in profile  profile \"{want}\" not found")
-sys.exit(1)
-PY
 fi
 
 # --- build ---------------------------------------------------------------------------------------------------------

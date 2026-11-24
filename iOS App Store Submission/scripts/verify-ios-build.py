@@ -113,7 +113,7 @@ def check_profile(r, profile, team, app_store, label):
         r.expect(profile_team == team, f"{label} team", profile_team, f"profile team {profile_team}, identity team {team}")
     expires = profile.get("ExpirationDate")
     if isinstance(expires, datetime.datetime):
-        now = datetime.datetime.now(expires.tzinfo) if expires.tzinfo else datetime.datetime.utcnow()
+        now = datetime.datetime.now(expires.tzinfo) if expires.tzinfo else datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         days = (expires - now).days
         if days < 0:
             r.fail(f"{label} expiry", f"expired on {expires:%Y-%m-%d} — download or regenerate it in the developer account")
