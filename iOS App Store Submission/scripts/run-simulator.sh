@@ -189,7 +189,13 @@ export SIMCTL_CHILD_HCG_MAIL_PREVIEW_SCREEN="$SCREEN"
 
 take_screenshot() {
   stage screenshot "$SHOT_TIMEOUT"
-  bounded xcrun simctl io "$UDID" screenshot "$SHOT" || fail $? "$SHOT"
+  # On an overloaded machine `simctl io screenshot` occasionally stalls (CI run 45298799853, load average 586): one
+  # fresh attempt before failing.
+  if ! bounded xcrun simctl io "$UDID" screenshot "$SHOT"; then
+    echo "[$(now)] HCG-SIM: screenshot did not finish; one more attempt"
+    stage screenshot-retry "$SHOT_TIMEOUT"
+    bounded xcrun simctl io "$UDID" screenshot "$SHOT" || fail $? "$SHOT"
+  fi
   stage_done
   echo "Screenshot: $SHOT"
 }

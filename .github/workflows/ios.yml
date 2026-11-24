@@ -143,6 +143,9 @@ jobs:
         env:
           HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
         run: |
+          # Simulator.app (opened by the Xcode launch step) is not needed for screenshots; its window rendering
+          # competes with the capture on a loaded runner.
+          osascript -e 'quit app "Simulator"' 2>/dev/null || killall Simulator 2>/dev/null || true
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" \
             scripts/run-simulator.sh --exclusive --preview --screen inbox --screenshot ../artifacts/ios-screenshots/iphone.png
       - name: Screenshot in preview mode on iPad (the app reports the inbox is open)
