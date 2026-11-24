@@ -1,0 +1,29 @@
+HCG Mail is a focused email client for the mailbox you already have. Connect any standard IMAP/SMTP account — for example your company's domain email — and read, write and organise your mail on iPhone and iPad.
+
+PRIVATE BY DESIGN
+• Encrypted connections only, with full certificate checks.
+• Your password is stored in the iOS Keychain on your device.
+• HCG Mail talks only to your own mail provider's servers. There is no HCG server, no analytics, no advertising and no tracking.
+• Remote images in messages are blocked until you choose to load them, so senders can't see when you open their email.
+• Links show their real destination before they open.
+
+EVERYTHING YOU NEED FOR DAILY EMAIL
+• Inbox, folders, drafts, sent mail, archive, spam and trash.
+• Read HTML and plain-text messages, with a Readable view for hard-to-read layouts.
+• Compose, reply, reply all and forward, with attachments.
+• Flag, mark as read or unread, archive, move and delete.
+• Search loaded messages, or search the whole folder on the server.
+• Open and share attachments through the iOS share sheet; files that can run code are clearly marked.
+
+MADE FOR IPHONE AND IPAD
+• iPad split view, Slide Over and every orientation.
+• Dynamic Type, VoiceOver labels and Reduce Motion are respected.
+• Two looks: HCG Future (dark) and HCG Classic (light).
+
+SET UP IN MINUTES
+A step-by-step connection test checks the server name, network, encryption and sign-in for incoming and outgoing mail, and explains any problem in plain language. No HCG account or HCG Connect is required.
+
+MAIL HEALTH
+Check your domain's SPF, DKIM and DMARC records and see the history of what your outgoing server accepted.
+
+HCG Mail checks for new mail when you open it or pull to refresh; it does not run in the background.

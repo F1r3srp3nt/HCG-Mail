@@ -19,6 +19,28 @@ happen; do not mark a step as passed before it has been done on a physical devic
     and an image attached.
 * **Record:** device, OS version, result (✅ / ❌ / ⚠️), and notes or a screenshot for anything unexpected.
 
+## On each physical device, before the test cases
+
+You do the upload and the TestFlight distribution yourself. Nothing in this repository does them.
+
+- [ ] **Build in TestFlight:** App Store Connect → TestFlight shows **0.1.0 (1)**, *Ready to Test*, with export
+      compliance answered.
+- [ ] **Same binary as checked:** its SHA-256 matches `artifacts/ios/ipa/HCGMail.iOS.ipa.sha256` from your
+      `export-ipa.sh` run.
+- [ ] **Tester access:** the tester is in an internal group that has this build, with the *App Manager*,
+      *Developer* or *Admin* role.
+- [ ] **TestFlight app:** installed on the iPhone/iPad from the App Store, signed in with the tester's Apple ID, and
+      the invitation e-mail accepted.
+- [ ] **Old copies removed:** any development build of HCG Mail (from `install-device.sh`, DEVICE_INSTALL.md) is
+      deleted. Otherwise the TestFlight install may fail with a signature mismatch, and you could test the wrong
+      binary.
+- [ ] **Install:** TestFlight → HCG Mail → **Install**. Confirm the version shown is 0.1.0 (1).
+- [ ] **Record:** device model, iOS version, and whether a **real SIM or Wi-Fi only**. Test at least once on
+      cellular data.
+- [ ] **Test mailboxes:** two are ready (see *Setup*), and their passwords are in your password manager, not in
+      notes on the device.
+- [ ] **Not on the device:** Developer Mode is **not** needed for TestFlight. If it is on, testing is still valid.
+
 ## Test cases
 
 | # | Area | Steps | Expected result | iPhone | iPad |
