@@ -22,6 +22,12 @@ public partial class AppDelegate : AvaloniaAppDelegate<MobileApp>
         var platform = new IosPlatform();
         MobileApp.Platform = platform;
         MobileApp.Mode = new AppMode(IsPreview: PreviewRequested());
+#if DEBUG
+        MobileApp.PreviewScreen = Environment.GetEnvironmentVariable("HCG_MAIL_PREVIEW_SCREEN");
+        // Tells scripts/run-simulator.sh that the app has started (a launch with --console-pty prints no process ID).
+        if (MobileApp.PreviewScreen is { Length: > 0 } previewScreen)
+            Console.WriteLine($"HCG-PREVIEW: started {previewScreen}");
+#endif
         return base.CustomizeAppBuilder(builder)
             .WithInterFont()
             .AfterSetup((Action<AppBuilder>)(_ready =>

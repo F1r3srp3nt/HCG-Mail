@@ -59,11 +59,11 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
             <Button Classes="primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add email account" Command="{Binding AddAccountCommand}" />
-            <Button Classes="subtle" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add Microsoft account" Command="{Binding AddMicrosoftAccountCommand}" />
-            <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding MicrosoftSignInStatus}" />
+            <Button x:Name="AddMicrosoftAccountButton" Classes="subtle" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Add Microsoft account"
+                    Command="{Binding AddMicrosoftAccountCommand}" IsVisible="{Binding ShowMicrosoftSignIn}" />
             <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding CredentialStorage, StringFormat='Passwords of IMAP accounts are stored in: {0}'}" />
             <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="Removing an account disconnects it and deletes its password or Microsoft sign-in and its send history from this device. Mail on the server is never deleted." />
+                       Text="Removing an account disconnects it and deletes its password or sign-in and its send history from this device. Mail on the server is never deleted." />
           </StackPanel>
 
           <!-- Checking for mail -->
@@ -133,7 +133,8 @@
             <Border Classes="group">
               <StackPanel Spacing="8">
                 <TextBlock Text="HCG Mail" FontWeight="SemiBold" FontSize="16" />
-                <TextBlock Classes="caption" TextWrapping="Wrap" Text="An independent email client in the Hakmi Capital Group ecosystem. Works with standard IMAP/SMTP mailboxes and Microsoft accounts; no HCG account or HCG Connect is required." />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="An independent email client in the Hakmi Capital Group ecosystem. Works with standard IMAP/SMTP mailboxes; no HCG account or HCG Connect is required." />
+                <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding ShowMicrosoftSignIn}" Text="Microsoft accounts (Outlook.com, Hotmail, Microsoft 365) can be added with Microsoft sign-in." />
                 <TextBlock Classes="formLabel" Text="Version" Margin="0,4,0,0" />
                 <SelectableTextBlock x:Name="VersionText" Text="{Binding Version}" TextWrapping="Wrap" />
                 <TextBlock Classes="formLabel" Text="Device and runtime" />
@@ -144,7 +145,7 @@
                 <TextBlock Classes="formLabel" Text="App data (settings, account list, logs — no mail content)" TextWrapping="Wrap" />
                 <SelectableTextBlock Text="{Binding DataDirectory}" TextWrapping="Wrap" Classes="caption" />
                 <TextBlock Classes="formLabel" Text="Privacy" />
-                <TextBlock TextWrapping="Wrap" Classes="caption" Text="No telemetry, analytics or advertising. Credentials and messages are exchanged only with your own mail servers (and Microsoft for Microsoft accounts). Message bodies are not stored on the device." />
+                <TextBlock TextWrapping="Wrap" Classes="caption" Text="No telemetry, analytics or advertising. Credentials and messages are exchanged only with the servers of your own mail provider. Message bodies are not stored on the device." />
               </StackPanel>
             </Border>
             <TextBlock Classes="caption" TextWrapping="Wrap" Text="Connection diagnostics: open an account with Edit and test and tap Test connection, or use Mail Health in the mailbox list for sending and DNS checks." />

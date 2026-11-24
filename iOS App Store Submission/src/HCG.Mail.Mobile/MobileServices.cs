@@ -96,6 +96,9 @@ public static class MobileServices
         services.AddSingleton<IHtmlToTextConverter, HtmlToTextConverter>();
         services.AddSingleton<IHtmlSanitizer, MailHtmlSanitizer>();
 
+        // A store release offers only sign-in providers that are configured in this build (Microsoft needs a client ID;
+        // Google has no iOS client yet). Their implementation stays in place for later activation.
+        services.AddSingleton(new SignInPresentation(OfferUnconfiguredProviders: false));
         services.AddSingleton<AppSettingsService>();
         services.AddSingleton<ThemeService>();
         services.AddSingleton<MobileOverlays>();

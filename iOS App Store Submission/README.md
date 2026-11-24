@@ -119,8 +119,14 @@ scripts/run-simulator.sh                   # install and start on the newest iPh
 scripts/run-simulator.sh --ipad            # … on an iPad simulator
 scripts/run-simulator.sh "iPhone 17 Pro"   # … on a named simulator (xcrun simctl list devices)
 scripts/run-simulator.sh --self-test       # Keychain round trip, sandbox, sanitizer, configuration → PASS/FAIL
-scripts/run-simulator.sh --preview --screenshot iphone.png   # Debug only: sample mailbox, no network
+scripts/run-simulator.sh --preview --screen inbox --screenshot iphone.png   # Debug only: sample mailbox, no network;
+                                           # waits until the app reports the screen is open (also reader, compose)
+scripts/run-simulator.sh --ipad --exclusive …   # shut down other booted simulators first
 ```
+
+Each stage (find, boot, install, launch, ready, screenshot) has a time limit and is logged as `HCG-SIM: <stage> …`.
+If one fails or runs out of time, the script prints the simulator's state, the CoreSimulator logs and the Mac's load
+and memory, stops what it started, and exits non-zero. The limits are in the comment at the top of the script.
 
 Equivalent raw commands:
 

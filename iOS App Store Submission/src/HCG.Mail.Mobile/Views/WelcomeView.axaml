@@ -19,7 +19,7 @@
       <Rectangle Height="1" Fill="{DynamicResource Hcg.Brush.AccentLine}" />
       <TextBlock Classes="largeTitle" Text="Welcome to HCG Mail" TextWrapping="Wrap" />
       <TextBlock Classes="body" Foreground="{DynamicResource Hcg.Text.Secondary}"
-                 Text="Connect your existing email account with IMAP and SMTP — for example domain email such as Domene.no — or sign in with a Microsoft account (Outlook.com, Hotmail, Microsoft 365). No HCG account is required." />
+                 Text="Connect your existing email account with IMAP and SMTP — for example domain email such as Domene.no. No HCG account is required." />
       <Grid ColumnDefinitions="Auto,*">
         <controls:IconView Data="{StaticResource Icon.Shield}" Width="18" Height="18" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Top" />
         <TextBlock Grid.Column="1" Classes="caption" FontSize="14" TextWrapping="Wrap" Margin="10,0,0,0"
@@ -31,9 +31,10 @@
           <TextBlock Text="Add email account" VerticalAlignment="Center" FontSize="16" />
         </StackPanel>
       </Button>
+      <!-- Offered only once Microsoft sign-in is configured in the build (SignInPresentation, MobileServices). -->
       <Button x:Name="AddMicrosoftAccountButton" Classes="subtle" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-              Command="{Binding Mail.AddMicrosoftAccountCommand}" Content="Add Microsoft account" />
-      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding Mail.MicrosoftSignInStatus}" />
+              Command="{Binding Mail.AddMicrosoftAccountCommand}" Content="Add Microsoft account (Outlook.com, Microsoft 365)"
+              IsVisible="{Binding Mail.ShowMicrosoftSignIn}" />
       <Button Classes="link" HorizontalAlignment="Center" Content="Settings" Command="{Binding Mail.OpenSettingsCommand}" />
     </StackPanel>
   </ScrollViewer>

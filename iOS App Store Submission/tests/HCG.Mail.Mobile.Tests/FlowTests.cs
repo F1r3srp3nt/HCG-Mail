@@ -5,6 +5,7 @@ using HCG.Mail.Core.Compose;
 using HCG.Mail.Core.Mail;
 using HCG.Mail.Mobile.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace HCG.Mail.Mobile.Tests;
 
@@ -272,6 +273,53 @@ public sealed class FlowTests
         await ui.Shell.CloseSheetCommand.ExecuteAsync(microsoft);
         await showing;
         Assert.False(ui.Overlays.HasSheet);
+    }
+
+    private static IEnumerable<Avalonia.Controls.Control> Visible(Avalonia.Visual root) =>
+        Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(root).OfType<Avalonia.Controls.Control>().Where(c => c.IsEffectivelyVisible);
+
+    private static bool MentionsMicrosoft(Avalonia.Controls.Control c) =>
+        c is Avalonia.Controls.Button { Content: string b } && b.Contains("Microsoft")
+        || c is Avalonia.Controls.TextBlock { Text: { } t } && (t.Contains("Microsoft") || t.Contains("Outlook"));
+
+    [AvaloniaFact]
+    public async Task Unconfigured_microsoft_sign_in_is_neither_offered_nor_advertised()
+    {
+        // Real mode, no accounts: welcome screen, then account setup and settings, as a new user sees them.
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone, realMode: true);
+        Assert.False(ui.Mail.ShowMicrosoftSignIn);
+        Assert.DoesNotContain(Visible(ui.View), MentionsMicrosoft);
+
+        var adding = ui.Mail.AddAccountCommand.ExecuteAsync(null);
+        await MobileHarness.Settle();
+        var setup = Assert.IsType<AccountSetupViewModel>(ui.Overlays.CurrentSheet);
+        Assert.False(setup.CanUseMicrosoft);
+        Assert.DoesNotContain(Visible(ui.View), MentionsMicrosoft);
+        await ui.Shell.CloseSheetCommand.ExecuteAsync(setup);
+        await adding;
+
+        ui.Mail.OpenSettingsCommand.Execute(null);
+        await MobileHarness.Settle();
+        var settings = Assert.IsType<SettingsViewModel>(ui.Overlays.CurrentSheet);
+        Assert.False(settings.ShowMicrosoftSignIn);
+        Assert.DoesNotContain(Visible(ui.View), MentionsMicrosoft);
+        await ui.Shell.CloseSheetCommand.ExecuteAsync(settings);
+
+        // IMAP/SMTP account setup is unaffected.
+        Assert.True(ui.Mail.AddAccountCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
+    public async Task Configured_microsoft_sign_in_is_offered()
+    {
+        var auth = NSubstitute.Substitute.For<HCG.Mail.Core.Accounts.IMicrosoftAuth>();
+        auth.IsConfigured.Returns(true);
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone, realMode: true,
+            configure: s => s.AddSingleton(auth));
+        Assert.True(ui.Mail.ShowMicrosoftSignIn);
+        var button = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(ui.View).OfType<Avalonia.Controls.Button>()
+            .Single(b => b.Name == "AddMicrosoftAccountButton");
+        Assert.True(button.IsEffectivelyVisible);
     }
 
     [AvaloniaFact]

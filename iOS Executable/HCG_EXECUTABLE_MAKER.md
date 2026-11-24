@@ -21,6 +21,41 @@ applications with project, solution, framework, build host, toolchain file and b
 libraries and test projects. `iOS App Store Submission/scripts/verify-app-selection.py` checks on every CI run that
 the manifest and a plain scan of all `*.csproj` files agree: exactly **one** executable targets `net10.0-ios`.
 
+## Status of Mobile Build Studio with this repository (checked 2026-11-21, read-only)
+
+The checks were made against HCG Executable Maker at commit `2842998` by reading its source. Maker itself was not
+run, and it was not changed.
+
+**Before `HCGMail.xcodeproj` (main as of PR #16):**
+* Maker's special case for HCG Mail applies (`MobileProjectInspector.Match`: a .NET iOS head next to a desktop app
+  scores 90).
+* The .NET iOS app `HCG.Mail.iOS.csproj` is attached for Mobile Build Studio.
+* Maker builds it with `dotnet build` / `dotnet publish -p:ArchiveOnBuild=true`, then `xcodebuild -exportArchive`.
+* Signing: identity and profile, plus team and export method. Nothing is uploaded.
+
+**With `HCGMail.xcodeproj` (PR #17) — confirmed incompatibility:**
+1. Any `.xcodeproj` that is not macOS-only adds a score-105 marker (`MobileProjectInspector.cs:25`). This disables the
+   HCG Mail special case (`:28`), and the Xcode route is taken instead of the .NET iOS head (`:210`).
+2. `XcodeProjectAnalyzer` only reads `PBXNativeTarget` application targets (`XcodeProjectAnalyzer.cs:58`).
+   `HCGMail.xcodeproj` has External Build System (`PBXLegacyTarget`) targets, so Maker finds "no iOS application
+   target".
+3. As a result, every iOS output in Mobile Build Studio is blocked before any command runs.
+4. Maker does not read `hcg-apps.json`.
+
+**What fixes it (a change in Maker, which needs separate approval).** Any one of these is enough:
+* honour `hcg-apps.json`, using its `project` for the iOS app;
+* let a `net*-ios` `Exe` project win over an `.xcodeproj` whose targets are all `PBXLegacyTarget`;
+* add `HCGMail.xcodeproj` to Maker's "HCG Mail like" test fixture and keep its expectation (`InspectorId == "dotnet"`,
+  `Mobile.DotNetIos` attached).
+
+Counting legacy targets as apps is not a fix: Maker would then run `xcodebuild archive`, which this repository
+refuses by design.
+
+**Also out of date in Maker's fixture:**
+* It still contains `scripts/workload-rollback.json`, which this repository removed.
+* The pinned workload version (`HcgIosWorkloadManifest` 26.2.10233) is now only in `toolchain.props`, so Maker does
+  not enforce it for this repository.
+
 ## 1. Selection rule (verify in Maker)
 
 Use the first rule that applies:

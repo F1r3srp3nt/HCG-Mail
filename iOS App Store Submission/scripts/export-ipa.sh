@@ -17,6 +17,7 @@
 #
 # Output (artifacts/ is ignored by git):
 #   artifacts/ios/ipa/HCGMail.iOS.ipa               the signed app — upload this one with Transporter
+#   artifacts/ios/ipa/HCGMail.iOS.ipa.sha256        its SHA-256 checksum (shasum -a 256 -c to re-check before upload)
 #   artifacts/ios/archive/HCG Mail <version> (<build>).xcarchive   copy of the archive; the original is listed in
 #                                                    Xcode › Window › Organizer › Archives
 #   artifacts/ios/verification.txt                  the checks below, for the release record
@@ -89,8 +90,13 @@ if [[ -n "${ARCHIVE_COPY:-}" ]]; then
 fi
 set -e
 
+# 5. Checksum of exactly what will be uploaded, for the release record.
+( cd "$(dirname "$IPA")" && shasum -a 256 "$(basename "$IPA")" ) > "$IPA.sha256"
+{ echo; echo "SHA-256: $(cut -d' ' -f1 "$IPA.sha256")  $(basename "$IPA")"; } | tee -a "$REPORT"
+
 echo
 echo "Signed IPA:   $IPA"
+echo "SHA-256:      $IPA.sha256"
 [[ -n "${ARCHIVE:-}" ]] && echo "Archive:      $ARCHIVE_COPY" && echo "              (also in Xcode › Window › Organizer › Archives: $ARCHIVE)"
 echo "Checks:       $REPORT"
 if [[ $ipa_ok -ne 0 || $archive_ok -ne 0 ]]; then

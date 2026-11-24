@@ -29,6 +29,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private DispatcherTimer? _autoRefresh;
     private readonly IMicrosoftAuth _microsoftAuth;
     private readonly IGoogleAuth _googleAuth;
+    private readonly SignInPresentation _signInPresentation;
     private readonly IDeliveryLog? _deliveryLog;
     private readonly ThemeService _themes;
     private readonly IAccountStore _accountStore;
@@ -79,8 +80,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         IMicrosoftAuth? microsoftAuth = null,
         IDeliveryLog? deliveryLog = null,
         RemoteImageLoader? remoteImages = null,
-        IGoogleAuth? googleAuth = null)
+        IGoogleAuth? googleAuth = null,
+        SignInPresentation? signInPresentation = null)
     {
+        _signInPresentation = signInPresentation ?? SignInPresentation.Default;
         _googleAuth = googleAuth ?? new UnconfiguredGoogleAuth("Google sign-in is not available in this mode.");
         _mailHealth = mailHealth;
         _microsoftAuth = microsoftAuth ?? new UnconfiguredMicrosoftAuth("Microsoft sign-in is not available in this mode.");
@@ -135,6 +138,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     public bool HasSelectedAccount => SelectedAccount is not null;
     public bool ShowNeedsPassword => SelectedAccount?.NeedsPassword == true;
     public bool ShowNeedsSignIn => SelectedAccount?.NeedsSignIn == true;
+
+    /// <summary>Whether "Add Microsoft account" is offered: always when configured; otherwise per <see cref="SignInPresentation"/>.</summary>
+    public bool ShowMicrosoftSignIn => _microsoftAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders;
 
     public string MicrosoftSignInStatus => _microsoftAuth.IsConfigured
         ? "Microsoft sign-in is available for Outlook.com, Hotmail and Microsoft 365 accounts."
@@ -733,7 +739,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             Accounts.Add(avm);
             SelectedAccount = avm;
             await ConnectAccountAsync(avm);
-        }, onUseMicrosoft: AddMicrosoftAccountAsync, onUseGoogle: AddGoogleAccountAsync);
+        }, onUseMicrosoft: ShowMicrosoftSignIn ? AddMicrosoftAccountAsync : null,
+           onUseGoogle: _googleAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders ? AddGoogleAccountAsync : null);
         await _dialogs.ShowAccountSetupAsync(vm);
     }
 
