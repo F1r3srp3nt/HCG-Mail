@@ -195,6 +195,13 @@ def run_app_checks(r, app, args):
         good = version_tuple(sdk_version) >= version_tuple(required_sdk)
         r.expect(good, "SDK", f"{sdk_name} (App Store minimum: iOS {required_sdk} SDK), Xcode build {info.get('DTXcode', '?')} ({info.get('DTXcodeBuild', '?')})",
                  f"{sdk_name} — App Store Connect requires the iOS {required_sdk} SDK or later")
+        # Apps built with the iOS 27 SDK or later must use the UIScene life cycle or iOS stops them at launch (TN3187).
+        # Avalonia 11 (the UI framework) has no scene support; Avalonia 12 adds it.
+        if version_tuple(sdk_version) >= (27,):
+            r.expect("UIApplicationSceneManifest" in info, "scene life cycle",
+                     "UIApplicationSceneManifest present (required from the iOS 27 SDK)",
+                     f"built with {sdk_name} without UIApplicationSceneManifest — iOS would not launch it. Build with the "
+                     f"Xcode {toolchain('HcgRequiredXcode')} SDK (toolchain.props) until the app adopts UIScene")
     else:
         (r.fail if kind == "device" else r.warn)("SDK", "DTSDKName missing from Info.plist")
 

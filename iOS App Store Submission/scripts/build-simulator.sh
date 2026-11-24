@@ -12,7 +12,8 @@ OUT="$OUT_ROOT/simulator/$CONFIG"
 # Mailbox sign-in values (HCG_MICROSOFT_CLIENT_ID etc.) reach the build through oauth-clients.props.
 extra=()
 
-dotnet build "$APP_PROJECT" -c "$CONFIG" -f "$TFM" -r "$RID" -o "$OUT" ${extra[@]+"${extra[@]}"} >&2
+require_build_xcode
+ios_dotnet build "$APP_PROJECT" -c "$CONFIG" -f "$TFM" -r "$RID" -o "$OUT" ${extra[@]+"${extra[@]}"} >&2
 
 APP="$(find "$OUT" -maxdepth 1 -name '*.app' -type d | head -1)"
 [[ -d "$APP" ]] || { echo "error: no .app bundle in $OUT" >&2; exit 1; }

@@ -76,6 +76,9 @@ if ! python3 -I -c 'import sys; v=lambda s: [int(x) for x in s.split(".") if x.i
   echo "error: HCG Mail needs iOS $MINIMUM_IOS or later; the device runs iOS $DEV_OS." >&2; exit 1
 fi
 
+# --- toolchain: the Xcode that compiles the app and the pinned workload (before anything else) ---------------------
+[[ $BUILD -eq 1 ]] && require_build_xcode
+
 # --- signing setup (before a 10-minute build) ----------------------------------------------------------------------
 if [[ $BUILD -eq 1 ]]; then
   step "Signing: development certificate and a profile that includes $DEV_NAME"
@@ -100,7 +103,8 @@ fi
 if [[ $BUILD -eq 1 ]]; then
   step "Build: $CONFIG, ios-arm64, signed for development (Release takes several minutes: full AOT)"
   rm -rf "$OUT"
-  dotnet build "$APP_PROJECT" -c "$CONFIG" -f "$TFM" -r ios-arm64 \
+  echo "  with the Xcode $BUILD_XCODE_VERSION SDK ($BUILD_XCODE_APP); installing uses the selected Xcode"
+  ios_dotnet build "$APP_PROJECT" -c "$CONFIG" -f "$TFM" -r ios-arm64 \
     -p:CodesignKey="$HCG_IOS_DEV_IDENTITY" -p:CodesignProvision="$HCG_IOS_DEV_PROFILE" \
     -p:ApplicationVersion="$BUILD_NUMBER" -o "$OUT"
 fi

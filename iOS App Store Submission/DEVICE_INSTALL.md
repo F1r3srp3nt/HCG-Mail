@@ -17,17 +17,15 @@ Start with **A**. It gets the app working on your iPhone today, and nothing leav
 
 ## 1. The Mac, once
 
-1. **Xcode 26.3** (the pinned toolchain; `toolchain.props` → `HcgRequiredXcode`):
-   * If `xcodebuild -version` already says 26.3, skip this.
-   * Otherwise download Xcode 26.3 from <https://developer.apple.com/download/all/> and keep it next to any newer
-     Xcode as `/Applications/Xcode_26.3.app`.
-   * Then:
+1. **Xcode 26.3 next to your Xcode** (keep Xcode 27.2 as your Xcode; nothing is switched):
+   * Download **Xcode 26.3** from <https://developer.apple.com/download/all/>.
+   * Double-click the `.xip`, rename the result **`Xcode_26.3.app`** and move it to **/Applications**.
+   * Accept its licence once:
      ```bash
-     sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
-     sudo xcodebuild -license accept
-     xcodebuild -runFirstLaunch
+     sudo DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer xcodebuild -license accept
      ```
-   * The pinned .NET iOS workload requires exactly this Xcode. A newer Xcode stops the build with a clear error.
+   * Only the .NET compile step uses it, because HCG Mail must be built with the iOS 26 SDK for now (see
+     `toolchain.props`). Xcode 27.2 stays your Xcode: it opens the project, runs Simulator and installs on the iPhone.
 2. **.NET 10 SDK** for Arm64 from <https://dotnet.microsoft.com/download/dotnet/10.0>. `global.json` accepts
    10.0.100 or newer.
 3. **The repository**, at the commit you want on the phone:
@@ -35,7 +33,7 @@ Start with **A**. It gets the app working on your iPhone today, and nothing leav
    git clone https://github.com/F1r3srp3nt/HCG-Mail.git   # or: cd HCG-Mail && git switch main && git pull
    cd "HCG-Mail/iOS App Store Submission"
    scripts/install-workload.sh      # the pinned .NET iOS workload 26.2.10233 (asks for your password)
-   scripts/doctor.sh                # must end with "Ready"
+   scripts/doctor.sh                # "builds with Xcode 26.3 …; Xcode 27.2 stays selected" means ready
    ```
 
 ## 2. The iPhone, once
@@ -105,6 +103,10 @@ What it does, and where it stops if something is wrong:
 5. **Install and start** with `xcrun devicectl`, by cable or over the same Wi-Fi.
 
 To reinstall the last build without rebuilding, run `scripts/install-device.sh --no-build`.
+
+**From Xcode instead:** open `HCGMail.xcodeproj` in your Xcode, choose the **HCG Mail** scheme and your connected
+iPhone as the destination, and press **Build** (⌘B). It runs the same script: build, check, install and start.
+Xcode's Run (⌘R) is not available for this kind of project; Build does the install.
 
 The first time, iOS may say **"Untrusted Developer"**. Open Settings › General › VPN & Device Management, tap your
 Apple Development profile and choose **Trust**, then open HCG Mail.

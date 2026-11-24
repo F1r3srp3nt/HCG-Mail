@@ -89,17 +89,16 @@ Each cause has its own message, so a missing workload is never mistaken for a si
 | Deployment target | `error HCG003` — `SupportedOSPlatformVersion` below 16.0 | Keep `HcgMinimumIos` |
 | Signing (devices only) | `HCG004` message, then the SDK's "No valid iOS code signing keys" if none is installed | Pass `CodesignKey`/`CodesignProvision` or use `scripts/export-ipa.sh`; simulators need none |
 | .NET iOS workload | SDK `NETSDK1147` / doctor `[workload]` | `scripts/install-workload.sh` |
-| Xcode | SDK "requires Xcode 26.3" / doctor `[xcode]` | `sudo xcode-select -s /Applications/Xcode_26.3.app` |
+| Xcode | "builds with Xcode 26.3, and none is installed" / doctor `[xcode]` | Put Xcode 26.3 next to your Xcode as `/Applications/Xcode_26.3.app` (DEVICE_INSTALL.md §1); your default Xcode stays selected |
 
 Paths are never machine-specific: the shared code is found relative to `Directory.Build.props`.
 
 ## Set up a Mac
 
 ```bash
-# 1. Xcode 26.3 from the App Store or developer.apple.com, then once:
-sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer   # or Xcode.app
-xcodebuild -runFirstLaunch
-# install an iOS 26 simulator runtime: Xcode → Settings → Components
+# 1. Xcode 26.3 (developer.apple.com/download/all) as /Applications/Xcode_26.3.app, next to any newer Xcode, then once:
+sudo DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer xcodebuild -license accept
+#    The .NET compile step uses it; your selected Xcode (e.g. 27.2) still runs Simulator and installs on devices.
 
 # 2. .NET 10 SDK (https://dotnet.microsoft.com/download/dotnet/10.0 or: brew install --cask dotnet-sdk)
 

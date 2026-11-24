@@ -51,7 +51,9 @@ extra=(-p:ApplicationVersion="$BUILD_NUMBER")
 [[ -n "${HCG_IOS_MARKETING_VERSION:-}" ]] && extra+=(-p:ApplicationDisplayVersion="$HCG_IOS_MARKETING_VERSION")
 marker="$(mktemp -t hcg-archive-start)"
 # Mailbox sign-in values (HCG_MICROSOFT_CLIENT_ID etc.) reach the build through oauth-clients.props.
-dotnet publish "$APP_PROJECT" -c Release -f "$TFM" -r ios-arm64 \
+require_build_xcode
+echo "Building with Xcode $BUILD_XCODE_VERSION ($BUILD_XCODE_APP)" | tee -a "$REPORT"
+ios_dotnet publish "$APP_PROJECT" -c Release -f "$TFM" -r ios-arm64 \
   -p:ArchiveOnBuild=true \
   -p:CodesignKey="$HCG_IOS_SIGNING_IDENTITY" \
   -p:CodesignProvision="$HCG_IOS_PROVISIONING_PROFILE" \

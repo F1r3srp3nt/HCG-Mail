@@ -39,6 +39,7 @@ if [[ -z "${HCG_XCODE_CLEAN_ENV:-}" ]]; then
         PATH="$dotnet_dir:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         DEVELOPER_DIR="$developer_dir" MD_APPLE_SDK_ROOT="${developer_dir%/Contents/Developer}"
         ACTION="$action" CONFIGURATION="$configuration" PLATFORM_NAME="$platform" HCG_XCODE_CLEAN_ENV=1
+        TARGET_DEVICE_IDENTIFIER="${TARGET_DEVICE_IDENTIFIER:-}" TARGET_DEVICE_PLATFORM_NAME="${TARGET_DEVICE_PLATFORM_NAME:-}"
         DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 AVALONIA_TELEMETRY_OPTOUT=1)
   [[ -n "${DOTNET_ROOT:-}" ]] && keep+=(DOTNET_ROOT="$DOTNET_ROOT")
   # Optional inputs from the caller's environment: HCG_* (OAuth client IDs, HCG_SHARED_ROOT, …), NuGet and proxies.
@@ -54,22 +55,21 @@ require_macos
 # Errors in the form Xcode lists in the Issue navigator ("error: …").
 xcode_errors() { sed -E 's/^(.*): (error|warning) ([A-Z]+[0-9]+): (.*)$/\2: \3: \4 [\1]/'; }
 
+# The .NET build needs Xcode $REQUIRED_XCODE's SDK (toolchain.props). The project can be open in a newer Xcode: the
+# compile step then uses an Xcode $REQUIRED_XCODE installed next to it (_common.sh: find_build_xcode), and Simulator,
+# simctl and devicectl stay with the Xcode you are using.
 check_xcode() {
-  local version
-  version="$(xcodebuild -version 2>/dev/null | awk 'NR==1{print $2}')"
-  if [[ "$version" != "$REQUIRED_XCODE" && "$version" != "$REQUIRED_XCODE".* ]]; then
-    echo "error: HCG Mail's .NET iOS workload ($IOS_WORKLOAD_MANIFEST) requires Xcode $REQUIRED_XCODE, but this build runs in Xcode ${version:-unknown} ($DEVELOPER_DIR). Open the project in Xcode $REQUIRED_XCODE (see toolchain.props)." >&2
-    exit 1
-  fi
+  RUNNING_XCODE="$(xcodebuild -version 2>/dev/null | awk 'NR==1{print $2}')"
+  require_build_xcode
 }
 
 case "$action" in
   build)
     check_xcode
-    echo "HCG Mail: $configuration build for $platform with $(dotnet --version 2>/dev/null) and Xcode $REQUIRED_XCODE"
+    echo "HCG Mail: $configuration build for $platform with .NET $(dotnet --version 2>/dev/null) and the Xcode $BUILD_XCODE_VERSION SDK ($BUILD_XCODE_APP), from Xcode ${RUNNING_XCODE:-?}"
     case "$platform" in
       iphonesimulator)
-        app="$("$here/build-simulator.sh" "$configuration" 2> >(xcode_errors >&2) | tail -1)"
+        app="$(HCG_BUILD_XCODE="$BUILD_XCODE_APP" "$here/build-simulator.sh" "$configuration" 2> >(xcode_errors >&2) | tail -1)"
         echo "HCG Mail app (simulator): $app"
         if [[ $launch -eq 1 ]]; then
           # Boot, install and start after the build has returned: a simulator booted from inside an Xcode build step
@@ -105,15 +105,23 @@ os.execv("/bin/bash", ["/bin/bash", "-c", cmd, script])
           echo "error: the \"HCG Mail Simulator\" scheme runs in the iOS Simulator only; choose a simulator as the destination." >&2
           exit 1
         fi
+        # A connected iPhone/iPad chosen as the run destination: build signed for development, check, install and
+        # start it there (scripts/install-device.sh finds the signing; DEVICE_INSTALL.md §3 if it has none).
+        if [[ -n "${TARGET_DEVICE_IDENTIFIER:-}" && "${TARGET_DEVICE_PLATFORM_NAME:-iphoneos}" == "iphoneos" ]]; then
+          echo "HCG Mail: installing on the device chosen in Xcode ($TARGET_DEVICE_IDENTIFIER)"
+          HCG_BUILD_XCODE="$BUILD_XCODE_APP" HCG_IOS_CONFIGURATION="$configuration" \
+            "$here/install-device.sh" "$TARGET_DEVICE_IDENTIFIER"
+          exit 0
+        fi
         out="$OUT_ROOT/device/$configuration"
         # Unsigned: proves the app compiles for devices (Release = the AOT App Store configuration). Signed, installable
         # and App Store builds come from scripts/export-ipa.sh, which needs your signing identity and profile.
         set -o pipefail
-        dotnet build "$APP_PROJECT" -c "$configuration" -f "$TFM" -r ios-arm64 -p:EnableCodeSigning=false -o "$out" 2>&1 | xcode_errors
+        ios_dotnet build "$APP_PROJECT" -c "$configuration" -f "$TFM" -r ios-arm64 -p:EnableCodeSigning=false -o "$out" 2>&1 | xcode_errors
         app="$(find "$out" -maxdepth 1 -name '*.app' -type d | head -1)"
         [[ -d "$app" ]] || { echo "error: no .app bundle in $out" >&2; exit 1; }
         echo "HCG Mail app (device, unsigned — compile check only): $app"
-        echo "warning: device builds from Xcode are not signed. For an installable or App Store build run scripts/export-ipa.sh (see APP_STORE_SUBMISSION.md)."
+        echo "warning: \"Any iOS Device\" builds are a compile check and are not signed. Choose your connected iPhone as the destination to install HCG Mail on it, or run scripts/install-device.sh."
         ;;
       *)
         echo "error: unsupported platform '$platform' — choose an iOS Simulator or Any iOS Device as the destination." >&2

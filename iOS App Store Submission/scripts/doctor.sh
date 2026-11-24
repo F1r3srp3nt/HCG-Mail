@@ -47,9 +47,10 @@ if [[ $mac -eq 1 ]]; then
   else bad workload "ios $workload installed, $IOS_WORKLOAD_MANIFEST pinned — run scripts/install-workload.sh"; fi
 
   xcode="$(xcodebuild -version 2>/dev/null | awk 'NR==1{print $2}')"
-  if [[ -z "$xcode" ]]; then bad xcode "no Xcode selected — install Xcode $REQUIRED_XCODE and run: sudo xcode-select -s /Applications/Xcode_$REQUIRED_XCODE.app"
-  elif [[ "$xcode" == "$REQUIRED_XCODE" || "$xcode" == "$REQUIRED_XCODE".* ]]; then ok xcode "Xcode $xcode at $(xcode-select -p)"
-  else bad xcode "Xcode $xcode selected; the pinned workload requires $REQUIRED_XCODE (sudo xcode-select -s …)"; fi
+  if find_build_xcode; then
+    if [[ "$BUILD_XCODE_APP/Contents/Developer" == "$(xcode-select -p 2>/dev/null)" ]]; then ok xcode "Xcode $BUILD_XCODE_VERSION at $BUILD_XCODE_APP"
+    else ok xcode "builds with Xcode $BUILD_XCODE_VERSION ($BUILD_XCODE_APP); Xcode ${xcode:-?} stays selected for Simulator and devices"; fi
+  else bad xcode "$BUILD_XCODE_PROBLEM"; fi
 
   runtimes="$(xcrun simctl list runtimes available 2>/dev/null | sed -n 's/^iOS \([0-9.]*\).*/\1/p' | tr '\n' ' ')"
   if [[ -n "$runtimes" ]]; then ok deployment "minimum iOS $MINIMUM_IOS; simulator runtimes installed: $runtimes"

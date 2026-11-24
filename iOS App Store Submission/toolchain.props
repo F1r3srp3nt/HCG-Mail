@@ -2,6 +2,13 @@
   <!--
     The toolchain HCG Mail for iOS is built and verified with. scripts/doctor.sh, the build scripts and CI read
     these values; change them here only (scripts/install-workload.sh builds its rollback file from them).
+
+    Xcode 27: Microsoft's .NET iOS workload 27.2.10000 supports Xcode 27.2, but it builds with the iOS 27 SDK, and apps
+    built with that SDK must use the UIScene life cycle or iOS will not launch them (Apple TN3187). Avalonia 11 (the UI
+    framework) has no scene support; Avalonia 12 adds it. Until HCG Mail moves to Avalonia 12, it builds with the Xcode
+    26.3 SDK. Apps built with it run on iOS 27. That Xcode can stay next to a newer default Xcode: the scripts and the
+    Xcode project use it only for the .NET compile step (scripts/_common.sh: find_build_xcode). verify-ios-build.py
+    rejects an iOS 27 SDK build without a scene manifest.
   -->
   <PropertyGroup>
     <HcgRequiredXcode>26.3</HcgRequiredXcode>
