@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs and starts HCG Mail in an iOS Simulator.
-#   scripts/run-simulator.sh                         first available iPhone, normal start
+#   scripts/run-simulator.sh                         newest iPhone Pro (Dynamic Island), normal start
 #   scripts/run-simulator.sh "iPad Air 11-inch (M3)" choose a device by name (xcrun simctl list devices)
 #   scripts/run-simulator.sh --ipad                  first available iPad
 #   scripts/run-simulator.sh --preview               Debug builds: sample mailbox, no network (for screenshots)
@@ -135,8 +135,11 @@ APP="${HCG_IOS_APP:-$("$IOS_ROOT/scripts/build-simulator.sh" "$CONFIG" | tail -1
 stage find "$FIND_TIMEOUT"
 devices_json="$LOG_DIR/devices.json"
 bounded sh -c 'xcrun simctl list devices available -j > "$0"' "$devices_json" || fail $? "xcrun simctl list devices"
+# Without a device name: an iPhone is a standard numbered model (not, for example, the two-display "iPhone Duo" of
+# the iOS 27.2 runtime, which simctl cannot screenshot without --display), preferably a Pro with the Dynamic Island,
+# the newest model first; a device that is already booted is reused. Runtimes are tried newest first.
 pick() { FAMILY="$FAMILY" DEVICE="$DEVICE" python3 -I -c '
-import json, os, sys
+import json, os, re, sys
 d = json.load(open(sys.argv[1]))["devices"]
 want = os.environ["DEVICE"]
 devices = [x for r in sorted(d, reverse=True) if "iOS" in r for x in d[r]]
@@ -144,7 +147,14 @@ if want:
     match = [x for x in devices if x["name"] == want]
 else:
     family = [x for x in devices if x["name"].startswith(os.environ["FAMILY"])]
-    match = [x for x in family if x.get("state") in ("Booted", "Booting")] + family
+    def rank(x):
+        name, booted = x["name"], x.get("state") in ("Booted", "Booting")
+        if os.environ["FAMILY"] != "iPhone":
+            return (booted,)
+        standard = re.fullmatch(r"iPhone \d+(e| Plus| Pro| Pro Max)?", name) is not None
+        number = int(re.search(r"\d+", name).group()) if standard else -1
+        return (standard, booted, name.endswith(" Pro"), number)
+    match = sorted(family, key=rank, reverse=True)  # stable: equal ranks keep the newest runtime first
 if not match: sys.exit(1)
 print(match[0]["name"]); print(match[0]["udid"])' "$devices_json"; }
 found="$(pick)" || { echo "No available simulator matches '${DEVICE:-$FAMILY}'. Installed:" >&2; xcrun simctl list devices available >&2; exit 1; }
