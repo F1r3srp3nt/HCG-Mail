@@ -37,3 +37,5 @@ xcuserdata/
 
 # Local OAuth client values (may contain the Google desktop client secret) — never commit
 oauth-clients.local.props
+
+__pycache__/
