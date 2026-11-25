@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  HCG Mail Unleashed (-p:HcgVariant=Unleashed): merged over Info.plist. CFBundleName also names the app's data folder
+	  and Keychain service (IosPlatform.AppName), keeping them apart from HCG Mail's. The bundle ID comes from HcgBundleId.
+	-->
+	<key>CFBundleDisplayName</key>
+	<string>HCG Mail Unleashed</string>
+	<key>CFBundleName</key>
+	<string>HCG Mail Unleashed</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>Microsoft sign-in</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>msauth.com.hakmicapitalgroup.hcgmail.unleashed</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

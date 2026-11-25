@@ -10,13 +10,13 @@ public sealed class JsonAppSettingsStore(AppPaths paths, ILogger<JsonAppSettings
     public AppSettings Load()
     {
         lock (_lock)
-            return (JsonFile.Read<AppSettings>(paths.SettingsFile, logger) ?? new AppSettings()).Normalize();
+            return (JsonFile.Read(paths.SettingsFile, StorageJsonContext.Default.AppSettings, logger) ?? new AppSettings()).Normalize();
     }
 
     public void Save(AppSettings settings)
     {
         lock (_lock)
-            JsonFile.Write(paths.SettingsFile, settings.Normalize());
+            JsonFile.Write(paths.SettingsFile, settings.Normalize(), StorageJsonContext.Default.AppSettings);
     }
 }
 

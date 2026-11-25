@@ -39,3 +39,6 @@ xcuserdata/
 oauth-clients.local.props
 
 __pycache__/
+
+# HCG Mail Unleashed CI output (.github/workflows/unleashed.yml)
+unleashed-out/

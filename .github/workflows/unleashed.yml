@@ -1,0 +1,276 @@
+# HCG Mail Unleashed — the rootless jailbreak edition for HCG Repo Candidate.
+# Builds the iOS app with its own identity (-p:HcgVariant=Unleashed: bundle ID com.hakmicapitalgroup.hcgmail.unleashed,
+# own name, URL scheme, data folder and Keychain service), packages it unchanged with HCG Executable Maker's rootless
+# packager (ldid pseudo-signature with Entitlements.Unleashed.ldid.plist: its Keychain group only), validates the package,
+# runs HCG Repo's inspector and importer dry run on the exact bytes, and installs/reinstalls/removes/purges it with real
+# dpkg in a sandbox. It uploads the .deb as the artifact an HCG Repo import request can pin. It installs nothing on a
+# device, signs nothing with an Apple identity, and publishes nothing.
+name: Unleashed
+
+on:
+  push:
+    branches: ['unleashed/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  AVALONIA_TELEMETRY_OPTOUT: '1'
+  PKG: com.hakmicapitalgroup.hcgmail.unleashed
+  PKG_VERSION: 0.1.0~beta1
+  BUNDLE_ID: com.hakmicapitalgroup.hcgmail.unleashed
+  DEB_ARTIFACT: hcg-mail-unleashed-deb
+  # HCG Executable Maker main (merge of PR #16): the rootless packager, validator and HCG Repo dry-run script.
+  MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
+  # HCG Repo main (merge of PR #19): the inspector and importer used for the dry run. Nothing is written to HCG Repo.
+  HCG_REPO_COMMIT: 296ea3100a1be3d7493e766ab50fcc2dca0259c0
+  # First test device class: rootless (Dopamine) on iOS 16.5. The app needs iOS 16.0 or later.
+  DEVICE_IOS: '16.5'
+
+jobs:
+  package:
+    name: Build (Release, ios-arm64, Mono AOT), package rootless .deb, validate, HCG Repo dry run
+    runs-on: xcode-27
+    timeout-minutes: 120
+    env:
+      OUT: ${{ github.workspace }}/unleashed-out
+    defaults:
+      run:
+        shell: bash
+        working-directory: iOS App Store Submission
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the Xcode version pinned in toolchain.props
+        run: |
+          XCODE_VERSION="$(sed -n 's:.*<HcgRequiredXcode>\(.*\)</HcgRequiredXcode>.*:\1:p' toolchain.props)"
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          xcodebuild -version
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.1xx'
+      - name: Install the pinned iOS workload
+        run: scripts/install-workload.sh
+      - name: ldid (pseudo-signing for jailbroken devices) and dpkg (package inspection)
+        run: |
+          brew install ldid dpkg
+          ldid 2>&1 | head -1 || true
+          dpkg --version | head -1
+
+      - name: Build HCG Mail Unleashed (Release, ios-arm64, full Mono AOT, unsigned; signed by ldid when packaged)
+        run: |
+          mkdir -p "$OUT"
+          dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 \
+            -p:HcgVariant=Unleashed -p:EnableCodeSigning=false -p:ApplicationVersion=1 -o "$OUT/app" 2>&1 | tee "$OUT/build.log"
+          app="$(find "$OUT/app" -maxdepth 1 -name '*.app' -type d | head -1)"; test -d "$app"
+          echo "APP=$app" >> "$GITHUB_ENV"
+          # Trimming/AOT: the persistence layer must have no reflection-based JSON (StorageJsonContext).
+          grep -oE "warning IL[0-9]{4}: [^ ]+" "$OUT/build.log" | sort | uniq -c | tee "$OUT/trim-warnings.txt" || true
+          if grep -q "HCG.Mail.Infrastructure.Storage" "$OUT/trim-warnings.txt"; then echo "persistence still has trimming warnings"; exit 1; fi
+
+      - name: Check the app — identity, iOS 16.0, arm64, SDK, icon, privacy and scene manifests (verify-ios-build.py)
+        run: |
+          HCG_IOS_BUNDLE_ID="$BUNDLE_ID" python3 -I scripts/verify-ios-build.py app "$APP" --kind device --build-number 1 | tee "$OUT/app-check.txt"
+          python3 -I - "$APP/Info.plist" <<'EOF'
+          import plistlib, sys
+          i = plistlib.load(open(sys.argv[1], "rb"))
+          schemes = [s for t in i.get("CFBundleURLTypes", []) for s in t.get("CFBundleURLSchemes", [])]
+          facts = {k: i.get(k) for k in ("CFBundleIdentifier", "CFBundleName", "CFBundleDisplayName", "CFBundleShortVersionString",
+                                          "CFBundleVersion", "MinimumOSVersion", "DTSDKName", "CFBundleExecutable")}
+          print(facts, schemes)
+          assert facts["CFBundleIdentifier"] == "com.hakmicapitalgroup.hcgmail.unleashed"
+          assert facts["CFBundleName"] == facts["CFBundleDisplayName"] == "HCG Mail Unleashed"   # names its data folder and Keychain service
+          assert schemes == ["msauth.com.hakmicapitalgroup.hcgmail.unleashed"], schemes          # never HCG Mail's scheme
+          assert facts["MinimumOSVersion"] == "16.0"
+          EOF
+          bin="$APP/$(plutil -extract CFBundleExecutable raw "$APP/Info.plist")"
+          lipo -archs "$bin" | tee "$OUT/archs.txt"; [ "$(lipo -archs "$bin")" = arm64 ]
+          vtool -show-build "$bin" | grep -E "platform|minos|sdk" | tee -a "$OUT/archs.txt"
+          # Mono AOT evidence (informational; Release strips symbols): AOT data files in the bundle, the executable's
+          # size (the managed code compiled in), and Mono AOT strings in it. No JIT runs on iOS.
+          {
+            echo "aotdata files: $(find "$APP" -name '*.aotdata*' | wc -l | tr -d ' ')"
+            echo "executable bytes: $(stat -f%z "$bin")"
+            echo "mono aot strings: $(strings -a "$bin" | grep -ci 'mono_aot' || true)"
+          } | tee -a "$OUT/archs.txt"
+
+      - name: HCG Executable Maker (pinned) — build its command line
+        run: |
+          git clone --quiet https://github.com/F1r3srp3nt/HCG-Executable-Maker.git "$OUT/maker"
+          git -C "$OUT/maker" checkout --quiet "$MAKER_COMMIT"
+          git -C "$OUT/maker" log -1 --format='%H %s'
+          dotnet build "$OUT/maker/src/HCG.ExecutableMaker.App" -c Release -v quiet
+          echo "MAKER=$OUT/maker/src/HCG.ExecutableMaker.App/bin/Release/net10.0/HCGExecutableMaker.dll" >> "$GITHUB_ENV"
+
+      - name: Package the rootless .deb and the Candidate handoff (twice — the bytes must be identical)
+        run: |
+          common=(--package "$PKG" --package-version "$PKG_VERSION" --name "HCG Mail Unleashed"
+            --description "Private email for your own IMAP/SMTP mailbox. Candidate beta of HCG Mail, packaged for rootless jailbreaks, with its own data and Keychain, separate from HCG Mail."
+            --entitlements "$PWD/src/HCG.Mail.iOS/Entitlements.Unleashed.ldid.plist" --device-ios "$DEVICE_IOS"
+            --repository "${{ github.repository }}" --commit "${{ github.sha }}")
+          dotnet "$MAKER" --rootless-deb "$APP" "${common[@]}" \
+            --ci-repository "${{ github.repository }}" --ci-commit "${{ github.sha }}" --ci-run "${{ github.run_id }}" --ci-artifact "$DEB_ARTIFACT" \
+            --built-with "$(xcodebuild -version | head -1), .NET iOS workload $(sed -n 's:.*<HcgIosWorkloadManifest>\(.*\)</HcgIosWorkloadManifest>.*:\1:p' toolchain.props)" \
+            --production-access undecided \
+            --change "First rootless candidate of HCG Mail (0.1.0): the iOS app built from source as HCG Mail Unleashed — its own bundle ID, data folder and Keychain group, separate from HCG Mail." \
+            --known-issue "Not yet device-tested: installation, launch, Keychain storage and mail on a jailbroken device are unverified." \
+            --known-issue "Microsoft and Google sign-in are not available in this build; IMAP/SMTP accounts with a password (or app password) only." \
+            --known-issue "Rootless only (iphoneos-arm64), iOS 16.0 or later." \
+            --out "$OUT/pkg" | tee "$OUT/package.log"
+          dotnet "$MAKER" --rootless-deb "$APP" "${common[@]}" --no-handoff --out "$OUT/pkg2" > "$OUT/package2.log"
+          deb="$(ls "$OUT"/pkg/*.deb)"; H="$(ls -d "$OUT"/pkg/*-candidate-handoff)"
+          cmp "$deb" "$(ls "$OUT"/pkg2/*.deb)"; cmp "$deb" "$(ls "$H"/*.deb)"
+          echo "DEB=$deb" >> "$GITHUB_ENV"; echo "HANDOFF=$H" >> "$GITHUB_ENV"
+          ls -la "$H"
+
+      - name: Record the reviewed entitlements in the handoff's package.toml (HCG Repo refuses unreviewed ones)
+        run: |
+          app_dir="$(basename "$APP")"; exe="$(plutil -extract CFBundleExecutable raw "$APP/Info.plist")"
+          python3 -I - "$HANDOFF/package.toml" "var/jb/Applications/$app_dir/$exe" "src/HCG.Mail.iOS/Entitlements.Unleashed.ldid.plist" <<'EOF'
+          import plistlib, sys
+          toml, binary, plist = sys.argv[1:]
+          ents = plistlib.load(open(plist, "rb"))
+          assert set(ents) == {"keychain-access-groups"}, ents
+          groups = ", ".join(f'"{g}"' for g in ents["keychain-access-groups"])
+          table = ("# Reviewed: HCG Mail's own Keychain group only (src/HCG.Mail.iOS/Entitlements.Unleashed.ldid.plist).\n"
+                   "# No no-sandbox, platform-application, task ports, root or filesystem entitlements.\n"
+                   f'[review.entitlements."{binary}"]\n"keychain-access-groups" = [{groups}]\n\n')
+          text = open(toml).read()
+          assert "\n[access]" in text and "[review]" in text
+          text = text.replace("\n[access]", "\n" + table + "[access]", 1)
+          open(toml, "w").write(text)
+          print(table)
+          EOF
+          sed -n '/^\[review\]/,$p' "$HANDOFF/package.toml"
+
+      - name: Validate the package — Maker's validator (iOS 16.5), control, contents, Mach-O, signature, entitlements
+        run: |
+          dotnet "$MAKER" --rootless-deb-validate "$DEB" --package "$PKG" --package-version "$PKG_VERSION" \
+            --bundle-id "$BUNDLE_ID" --device-ios "$DEVICE_IOS" | tee "$OUT/validate.txt"
+          dpkg-deb -I "$DEB" | tee "$OUT/control.txt"
+          dpkg-deb -c "$DEB" | tee "$OUT/contents.txt"
+          grep -q "Architecture: iphoneos-arm64" "$OUT/control.txt"
+          grep -q "Version: $PKG_VERSION" "$OUT/control.txt"
+          grep -qE "Depends: .*firmware \(>= 16\.0\)" "$OUT/control.txt"
+          grep -qE "Depends: .*uikittools" "$OUT/control.txt"
+          app_dir="$(basename "$APP")"; exe="$(plutil -extract CFBundleExecutable raw "$APP/Info.plist")"
+          grep -q "./var/jb/Applications/$app_dir/$exe$" "$OUT/contents.txt"
+          awk '{print $6}' "$OUT/contents.txt" | grep -v '^\./$' | grep -v '^\./var/$' | grep -v '^\./var/jb' && { echo "paths outside /var/jb"; exit 1; } || true
+          x="$(mktemp -d)"; dpkg-deb -x "$DEB" "$x"; bin="$x/var/jb/Applications/$app_dir/$exe"
+          { lipo -archs "$bin"; vtool -show-build "$bin" | grep -E "platform|minos"; codesign -dv "$bin" 2>&1 | grep -E "Signature|Identifier|TeamIdentifier|Format"; } | tee "$OUT/binary.txt"
+          ldid -e "$bin" | tee "$OUT/entitlements.xml"
+          python3 -I - "$OUT/entitlements.xml" <<'EOF'
+          import plistlib, sys
+          e = plistlib.loads(open(sys.argv[1], "rb").read())
+          assert e == {"keychain-access-groups": ["com.hakmicapitalgroup.hcgmail.unleashed"]}, e
+          print("entitlements exactly:", e)
+          EOF
+          plutil -extract CFBundleIdentifier raw "$x/var/jb/Applications/$app_dir/Info.plist" | grep -qx "$BUNDLE_ID"
+          dpkg-deb -e "$DEB" "$x/control"; for s in postinst postrm; do echo "--- $s"; cat "$x/control/$s" 2>/dev/null; done | tee "$OUT/scripts.txt"
+
+      - name: HCG Repo (pinned) — bin/hcgrepo inspect, then the importer dry run on the exact bytes
+        run: |
+          git clone --quiet https://github.com/F1r3srp3nt/HCG-repo.git "$OUT/hcg-repo"
+          git -C "$OUT/hcg-repo" checkout --quiet "$HCG_REPO_COMMIT"
+          # inspect needs the package's reviewed metadata; use a throwaway copy so the pinned checkout stays clean.
+          cp -R "$OUT/hcg-repo" "$OUT/hcg-repo-inspect"; mkdir -p "$OUT/hcg-repo-inspect/packages/$PKG"
+          cp "$HANDOFF/package.toml" "$OUT/hcg-repo-inspect/packages/$PKG/"
+          [ -f "$HANDOFF/icon.png" ] && cp "$HANDOFF/icon.png" "$OUT/hcg-repo-inspect/packages/$PKG/"
+          (cd "$OUT/hcg-repo-inspect" && bin/hcgrepo inspect "$DEB") | tee "$OUT/hcgrepo-inspect.txt"
+          grep -q "^OK: package passes package-level validation" "$OUT/hcgrepo-inspect.txt"
+          PYTHONPATH="$OUT/hcg-repo/tools" python3 "$OUT/maker/tools/unleashify/hcgrepo-dry-run.py" --repo "$OUT/hcg-repo" \
+            --handoff "$HANDOFF" --hypothetical-approval --report "$OUT/hcgrepo-dry-run.json" | tee "$OUT/hcgrepo-dry-run.txt"
+          grep -qE "^RESULT +(VALIDATED|BYTES VALIDATED, NOT YET IMPORTABLE)" "$OUT/hcgrepo-dry-run.txt"
+          git -C "$OUT/hcg-repo" status --porcelain | tee "$OUT/hcg-repo-status.txt"; [ ! -s "$OUT/hcg-repo-status.txt" ]
+
+      - name: The build left the checkout clean
+        run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DEB_ARTIFACT }}
+          path: ${{ env.DEB }}
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hcg-mail-unleashed-handoff
+          path: ${{ env.HANDOFF }}
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-unleashed-reports
+          path: |
+            unleashed-out/*.txt
+            unleashed-out/*.log
+            unleashed-out/*.json
+            unleashed-out/*.xml
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### HCG Mail Unleashed $PKG_VERSION ($PKG)"
+            [ -n "${DEB:-}" ] && echo "- \`$(basename "$DEB")\`: $(stat -f%z "$DEB") bytes, SHA-256 \`$(shasum -a 256 < "$DEB" | cut -d' ' -f1)\`"
+            echo "- source: ${{ github.repository }}@${{ github.sha }}, run ${{ github.run_id }}, artifact \`$DEB_ARTIFACT\`"
+            sed 's/^/- /' "$OUT/archs.txt" 2>/dev/null
+            grep -E "^RESULT" "$OUT/hcgrepo-dry-run.txt" 2>/dev/null | sed 's/^/- /'
+            echo "- trimming warnings left: $(wc -l < "$OUT/trim-warnings.txt" 2>/dev/null | tr -d ' ') kinds (none in persistence)"
+            echo "- **not a device test**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dpkg-roundtrip:
+    name: The uploaded artifact — exact bytes, importer dry run, real dpkg install/reinstall/remove/purge (sandbox)
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.DEB_ARTIFACT }}
+          path: downloaded
+      - uses: actions/download-artifact@v4
+        with:
+          name: hcg-mail-unleashed-handoff
+          path: handoff
+      - name: One .deb with the import request's SHA-256; importer dry run on the downloaded bytes
+        run: |
+          ls -la downloaded; [ "$(ls downloaded/*.deb | wc -l)" = 1 ]
+          sha="$(sha256sum downloaded/*.deb | cut -d' ' -f1)"; echo "downloaded sha256 $sha"
+          grep -q "^sha256 = \"$sha\"$" handoff/import-request.toml
+          grep -q "^run_id = ${{ github.run_id }}$" handoff/import-request.toml
+          git clone --quiet https://github.com/F1r3srp3nt/HCG-repo.git hcg-repo && git -C hcg-repo checkout --quiet "$HCG_REPO_COMMIT"
+          git clone --quiet https://github.com/F1r3srp3nt/HCG-Executable-Maker.git maker && git -C maker checkout --quiet "$MAKER_COMMIT"
+          PYTHONPATH=hcg-repo/tools python3 maker/tools/unleashify/hcgrepo-dry-run.py --repo hcg-repo --handoff handoff \
+            --deb "$(ls downloaded/*.deb)" --hypothetical-approval | tee dry-run.txt
+          grep -qE "^RESULT +(VALIDATED|BYTES VALIDATED, NOT YET IMPORTABLE)" dry-run.txt
+      - name: dpkg sandbox — install, reinstall, remove and purge (real dpkg; not a device test)
+        run: |
+          deb="$(ls "$PWD"/downloaded/*.deb)"; R="$PWD/dpkg"
+          mkdir -p "$R/root" "$R/admin/updates" "$R/admin/info" "$R/bin"; touch "$R/admin/status" "$R/admin/available"
+          printf '#!/bin/sh\necho "uicache $*" >> "%s/uicache.log"\n' "$R" > "$R/bin/uicache"; chmod +x "$R/bin/uicache"
+          D="dpkg --root=/ --instdir=$R/root --admindir=$R/admin --force-script-chrootless --force-architecture --force-depends --force-not-root"
+          PATH="$R/bin:$PATH" $D -i "$deb"
+          PATH="$R/bin:$PATH" $D -s "$PKG" | grep -E "^(Status|Version)"
+          find "$R/root" | sed "s|$R/root||" | sort | tee "$R/installed.txt"
+          grep -q "^/var/jb/Applications/.*\.app/HCGMail.iOS$" "$R/installed.txt"
+          [ -z "$(grep -v '^/var/jb' "$R/installed.txt" | grep -v '^/var$' | grep -v '^$')" ] || { echo "files outside /var/jb"; exit 1; }
+          PATH="$R/bin:$PATH" $D -i "$deb"     # reinstall of the same version (upgrade path)
+          PATH="$R/bin:$PATH" $D -r "$PKG"
+          left="$(find "$R/root" -type f | wc -l | tr -d ' ')"; echo "files left after removal: $left"; [ "$left" = 0 ]
+          PATH="$R/bin:$PATH" $D -P "$PKG"
+          PATH="$R/bin:$PATH" $D -s "$PKG" 2>&1 | tail -1
+          cat "$R/uicache.log"
+          grep -q "uicache -p /var/jb/Applications/" "$R/uicache.log"; grep -q "uicache -u /var/jb/Applications/" "$R/uicache.log"
+          {
+            echo "### dpkg sandbox (Linux dpkg, the uploaded artifact's bytes)"
+            echo "- installed $(grep -c . "$R/installed.txt") paths, all under /var/jb; reinstall, remove (0 files left) and purge succeeded"
+            echo "- uicache calls: $(tr '\n' ';' < "$R/uicache.log")"
+          } >> "$GITHUB_STEP_SUMMARY"

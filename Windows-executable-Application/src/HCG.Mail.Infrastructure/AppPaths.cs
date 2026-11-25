@@ -16,7 +16,9 @@ public sealed class AppPaths
     public string AccountsFile => Path.Combine(DataDirectory, "accounts.json");
     public string DeliveryHistoryFile => Path.Combine(DataDirectory, "delivery-history.json");
 
-    public static AppPaths ForCurrentUser()
+    /// <param name="appName">The folder name on Windows, macOS and iOS ("HCG Mail"); the iOS jailbreak edition passes
+    /// its own name so its data stays apart from HCG Mail's.</param>
+    public static AppPaths ForCurrentUser(string appName = "HCG Mail")
     {
         var overrideDir = Environment.GetEnvironmentVariable(DataDirectoryOverrideVariable);
         if (!string.IsNullOrWhiteSpace(overrideDir))
@@ -25,10 +27,10 @@ public sealed class AppPaths
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string dir;
         if (OperatingSystem.IsWindows())
-            dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HCG", "HCG Mail");
+            dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HCG", appName);
         else if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
-            // On iOS the home directory is the app's sandbox container.
-            dir = Path.Combine(home, "Library", "Application Support", "HCG Mail");
+            // On iOS the home directory is the app's sandbox container (for a rootless jailbreak app it can be /var/mobile).
+            dir = Path.Combine(home, "Library", "Application Support", appName);
         else
         {
             var xdg = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
