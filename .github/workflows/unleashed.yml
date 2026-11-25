@@ -88,8 +88,13 @@ jobs:
           bin="$APP/$(plutil -extract CFBundleExecutable raw "$APP/Info.plist")"
           lipo -archs "$bin" | tee "$OUT/archs.txt"; [ "$(lipo -archs "$bin")" = arm64 ]
           vtool -show-build "$bin" | grep -E "platform|minos|sdk" | tee -a "$OUT/archs.txt"
-          # Mono AOT: the managed code is compiled into the executable (no JIT on iOS).
-          nm -U "$bin" 2>/dev/null | grep -c "mono_aot_module" | tee -a "$OUT/archs.txt"
+          # Mono AOT evidence (informational; Release strips symbols): AOT data files in the bundle, the executable's
+          # size (the managed code compiled in), and Mono AOT strings in it. No JIT runs on iOS.
+          {
+            echo "aotdata files: $(find "$APP" -name '*.aotdata*' | wc -l | tr -d ' ')"
+            echo "executable bytes: $(stat -f%z "$bin")"
+            echo "mono aot strings: $(strings -a "$bin" | grep -ci 'mono_aot' || true)"
+          } | tee -a "$OUT/archs.txt"
 
       - name: HCG Executable Maker (pinned) — build its command line
         run: |
