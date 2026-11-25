@@ -36,15 +36,28 @@ public partial class MobileApp : Application
     {
         AvaloniaXamlLoader.Load(this);
         RequestedThemeVariant = HcgThemeVariants.Future;
+        StartupTrace.Mark(StartupStage.AvaloniaReady, "application resources loaded");
     }
 
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
         {
-            var platform = Platform ?? throw new InvalidOperationException("MobileApp.Platform must be set by the platform host before start-up.");
-            var (shell, view) = CreateShell(platform, Mode);
-            singleView.MainView = view;
+            MobileShellViewModel shell;
+            try
+            {
+                var platform = Platform ?? throw new InvalidOperationException("MobileApp.Platform must be set by the platform host before start-up.");
+                (shell, var view) = CreateShell(platform, Mode);
+                singleView.MainView = view;
+            }
+            catch (Exception ex)
+            {
+                // Show what failed instead of closing: the start-up report names the stage and the exception.
+                StartupTrace.Failure("creating the main view", ex);
+                singleView.MainView = StartupFailureView.Create(ex, Platform);
+                base.OnFrameworkInitializationCompleted();
+                return;
+            }
             if (TryGetFeature(typeof(IActivatableLifetime)) is IActivatableLifetime activatable)
             {
                 activatable.Deactivated += (_, e) =>
@@ -69,25 +82,64 @@ public partial class MobileApp : Application
         var services = MobileServices.Build(platform, mode, configure);
         Services = services;
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("HCG.Mail.Mobile");
-        var settings = services.GetRequiredService<AppSettingsService>();
-        MobileServices.PrepareStorage(platform, settings, logger);
         InstallErrorHandlers();
-        services.GetRequiredService<ThemeService>().ApplySaved();
+        var settings = services.GetRequiredService<AppSettingsService>();
+        try
+        {
+            services.GetRequiredService<ThemeService>().ApplySaved();
+            StartupTrace.Mark(StartupStage.Settings, $"loaded, theme {settings.Current.Theme}");
+        }
+        catch (Exception ex)
+        {
+            // The default theme is fine; the saved one is cosmetic.
+            StartupTrace.Failure("applying the saved theme", ex);
+        }
 
         var shell = services.GetRequiredService<MobileShellViewModel>();
         var view = new MobileShellView { DataContext = shell };
         services.GetRequiredService<MobileDialogService>().AttachTopLevel(() => TopLevel.GetTopLevel(view));
+        StartupTrace.Mark(StartupStage.MainView);
         var started = false;
-        view.AttachedToVisualTree += async (_, _) =>
+        view.AttachedToVisualTree += (_, _) =>
         {
             if (started)
                 return;
             started = true;
-            await shell.Mail.InitializeAsync();
-            if (mode.IsPreview && PreviewScreen is { Length: > 0 } screen)
-                await OpenPreviewScreenAsync(shell, screen);
+            StartupTrace.Mark(StartupStage.MainViewAttached);
+            if (TopLevel.GetTopLevel(view) is { } topLevel)
+                topLevel.RequestAnimationFrame(_ => Dispatcher.UIThread.Post(() => StartupTrace.Mark(StartupStage.FirstFrame), DispatcherPriority.Background));
+            // Non-essential start-up work runs after the view is on screen, and a failure in it is reported, not fatal.
+            Dispatcher.UIThread.Post(() => _ = RunDeferredStartupAsync(platform, mode, shell, settings, logger), DispatcherPriority.Background);
         };
         return (shell, view);
+    }
+
+    private static async Task RunDeferredStartupAsync(IMobilePlatform platform, AppMode mode, MobileShellViewModel shell, AppSettingsService settings, ILogger logger)
+    {
+        try
+        {
+            MobileServices.PrepareStorage(platform, settings, logger);
+        }
+        catch (Exception ex)
+        {
+            StartupTrace.Failure("preparing temporary storage", ex);
+        }
+        if (StartupTrace.PreviousLaunchStoppedAt is { } stage)
+            logger.LogWarning("The previous launch stopped before its first frame (last start-up stage: {Stage}); its trace is {File}", stage, StartupTrace.PreviousFileName);
+        try
+        {
+            await shell.Mail.InitializeAsync();
+            StartupTrace.Mark(StartupStage.DeferredServices, "mailbox start-up finished");
+        }
+        catch (Exception ex)
+        {
+            StartupTrace.Failure("starting the mailbox", ex);
+            logger.LogError(ex, "Mailbox start-up failed");
+            (Services?.GetService(typeof(INotificationService)) as INotificationService)?.Error("Could not load your mail",
+                $"Start-up of the mailbox failed ({ex.GetType().Name}). Your accounts and settings were not changed. Details are in the app's log (see Settings › About and diagnostics).");
+        }
+        if (mode.IsPreview && PreviewScreen is { Length: > 0 } screen)
+            await OpenPreviewScreenAsync(shell, screen);
     }
 
     private static async Task OpenPreviewScreenAsync(MobileShellViewModel shell, string screen)
@@ -128,6 +180,8 @@ public partial class MobileApp : Application
         _errorHandlersInstalled = true;
         Dispatcher.UIThread.UnhandledException += (_, e) =>
         {
+            if (StartupTrace.LastStage is not StartupStage.DeferredServices)
+                StartupTrace.Failure("the UI thread", e.Exception);
             if (Services is not { } services)
                 return;
             services.GetRequiredService<ILoggerFactory>().CreateLogger("HCG.Mail.Mobile").LogError(e.Exception, "Unhandled UI exception");
@@ -137,6 +191,7 @@ public partial class MobileApp : Application
         };
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
+            StartupTrace.Failure("a background task", e.Exception);
             (Services?.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("HCG.Mail.Mobile").LogError(e.Exception, "Unobserved task exception");
             e.SetObserved();
         };

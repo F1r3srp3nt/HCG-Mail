@@ -71,6 +71,17 @@ public sealed class IosKeychainCredentialVault(string service = "HCG Mail") : IC
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Start-up diagnostics: looks up an item that is never written and returns the Keychain's answer. ItemNotFound
+    /// means the Keychain and this app's Keychain group work; MissingEntitlement (-34018) means the app's signature does
+    /// not grant its group. Reads and writes no secret.
+    /// </summary>
+    public SecStatusCode Probe()
+    {
+        SecKeyChain.QueryAsData(Query("hcg-startup-probe-never-written"), false, out var status);
+        return status;
+    }
+
     private static CredentialVaultException Fail(string action, SecStatusCode status) =>
         new($"Could not {action} the password in the iOS Keychain ({status}). If the device is locked, unlock it and try again.");
 }

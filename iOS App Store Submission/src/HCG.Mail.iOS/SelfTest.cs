@@ -93,6 +93,14 @@ public static class SelfTest
             await Task.Delay(1500); // let the first layout pass finish
             var layout = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync<(bool Ok, string Detail)>(MeasureSafeAreaLayout);
             Report("Safe area applied once", layout.Ok, layout.Detail);
+
+            // Start-up diagnostics: the trace on disk names every stage up to the first frame.
+            var trace = HCG.Mail.Mobile.Services.StartupTrace.FilePath;
+            for (var i = 0; i < 100 && (trace is null || !File.ReadAllText(trace).Contains(" ms  first-frame")); i++)
+                await Task.Delay(100);
+            var traced = trace is not null && File.Exists(trace) ? File.ReadAllText(trace) : "";
+            Report("Start-up trace reached the first frame", traced.Contains(" ms  runtime-ready") && traced.Contains(" ms  first-frame") && !traced.Contains("FAILED"),
+                trace ?? "no trace file");
         }
         catch (Exception ex)
         {

@@ -5,6 +5,7 @@ using Foundation;
 using HCG.Mail.App.ViewModels;
 using HCG.Mail.iOS.Platform;
 using HCG.Mail.Mobile;
+using HCG.Mail.Mobile.Services;
 using Microsoft.Identity.Client;
 
 namespace HCG.Mail.iOS;
@@ -26,9 +27,19 @@ namespace HCG.Mail.iOS;
 [Register("AppDelegate")]
 public partial class AppDelegate : AvaloniaAppDelegate<MobileApp>
 {
+    public AppDelegate() => StartupTrace.Mark(StartupStage.AppDelegate, "created by UIApplicationMain");
+
     protected override AppBuilder CustomizeAppBuilder(AppBuilder builder)
     {
+        StartupTrace.Mark(StartupStage.AvaloniaInit, "application:didFinishLaunching");
         var platform = new IosPlatform();
+        StartupTrace.Mark(StartupStage.Keychain, $"credential store created for \"{(platform.CredentialVault is IosKeychainCredentialVault v ? v.Service : "?")}\" (not accessed yet)");
+        StartupTrace.FirstFrameRendered += () =>
+        {
+            // After the first frame: a failure here is reported, never fatal.
+            if (platform.CredentialVault is IosKeychainCredentialVault vault)
+                StartupTrace.Mark(StartupStage.Keychain, $"probe {vault.Probe()} (ItemNotFound = the app's Keychain group works)");
+        };
         MobileApp.Platform = platform;
         MobileApp.Mode = new AppMode(IsPreview: PreviewRequested());
 #if DEBUG
@@ -41,6 +52,7 @@ public partial class AppDelegate : AvaloniaAppDelegate<MobileApp>
             .WithInterFont()
             .AfterSetup((Action<AppBuilder>)(_ready =>
             {
+                StartupTrace.Mark(StartupStage.AvaloniaReady, "platform set up");
                 if (Avalonia.Application.Current?.TryGetFeature(typeof(IActivatableLifetime)) is IActivatableLifetime lifetime)
                     lifetime.Activated += OnActivated;
                 if (Environment.GetEnvironmentVariable(SelfTest.Variable) == "1")

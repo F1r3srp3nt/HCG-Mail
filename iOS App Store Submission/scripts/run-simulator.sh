@@ -240,7 +240,7 @@ launch_and_wait() {   # launch_and_wait PATTERN
 
 if [[ $SELFTEST -eq 1 ]]; then
   launch_and_wait 'HCG-SELFTEST: \(PASS\|FAIL\)' || fail $? "no self-test verdict from the app"
-  grep 'HCG-SELFTEST' "$APP_LOG" || true
+  grep -E 'HCG-SELFTEST|HCG-STARTUP' "$APP_LOG" || true
   [[ -n "$SHOT" ]] && take_screenshot
   grep -q 'HCG-SELFTEST: PASS' "$APP_LOG" || { echo "HCG-SIM: self-test FAILED" >&2; exit 1; }
   exit 0

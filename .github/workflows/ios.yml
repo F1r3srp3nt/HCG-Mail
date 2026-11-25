@@ -136,6 +136,16 @@ jobs:
         run: |
           mkdir -p ../artifacts/ios-screenshots
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" scripts/run-simulator.sh --exclusive --self-test
+      # The Debug build above runs with the interpreter. Release (the shipped configuration: trimmed, optimised) is
+      # also launched, so a trimming or Release-only start-up failure shows here. The simulator runs Release code with
+      # the JIT, so full-AOT-only failures still need a device.
+      - name: Release build on an iPhone simulator — launch, start-up trace and self-test
+        timeout-minutes: 40
+        env:
+          HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs-release
+        run: |
+          app="$(scripts/build-simulator.sh Release | tail -1)"
+          HCG_IOS_APP="$app" HCG_IOS_CONFIGURATION=Release scripts/run-simulator.sh --exclusive --self-test
       # Preview mode: sample mailbox, no network. Each device is its own step, and run-simulator.sh limits and logs
       # every stage (boot, install, launch, ready, screenshot), so a stall names its stage well before the step limit.
       # --exclusive shuts the iPhone down before the iPad boots: in run 44953152990 the iPad boot, started while the
