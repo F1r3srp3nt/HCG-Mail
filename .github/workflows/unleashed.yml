@@ -20,7 +20,9 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   AVALONIA_TELEMETRY_OPTOUT: '1'
   PKG: com.hakmicapitalgroup.hcgmail.unleashed
-  PKG_VERSION: 0.1.0~beta1
+  PKG_VERSION: 0.1.0~beta2
+  # CFBundleVersion: 1 was 0.1.0~beta1; every package version gets its own build number.
+  BUILD_NUMBER: 2
   BUNDLE_ID: com.hakmicapitalgroup.hcgmail.unleashed
   DEB_ARTIFACT: hcg-mail-unleashed-deb
   # HCG Executable Maker main (merge of PR #16): the rootless packager, validator and HCG Repo dry-run script.
@@ -63,7 +65,7 @@ jobs:
         run: |
           mkdir -p "$OUT"
           dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 \
-            -p:HcgVariant=Unleashed -p:EnableCodeSigning=false -p:ApplicationVersion=1 -o "$OUT/app" 2>&1 | tee "$OUT/build.log"
+            -p:HcgVariant=Unleashed -p:EnableCodeSigning=false -p:ApplicationVersion=$BUILD_NUMBER -o "$OUT/app" 2>&1 | tee "$OUT/build.log"
           app="$(find "$OUT/app" -maxdepth 1 -name '*.app' -type d | head -1)"; test -d "$app"
           echo "APP=$app" >> "$GITHUB_ENV"
           # Trimming/AOT: the persistence layer must have no reflection-based JSON (StorageJsonContext).
@@ -72,7 +74,12 @@ jobs:
 
       - name: Check the app — identity, iOS 16.0, arm64, SDK, icon, privacy and scene manifests (verify-ios-build.py)
         run: |
-          HCG_IOS_BUNDLE_ID="$BUNDLE_ID" python3 -I scripts/verify-ios-build.py app "$APP" --kind device --build-number 1 | tee "$OUT/app-check.txt"
+          HCG_IOS_BUNDLE_ID="$BUNDLE_ID" python3 -I scripts/verify-ios-build.py app "$APP" --kind device --build-number "$BUILD_NUMBER" | tee "$OUT/app-check.txt"
+          # Diagnostic build: the start-up trace must be compiled in.
+          # .NET keeps string literals in UTF-16 (the IL-stripped assembly keeps its metadata and string heaps).
+          python3 -I -c 'import sys; sys.exit(0 if "HCG-STARTUP: ".encode("utf-16-le") in open(sys.argv[1],"rb").read() else 1)' "$APP/HCG.Mail.Mobile.dll" \
+            || { echo "::error::the start-up trace is missing from HCG.Mail.Mobile.dll"; exit 1; }
+          echo "start-up trace: present (HCG.Mail.Mobile.dll)" | tee -a "$OUT/app-check.txt"
           python3 -I - "$APP/Info.plist" <<'EOF'
           import plistlib, sys
           i = plistlib.load(open(sys.argv[1], "rb"))
@@ -114,8 +121,9 @@ jobs:
             --ci-repository "${{ github.repository }}" --ci-commit "${{ github.sha }}" --ci-run "${{ github.run_id }}" --ci-artifact "$DEB_ARTIFACT" \
             --built-with "$(xcodebuild -version | head -1), .NET iOS workload $(sed -n 's:.*<HcgIosWorkloadManifest>\(.*\)</HcgIosWorkloadManifest>.*:\1:p' toolchain.props)" \
             --production-access undecided \
-            --change "First rootless candidate of HCG Mail (0.1.0): the iOS app built from source as HCG Mail Unleashed — its own bundle ID, data folder and Keychain group, separate from HCG Mail." \
-            --known-issue "Not yet device-tested: installation, launch, Keychain storage and mail on a jailbroken device are unverified." \
+            --change "DIAGNOSTIC BUILD, not a confirmed fix: 0.1.0~beta1 closed immediately at launch on a jailbroken iPhone and the cause is not yet known. This build records how far start-up gets: each stage is written to Library/Application Support/HCG Mail Unleashed/startup/startup.txt under the app's home folder and to the device log as HCG-STARTUP lines (no passwords, mail or tokens)." \
+            --change "Start-up hardening: temporary-file cleanup and mailbox start-up run after the first screen; if the main screen cannot be created, a failure screen names the stage instead of the app closing. Packaging, signing and entitlements are unchanged from 0.1.0~beta1." \
+            --known-issue "Diagnostic build: 0.1.0~beta1 closed at launch on a jailbroken iPhone; whether this build starts is unverified. If it closes too, its start-up trace shows the last stage reached." \
             --known-issue "Microsoft and Google sign-in are not available in this build; IMAP/SMTP accounts with a password (or app password) only." \
             --known-issue "Rootless only (iphoneos-arm64), iOS 16.0 or later." \
             --out "$OUT/pkg" | tee "$OUT/package.log"
