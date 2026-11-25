@@ -8,7 +8,7 @@ self-contained single file: the target PC does **not** need .NET installed.
 ```bash
 scripts/publish-windows.sh
 # → artifacts/publish/win-x64/HCGMail.exe          (~110 MB, single file)
-# → artifacts/HCGMail-0.1.0-mvp-win-x64.zip        (+ SHA-256 checksums printed)
+# → artifacts/HCGMail-0.1.0-win-x64.zip          (+ SHA-256 checksums printed)
 ```
 
 Equivalent manual command:
@@ -27,8 +27,8 @@ awareness, long paths), the HCG Mail application icon and version information (H
 
 ## Install on the test PC (no installer yet)
 
-1. Copy `HCGMail-0.1.0-mvp-win-x64.zip` to the PC and compare its SHA-256
-   (`Get-FileHash .\HCGMail-0.1.0-mvp-win-x64.zip`).
+1. Copy `HCGMail-0.1.0-win-x64.zip` to the PC and compare its SHA-256
+   (`Get-FileHash .\HCGMail-0.1.0-win-x64.zip`).
 2. Right-click the zip → **Properties** → tick **Unblock** (if shown) → OK, then extract to e.g.
    `C:\Users\<you>\Apps\HCG Mail\`.
 3. Run `HCGMail.exe`. Because the build is **not code-signed**, SmartScreen shows *"Windows protected
