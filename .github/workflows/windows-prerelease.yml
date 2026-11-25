@@ -64,7 +64,9 @@ jobs:
           Get-Content "$dist\SHA256SUMS.txt"
           # The SDK the build used is the one HCG Mail's global.json selects in its own folder (the runner also has newer ones).
           Push-Location hcg-mail/Windows-executable-Application; $sdk = (dotnet --version); Pop-Location
-          $inno = ((& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" '/?' 2>&1) | Select-String 'Inno Setup' | Select-Object -First 1).ToString().Trim()
+          # Inno Setup's own version, from its uninstall registration (ISCC /? prints no version number and exits 1).
+          $innoKey = Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1', 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1' -ErrorAction SilentlyContinue | Select-Object -First 1
+          $inno = "Inno Setup $(if ($innoKey) { $innoKey.DisplayVersion } else { (Get-Item "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe").VersionInfo.FileVersion })"
           $files = @()
           $runtime = $null
           # (Get-ChildItem <folder> -Exclude … returns nothing without a wildcard in the path: filter instead.)
@@ -116,6 +118,7 @@ jobs:
             if ($f.appExecutable.peMachine -ne $want) { throw "$($f.fileName): HCGMail.exe is $($f.appExecutable.peMachine), expected $want" }
             if ($f.appExecutable.productVersion -notlike "$env:VERSION*") { throw "$($f.fileName): product version $($f.appExecutable.productVersion), expected $env:VERSION" }
           }
+          exit 0   # every check above passed; do not inherit a native tool's exit code
       - uses: actions/upload-artifact@v4
         with:
           name: hcg-mail-windows-${{ env.VERSION }}
