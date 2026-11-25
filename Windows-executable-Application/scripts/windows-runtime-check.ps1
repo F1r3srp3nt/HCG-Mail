@@ -73,6 +73,28 @@ foreach ($t in $tls) {
 
 # 3. Start-up, rendering, close, restart
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+Add-Type -Namespace Hcg -Name Win32 -MemberDefinition @'
+[DllImport("user32.dll")] public static extern bool PrintWindow(System.IntPtr hwnd, System.IntPtr hdc, uint flags);
+[DllImport("user32.dll")] public static extern bool GetWindowRect(System.IntPtr hwnd, out RECT rect);
+[DllImport("user32.dll")] public static extern bool SetForegroundWindow(System.IntPtr hwnd);
+[StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
+'@
+# The app's own window, rendered by Windows even when something else covers the screen (PW_RENDERFULLCONTENT).
+function WindowShot([System.IntPtr] $hwnd, [string] $name) {
+    $r = New-Object Hcg.Win32+RECT
+    if (-not [Hcg.Win32]::GetWindowRect($hwnd, [ref]$r)) { Write-Host "      window screenshot: no window rectangle"; return $false }
+    $w = $r.Right - $r.Left; $h = $r.Bottom - $r.Top
+    if ($w -le 0 -or $h -le 0) { return $false }
+    $bmp = New-Object System.Drawing.Bitmap $w, $h
+    $g = [System.Drawing.Graphics]::FromImage($bmp); $hdc = $g.GetHdc()
+    $ok = [Hcg.Win32]::PrintWindow($hwnd, $hdc, 2)
+    $g.ReleaseHdc($hdc); $g.Dispose()
+    # A rendered window is not one flat colour: count distinct colours on a coarse grid.
+    $colors = @{}; for ($x = 0; $x -lt $w; $x += [Math]::Max(1, [int]($w / 40))) { for ($y = 0; $y -lt $h; $y += [Math]::Max(1, [int]($h / 40))) { $colors[$bmp.GetPixel($x, $y).ToArgb()] = 1 } }
+    $path = Join-Path $Out $name; $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+    Write-Host "      window screenshot: $path ($w x $h, $($colors.Count) colours sampled)"
+    return ($ok -and $colors.Count -ge 8)
+}
 function Shot([string] $name) {
     $b = [System.Windows.Forms.SystemInformation]::VirtualScreen
     $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
@@ -96,6 +118,11 @@ function StartAndClose([string] $label, [string] $shot) {
     Check $shown "$label`: main window shown (title '$($p.MainWindowTitle)')"
     if (-not $shown -and $p.HasExited) { Write-Host "      exited with code $($p.ExitCode)" }
     Start-Sleep -Seconds 4   # let the first frames render before the screenshot
+    if ($shown) {
+        [void][Hcg.Win32]::SetForegroundWindow($p.MainWindowHandle)
+        Start-Sleep -Milliseconds 500
+        Check (WindowShot $p.MainWindowHandle ("window-" + $shot)) "$label`: the window has rendered content"
+    }
     Shot $shot
     if (-not $p.HasExited) {
         [void]$p.CloseMainWindow()
@@ -107,7 +134,8 @@ function StartAndClose([string] $label, [string] $shot) {
 StartAndClose 'First start' 'first-start.png'
 $settings = Get-ChildItem $data -Recurse -Filter 'settings.json' -ErrorAction SilentlyContinue | Select-Object -First 1
 $log = Get-ChildItem (Join-Path $data 'logs') -File -ErrorAction SilentlyContinue | Select-Object -First 1
-Check ($null -ne $log) "The app wrote its log in the data folder ($(if ($log) { $log.Name } else { 'none' }))"
+# Information only: the app writes its log when it has something to log, not at every start.
+Write-Host "      log after first start: $(if ($log) { $log.Name } else { 'none written (nothing to log)' })"
 Write-Host "      data folder after first start: $((Get-ChildItem $data -Recurse -File | ForEach-Object { $_.FullName.Substring($data.Length + 1) }) -join ', ')"
 StartAndClose 'Restart' 'restart.png'
 if ($log) {

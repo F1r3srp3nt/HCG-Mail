@@ -1,0 +1,6 @@
+# C# sources are checked out with LF on every OS. Tests build MIME messages and mail headers from multi-line raw string
+# literals; with Git for Windows' default (core.autocrlf=true) those literals became CRLF and four tests failed on
+# Windows only (Windows prerelease run 45681061181) although the app itself reads mail as raw bytes from the network.
+*.cs text eol=lf
+# Mail fixtures are byte-exact RFC 5322 messages (CRLF): never converted.
+*.eml -text
