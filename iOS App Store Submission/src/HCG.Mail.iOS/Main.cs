@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Foundation;
@@ -52,10 +51,9 @@ public static class Application
                 $"{name} {version}, {bundle.BundleIdentifier} · {NSProcessInfo.ProcessInfo.OperatingSystemVersionString} · "
                 + $"{RuntimeInformation.FrameworkDescription}, {RuntimeInformation.ProcessArchitecture}, dynamic code {(RuntimeFeature.IsDynamicCodeSupported ? "supported (interpreter)" : "not supported (AOT only)")} · "
                 + $"bundle {bundle.BundlePath} · home {NSFileManager.HomeDirectory} · temp {Path.GetTempPath()}");
-            string started;
-            try { started = $"process started {Process.GetCurrentProcess().StartTime.ToUniversalTime():HH:mm:ss.fff}Z"; }
-            catch (Exception) { started = "process start time not available"; }
-            StartupTrace.Mark(StartupStage.NativeEntry, started);
+            // iOS gives no process start time to .NET; the trace's own clock starts with the runtime, so the time
+            // the runtime itself took is the gap between launch and this line in the device log.
+            StartupTrace.Mark(StartupStage.NativeEntry, "process running");
             StartupTrace.Mark(StartupStage.RuntimeReady, "managed Main");
         }
         catch (Exception ex)

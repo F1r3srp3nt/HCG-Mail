@@ -136,16 +136,6 @@ jobs:
         run: |
           mkdir -p ../artifacts/ios-screenshots
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" scripts/run-simulator.sh --exclusive --self-test
-      # The Debug build above runs with the interpreter. Release (the shipped configuration: trimmed, optimised) is
-      # also launched, so a trimming or Release-only start-up failure shows here. The simulator runs Release code with
-      # the JIT, so full-AOT-only failures still need a device.
-      - name: Release build on an iPhone simulator — launch, start-up trace and self-test
-        timeout-minutes: 40
-        env:
-          HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs-release
-        run: |
-          app="$(scripts/build-simulator.sh Release | tail -1)"
-          HCG_IOS_APP="$app" HCG_IOS_CONFIGURATION=Release scripts/run-simulator.sh --exclusive --self-test
       # Preview mode: sample mailbox, no network. Each device is its own step, and run-simulator.sh limits and logs
       # every stage (boot, install, launch, ready, screenshot), so a stall names its stage well before the step limit.
       # --exclusive shuts the iPhone down before the iPad boots: in run 44953152990 the iPad boot, started while the
@@ -183,6 +173,54 @@ jobs:
           path: |
             artifacts/ios-screenshots
             artifacts/ios-sim-logs
+          if-no-files-found: ignore
+          retention-days: 14
+
+  simulator-release:
+    name: Release build on the simulator (trimmed, AOT) — launch, start-up trace, self-test
+    # The simulator job above runs the Debug build (interpreter). This one builds the shipped configuration (Release:
+    # trimmed and AOT-compiled, here for the simulator) and starts it, so a trimming, AOT or Release-only start-up
+    # failure shows without a phone. Its own job: the Release simulator build alone took over 36 minutes (run 45629298838).
+    runs-on: xcode-27
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+        working-directory: iOS App Store Submission
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the Xcode version pinned in toolchain.props
+        run: |
+          XCODE_VERSION="$(sed -n 's:.*<HcgRequiredXcode>\(.*\)</HcgRequiredXcode>.*:\1:p' toolchain.props)"
+          app="/Applications/Xcode_${XCODE_VERSION}.app"
+          if [ ! -d "$app" ]; then echo "Xcode ${XCODE_VERSION} is not installed on this runner."; exit 1; fi
+          sudo xcode-select -s "$app/Contents/Developer"
+          xcodebuild -version
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.1xx'
+      - name: Install the pinned iOS workload
+        run: scripts/install-workload.sh
+      - name: Build for the simulator (Release)
+        timeout-minutes: 120
+        run: scripts/build-simulator.sh Release | tee "$RUNNER_TEMP/app-path.txt"
+      - name: Start the Release build on an iPhone simulator (start-up trace and self-test)
+        timeout-minutes: 40
+        env:
+          HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs-release
+        run: HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" HCG_IOS_CONFIGURATION=Release scripts/run-simulator.sh --exclusive --self-test
+      - name: Shut down the simulators
+        if: always()
+        timeout-minutes: 10
+        run: |
+          xcrun simctl shutdown all || true
+          killall Simulator 2>/dev/null || true
+          pkill -f 'scripts/run-simulator.sh' 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-simulator-release-logs
+          path: artifacts/ios-sim-logs-release
           if-no-files-found: ignore
           retention-days: 14
 
