@@ -51,10 +51,12 @@ public static class MobileServices
                 {
                     paths.EnsureCreated();
                     builder.AddProvider(new FileLoggerProvider(paths.LogDirectory));
+                    StartupTrace.Mark(StartupStage.LocalStorage, "data folder ready");
                 }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     // Continue without file logging if the app's storage is unavailable.
+                    StartupTrace.Failure("creating the data folder (continuing without the file log)", ex);
                 }
             }
         });
