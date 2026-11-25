@@ -223,6 +223,72 @@ jobs:
           path: artifacts/ios-sim-logs-release
           if-no-files-found: ignore
           retention-days: 14
+      - name: Keep the Release simulator app for the older-iOS job
+        run: |
+          app="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/HCGMail-simulator-release.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-release-app
+          path: ${{ runner.temp }}/HCGMail-simulator-release.zip
+          retention-days: 7
+
+  older-ios:
+    name: Release build on older iOS simulators (${{ matrix.label }})
+    # The Release app above runs on iOS 27.2, which says nothing about the oldest iOS the app declares (16.0). This
+    # starts the same .app on the oldest iOS runtime each source offers and reports how far the start-up trace got.
+    # Which runtimes exist depends on the runner image, so each source is tried independently.
+    needs: simulator-release
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: "macos-15 image, oldest preinstalled", runner: macos-15, download: "" }
+          - { label: "macos-14 image, oldest preinstalled", runner: macos-14, download: "" }
+          - { label: "Xcode 27 + downloaded iOS 16.4", runner: xcode-27, download: "16.4" }
+          - { label: "Xcode 27 + downloaded iOS 17.5", runner: xcode-27, download: "17.5" }
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-simulator-release-app
+          path: ${{ runner.temp }}/app
+      - name: Runtime (download if requested)
+        if: matrix.download != ''
+        timeout-minutes: 60
+        run: xcodebuild -downloadPlatform iOS -buildVersion "${{ matrix.download }}"
+      - name: Start the app on the oldest iOS 16+ runtime and read its start-up trace
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          set -u
+          cd "$RUNNER_TEMP/app" && ditto -x -k HCGMail-simulator-release.zip . && APP="$PWD/$(ls -d *.app | head -1)"
+          xcrun simctl list runtimes
+          want="${{ matrix.download }}"
+          rt="$(xcrun simctl list runtimes -j | python3 -c '
+          import json,sys; want=sys.argv[1]
+          rts=[r for r in json.load(sys.stdin)["runtimes"] if r["platform"]=="iOS" and r.get("isAvailable")]
+          rts=[r for r in rts if tuple(map(int,r["version"].split(".")[:2]))>=(16,0) and (not want or r["version"].startswith(want))]
+          rts.sort(key=lambda r: tuple(map(int,r["version"].split("."))))
+          print(rts[0]["identifier"]+" "+rts[0]["version"] if rts else "")' "$want")"
+          [ -n "$rt" ] || { echo "No iOS 16.0+ simulator runtime${want:+ $want} on this runner."; exit 1; }
+          id="${rt%% *}"; ver="${rt##* }"
+          dt="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys;print([d["identifier"] for d in json.load(sys.stdin)["devicetypes"] if d["name"].startswith("iPhone")][-1])')"
+          udid="$(xcrun simctl create "HCG older iOS" "$dt" "$id")" || { echo "This runtime cannot create $dt"; exit 1; }
+          echo "Simulator: iOS $ver, $dt"
+          xcrun simctl boot "$udid"; xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$APP"
+          log="$RUNNER_TEMP/app.log"
+          SIMCTL_CHILD_HCG_MAIL_SELF_TEST=1 xcrun simctl launch --console-pty --terminate-running-process "$udid" com.hakmicapitalgroup.hcgmail > "$log" 2>&1 &
+          for i in $(seq 1 240); do grep -q 'HCG-SELFTEST: \(PASS\|FAIL\)' "$log" && break; sleep 2; done
+          kill %1 2>/dev/null || true
+          echo "== iOS $ver: start-up trace and self-test"; grep -E 'HCG-STARTUP|HCG-SELFTEST' "$log" || { echo "(no output)"; tail -40 "$log"; }
+          echo "== crash reports"; ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i hcg || echo "none"
+          xcrun simctl shutdown "$udid" || true
+          grep -q ' ms  first-frame' "$log" || { echo "iOS $ver: start-up did NOT reach the first frame"; exit 1; }
+          echo "iOS $ver: start-up reached the first frame"
 
   device-aot:
     # The App Store build is fully AOT-compiled; this takes much longer than a simulator build, so it runs as its own
