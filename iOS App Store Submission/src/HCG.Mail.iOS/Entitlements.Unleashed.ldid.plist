@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  HCG Mail Unleashed, pseudo-signed with ldid for rootless jailbreaks (there is no Team ID, so the group carries none).
+	  The only entitlement: the app's own Keychain group, where it stores IMAP/SMTP passwords. Nothing else: no
+	  no-sandbox, platform-application, task ports, root or filesystem access. HCG Repo records exactly this set
+	  (packages/com.hakmicapitalgroup.hcgmail.unleashed/package.toml) and refuses a binary that carries another.
+	-->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>com.hakmicapitalgroup.hcgmail.unleashed</string>
+	</array>
+</dict>
+</plist>

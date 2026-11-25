@@ -15,9 +15,14 @@
 
     <!-- Bundle identifier: must match the App ID registered by Hakmi Capital Group in the Apple Developer account and
          the msauth.<bundle id> URL scheme in Info.plist. Override with -p:HcgBundleId=... only together with Info.plist. -->
+    <!-- HCG Mail Unleashed (-p:HcgVariant=Unleashed): the rootless jailbreak edition for HCG Repo Candidate. The same app
+         with its own identity: bundle ID, name and URL scheme (Info.Unleashed.plist), and therefore its own data folder and
+         Keychain service (IosPlatform.AppName), so it never shares accounts, settings or passwords with HCG Mail. -->
+    <HcgBundleId Condition="'$(HcgBundleId)' == '' And '$(HcgVariant)' == 'Unleashed'">com.hakmicapitalgroup.hcgmail.unleashed</HcgBundleId>
     <HcgBundleId Condition="'$(HcgBundleId)' == ''">com.hakmicapitalgroup.hcgmail</HcgBundleId>
     <ApplicationId>$(HcgBundleId)</ApplicationId>
     <ApplicationTitle>HCG Mail</ApplicationTitle>
+    <ApplicationTitle Condition="'$(HcgVariant)' == 'Unleashed'">HCG Mail Unleashed</ApplicationTitle>
     <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
     <!-- CFBundleVersion: increase for every upload (-p:ApplicationVersion=N). -->
     <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">1</ApplicationVersion>
@@ -50,6 +55,14 @@
          and compiled by actool; Info.plist points XSAppIconAssets at it. -->
     <!-- App Store privacy manifest: no tracking, no data collected by the developer; required-reason APIs used by .NET. -->
     <BundleResource Include="PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(HcgVariant)' == 'Unleashed'">
+    <!-- Overrides Info.plist's name and Microsoft URL scheme (a partial manifest wins over Info.plist). -->
+    <PartialAppManifest Include="Info.Unleashed.plist" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Used only by HCG Executable Maker's ldid signing of the rootless package (CI workflow unleashed.yml). -->
+    <None Remove="Entitlements.Unleashed.ldid.plist;Info.Unleashed.plist" />
   </ItemGroup>
 
   <!-- Microsoft application (client) ID for Outlook.com / Microsoft 365 sign-in, from the shared oauth-clients.props

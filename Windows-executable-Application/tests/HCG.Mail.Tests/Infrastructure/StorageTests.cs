@@ -1,4 +1,8 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using HCG.Mail.Core.Accounts;
+using HCG.Mail.Core.Compose;
+using HCG.Mail.Core.Delivery;
 using HCG.Mail.Core.Settings;
 using HCG.Mail.Infrastructure;
 using HCG.Mail.Infrastructure.Credentials;
@@ -24,6 +28,59 @@ public sealed class StorageTests : IDisposable
         Smtp = new ServerEndpoint("smtp.firma.no", 587, MailSecurityMode.StartTls),
         PresetId = "domene.no",
     };
+
+    // The options the reflection-based serializer used before the source-generated StorageJsonContext.
+    private static readonly JsonSerializerOptions PreviousOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() },
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    [Fact]
+    public void Source_generated_json_matches_the_previous_format()
+    {
+        var settings = new AppSettings
+        {
+            Theme = ThemeKind.HcgClassic, DownloadDirectory = "/tmp/x", AutomaticRefreshMinutes = 15,
+            MarkAsReadWhenOpened = false, PendingCredentialDeletions = ["imap:old"], LastAccountId = "acc1",
+        };
+        Assert.Equal(JsonSerializer.Serialize(settings, PreviousOptions), JsonSerializer.Serialize(settings, StorageJsonContext.Default.AppSettings));
+
+        var accounts = new JsonAccountStore.AccountsFile
+        {
+            Version = 1,
+            Accounts = [JsonAccountStore.AccountDto.From(Account()), JsonAccountStore.AccountDto.From(Account("acc2") with { PresetId = null })],
+        };
+        Assert.Equal(JsonSerializer.Serialize(accounts, PreviousOptions), JsonSerializer.Serialize(accounts, StorageJsonContext.Default.AccountsFile));
+
+        List<DeliveryRecord> history =
+        [
+            new() { Timestamp = DateTimeOffset.Parse("2026-11-25T10:00:00+01:00"), AccountId = "acc1", AccountAddress = "ola@firma.no",
+                    SmtpServer = "smtp.firma.no:587", State = DeliveryState.Accepted, MessageId = "<a@b>", RecipientCount = 2,
+                    Priority = MessagePriority.High, SmtpStatusCode = 250, ServerReply = "2.0.0 Ok" },
+            new() { Timestamp = DateTimeOffset.Parse("2026-11-25T10:05:00Z"), AccountId = "acc1", AccountAddress = "ola@firma.no",
+                    SmtpServer = "smtp.firma.no:587", State = DeliveryState.Rejected, ErrorMessage = "550 refused" },
+        ];
+        Assert.Equal(JsonSerializer.Serialize(history, PreviousOptions), JsonSerializer.Serialize(history, StorageJsonContext.Default.ListDeliveryRecord));
+    }
+
+    [Fact]
+    public void Files_written_by_the_previous_serializer_still_load()
+    {
+        Directory.CreateDirectory(_dir);
+        var settings = new AppSettings { Theme = ThemeKind.HcgClassic, AutomaticRefreshMinutes = 30, PendingCredentialDeletions = ["k"] };
+        File.WriteAllText(Paths.SettingsFile, JsonSerializer.Serialize(settings, PreviousOptions));
+        var accounts = new JsonAccountStore.AccountsFile { Version = 1, Accounts = [JsonAccountStore.AccountDto.From(Account())] };
+        File.WriteAllText(Paths.AccountsFile, JsonSerializer.Serialize(accounts, PreviousOptions));
+
+        var loaded = new JsonAppSettingsStore(Paths, NullLogger<JsonAppSettingsStore>.Instance).Load();
+        Assert.Equal(ThemeKind.HcgClassic, loaded.Theme);
+        Assert.Equal(30, loaded.AutomaticRefreshMinutes);
+        Assert.Equal(["k"], loaded.PendingCredentialDeletions);
+        Assert.Equal(Account(), Assert.Single(new JsonAccountStore(Paths, NullLogger<JsonAccountStore>.Instance).Load()));
+    }
 
     [Fact]
     public void Theme_and_settings_persist_across_store_instances()

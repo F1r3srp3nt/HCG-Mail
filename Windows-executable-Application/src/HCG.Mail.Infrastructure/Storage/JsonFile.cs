@@ -1,28 +1,23 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.Logging;
 
 namespace HCG.Mail.Infrastructure.Storage;
 
-/// <summary>Small JSON persistence helper with atomic replace and recovery from corrupted files.</summary>
+/// <summary>
+/// Small JSON persistence helper with atomic replace and recovery from corrupted files. Types come from
+/// <see cref="StorageJsonContext"/> (source-generated, no reflection).
+/// </summary>
 internal static class JsonFile
 {
-    public static readonly JsonSerializerOptions Options = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = { new JsonStringEnumConverter() },
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
-    public static T? Read<T>(string path, ILogger logger) where T : class
+    public static T? Read<T>(string path, JsonTypeInfo<T> typeInfo, ILogger logger) where T : class
     {
         if (!File.Exists(path))
             return null;
         try
         {
             using var stream = File.OpenRead(path);
-            return JsonSerializer.Deserialize<T>(stream, Options);
+            return JsonSerializer.Deserialize(stream, typeInfo);
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException or InvalidOperationException)
         {
@@ -39,7 +34,7 @@ internal static class JsonFile
         }
     }
 
-    public static void Write<T>(string path, T value)
+    public static void Write<T>(string path, T value, JsonTypeInfo<T> typeInfo)
     {
         var directory = Path.GetDirectoryName(path)!;
         AppPaths.CreatePrivateDirectory(directory);
@@ -48,7 +43,7 @@ internal static class JsonFile
         {
             using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
-                JsonSerializer.Serialize(stream, value, Options);
+                JsonSerializer.Serialize(stream, value, typeInfo);
                 stream.Flush(flushToDisk: true);
             }
             if (!OperatingSystem.IsWindows())

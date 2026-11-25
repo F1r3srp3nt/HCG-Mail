@@ -6,20 +6,21 @@ using Security;
 namespace HCG.Mail.iOS.Platform;
 
 /// <summary>
-/// IMAP/SMTP passwords in the iOS Keychain as generic-password items (service "HCG Mail", account = credential key).
+/// IMAP/SMTP passwords in the iOS Keychain as generic-password items (service = the app's name, account = credential key).
 /// Items are readable only while the device is unlocked, never leave this device (no iCloud Keychain sync, not
 /// restored to another device from a backup) and are never written to a file. Uses the Security framework directly;
 /// no command-line tools are involved.
 /// </summary>
-public sealed class IosKeychainCredentialVault : ICredentialVault
+public sealed class IosKeychainCredentialVault(string service = "HCG Mail") : ICredentialVault
 {
-    public const string Service = "HCG Mail";
+    /// <summary>"HCG Mail"; "HCG Mail Unleashed" for the jailbreak edition, which also has its own Keychain group.</summary>
+    public string Service { get; } = service;
 
     public bool IsPersistent => true;
 
     public string StorageDescription => "iOS Keychain (this device only)";
 
-    private static SecRecord Query(string key) => new(SecKind.GenericPassword)
+    private SecRecord Query(string key) => new(SecKind.GenericPassword)
     {
         Service = Service,
         Account = key,
@@ -54,7 +55,7 @@ public sealed class IosKeychainCredentialVault : ICredentialVault
         return Task.CompletedTask;
     }
 
-    private static SecRecord NewItem(string key, string secret)
+    private SecRecord NewItem(string key, string secret)
     {
         var record = Query(key);
         record.ValueData = NSData.FromArray(Encoding.UTF8.GetBytes(secret));

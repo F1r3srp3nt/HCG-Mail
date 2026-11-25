@@ -18,9 +18,11 @@ public sealed class IosPlatform : IMobilePlatform, IDisposable
     public IosPlatform()
     {
         // The app's sandbox: settings and the account list in Library/Application Support (no secrets, no mail),
-        // temporary attachment copies in tmp/ (cleared at start).
-        Paths = AppPaths.ForCurrentUser();
-        TemporaryFilesDirectory = Path.Combine(Path.GetTempPath(), "HCG Mail");
+        // temporary attachment copies in tmp/ (cleared at start). Named after the app, so HCG Mail Unleashed (a rootless
+        // jailbreak app, which can run without a sandbox container) never shares them with HCG Mail.
+        Paths = AppPaths.ForCurrentUser(AppName);
+        TemporaryFilesDirectory = Path.Combine(Path.GetTempPath(), AppName);
+        CredentialVault = new IosKeychainCredentialVault(AppName);
         _microsoftAuth = new(() => IosMicrosoftAuth.Create(TopViewController, NullLogger.Instance));
 
         _observers.Add(NSNotificationCenter.DefaultCenter.AddObserver(UIApplication.ContentSizeCategoryChangedNotification, _ => RaiseChanged()));
@@ -30,7 +32,12 @@ public sealed class IosPlatform : IMobilePlatform, IDisposable
     public string Description => $"{UIDevice.CurrentDevice.SystemName} {UIDevice.CurrentDevice.SystemVersion}, {UIDevice.CurrentDevice.Model}";
     public AppPaths Paths { get; }
     public string TemporaryFilesDirectory { get; }
-    public ICredentialVault CredentialVault { get; } = new IosKeychainCredentialVault();
+    public ICredentialVault CredentialVault { get; }
+
+    /// <summary>CFBundleName: "HCG Mail", or "HCG Mail Unleashed" (Info.Unleashed.plist). Names the data folder, the
+    /// temporary folder and the Keychain service.</summary>
+    public static string AppName { get; } =
+        NSBundle.MainBundle.ObjectForInfoDictionary("CFBundleName")?.ToString() is { Length: > 0 } name ? name : "HCG Mail";
     public IMicrosoftAuth MicrosoftAuth => _microsoftAuth.Value;
     public bool IsTablet => UIDevice.CurrentDevice.UserInterfaceIdiom == UIUserInterfaceIdiom.Pad;
 

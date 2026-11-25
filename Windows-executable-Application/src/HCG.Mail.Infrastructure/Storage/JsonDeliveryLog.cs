@@ -31,7 +31,7 @@ public sealed class JsonDeliveryLog : IDeliveryLog
             records.Add(record);
             if (records.Count > MaxRecords)
                 records.RemoveRange(0, records.Count - MaxRecords);
-            JsonFile.Write(_path, records);
+            JsonFile.Write(_path, records, StorageJsonContext.Default.ListDeliveryRecord);
         }
     }
 
@@ -47,9 +47,9 @@ public sealed class JsonDeliveryLog : IDeliveryLog
         {
             var records = Load();
             records.RemoveAll(r => accountId is null || r.AccountId == accountId);
-            JsonFile.Write(_path, records);
+            JsonFile.Write(_path, records, StorageJsonContext.Default.ListDeliveryRecord);
         }
     }
 
-    private List<DeliveryRecord> Load() => _records ??= JsonFile.Read<List<DeliveryRecord>>(_path, _logger) ?? [];
+    private List<DeliveryRecord> Load() => _records ??= JsonFile.Read(_path, StorageJsonContext.Default.ListDeliveryRecord, _logger) ?? [];
 }

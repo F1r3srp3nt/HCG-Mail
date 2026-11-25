@@ -16,7 +16,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
     {
         lock (_lock)
         {
-            var file = JsonFile.Read<AccountsFile>(paths.AccountsFile, logger);
+            var file = JsonFile.Read(paths.AccountsFile, StorageJsonContext.Default.AccountsFile, logger);
             if (file?.Accounts is null)
                 return [];
 
@@ -38,7 +38,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
     public void Save(IReadOnlyList<MailAccount> accounts)
     {
         lock (_lock)
-            JsonFile.Write(paths.AccountsFile, new AccountsFile { Version = 1, Accounts = accounts.Select(AccountDto.From).ToList() });
+            JsonFile.Write(paths.AccountsFile, new AccountsFile { Version = 1, Accounts = accounts.Select(AccountDto.From).ToList() }, StorageJsonContext.Default.AccountsFile);
     }
 
     internal sealed class AccountsFile
