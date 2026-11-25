@@ -17,6 +17,8 @@ env:
   BUILD_NUMBER: 1
   # HCG Executable Maker main (Inno Setup installer, portable ZIP, installer test).
   MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
+  # HCG Repo main with the Release Passport v1 schema (final).
+  HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
   DOTNET_NOLOGO: 1
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
@@ -170,3 +172,42 @@ jobs:
           name: hcg-mail-windows-runtime-${{ matrix.arch }}
           path: ${{ runner.temp }}/runtime-portable
           retention-days: 30
+
+  store-draft:
+    name: HCG Store draft body and Release Passports (from the evidence; nothing is sent)
+    needs: [package, tests, runtime]
+    if: always() && needs.package.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: hcg-mail
+      - uses: actions/checkout@v5
+        with:
+          repository: F1r3srp3nt/HCG-repo
+          ref: ${{ env.HCG_REPO_COMMIT }}
+          path: hcg-repo
+          sparse-checkout: docs/schemas
+      - uses: actions/download-artifact@v4
+        with: { name: 'hcg-mail-windows-${{ env.VERSION }}', path: dist }
+      - uses: actions/download-artifact@v4
+        with: { name: hcg-mail-windows-build-evidence, path: evidence }
+      - uses: actions/download-artifact@v4
+        with: { name: hcg-mail-windows-test-results, path: tests }
+      - uses: actions/download-artifact@v4
+        with: { name: hcg-mail-windows-runtime-x64, path: runtime/x64 }
+      - uses: actions/download-artifact@v4
+        with: { name: hcg-mail-windows-runtime-arm64, path: runtime/arm64 }
+      - name: Generate and validate
+        run: |
+          pip install --quiet jsonschema
+          python3 -I hcg-mail/Windows-executable-Application/scripts/maker/store-draft.py --dist dist --evidence evidence/build-evidence.json \
+            --runtime runtime --tests tests --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out store-draft | tee -a "$GITHUB_STEP_SUMMARY"
+          cp dist/SHA256SUMS.txt store-draft/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-windows-store-draft
+          path: store-draft
+          retention-days: 90

@@ -23,8 +23,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $failures = 0
+$results = New-Object System.Collections.ArrayList
 function Check([bool] $ok, [string] $what) {
     if ($ok) { Write-Host "PASS  $what" } else { Write-Host "FAIL  $what"; $script:failures++ }
+    [void]$script:results.Add([ordered]@{ check = $what; passed = $ok })
 }
 
 $Exe = (Resolve-Path $Exe).Path
@@ -142,6 +144,13 @@ if ($log) {
     $text = Get-Content $log.FullName -Raw
     Check ($text -notmatch '(?i)password\s*[:=]|AUTHENTICATE PLAIN [A-Za-z0-9+/=]{8,}') 'The log holds no password or authentication payload'
 }
+
+$os = Get-CimInstance Win32_OperatingSystem
+[ordered]@{
+    executable = [ordered]@{ productVersion = $info.ProductVersion; fileVersion = $info.FileVersion; authenticode = [string]$sig.Status }
+    windows = [ordered]@{ caption = $os.Caption; version = [string][Environment]::OSVersion.Version; build = $os.BuildNumber; architecture = $env:PROCESSOR_ARCHITECTURE }
+    checks = $results; failures = $failures
+} | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $Out 'runtime-summary.json') -Encoding utf8
 
 Write-Host ''
 if ($failures -eq 0) { Write-Host 'Windows runtime check: all checks passed' } else { Write-Host "Windows runtime check: $failures check(s) FAILED" }
