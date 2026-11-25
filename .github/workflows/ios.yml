@@ -246,10 +246,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Run 45656262522: the macos-15 image's oldest runtime is iOS 18.5; Xcode 27 cannot download iOS 16.4 or 17.5
+          # ("not available for download"); the macos-14 image did not start. The macos-15 image's own Xcode is older,
+          # so it is asked for the older runtimes.
           - { label: "macos-15 image, oldest preinstalled", runner: macos-15, download: "" }
-          - { label: "macos-14 image, oldest preinstalled", runner: macos-14, download: "" }
-          - { label: "Xcode 27 + downloaded iOS 16.4", runner: xcode-27, download: "16.4" }
-          - { label: "Xcode 27 + downloaded iOS 17.5", runner: xcode-27, download: "17.5" }
+          - { label: "macos-15 image + downloaded iOS 17.5", runner: macos-15, download: "17.5" }
+          - { label: "macos-15 image + downloaded iOS 16.4", runner: macos-15, download: "16.4" }
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -275,7 +277,11 @@ jobs:
           print(rts[0]["identifier"]+" "+rts[0]["version"] if rts else "")' "$want")"
           [ -n "$rt" ] || { echo "No iOS 16.0+ simulator runtime${want:+ $want} on this runner."; exit 1; }
           id="${rt%% *}"; ver="${rt##* }"
-          dt="$(xcrun simctl list devicetypes -j | python3 -c 'import json,sys;print([d["identifier"] for d in json.load(sys.stdin)["devicetypes"] if d["name"].startswith("iPhone")][-1])')"
+          # An iPhone this runtime supports (the newest one it lists).
+          dt="$(xcrun simctl list runtimes -j | python3 -c '
+          import json,sys
+          r=[r for r in json.load(sys.stdin)["runtimes"] if r["identifier"]==sys.argv[1]][0]
+          print([d["identifier"] for d in r.get("supportedDeviceTypes",[]) if d["name"].startswith("iPhone")][-1])' "$id")"
           udid="$(xcrun simctl create "HCG older iOS" "$dt" "$id")" || { echo "This runtime cannot create $dt"; exit 1; }
           echo "Simulator: iOS $ver, $dt"
           xcrun simctl boot "$udid"; xcrun simctl bootstatus "$udid" -b
