@@ -68,25 +68,37 @@ jobs:
           $files = @()
           $runtime = $null
           # (Get-ChildItem <folder> -Exclude … returns nothing without a wildcard in the path: filter instead.)
+          function PeInfo([string] $path) {
+            $bytes = [IO.File]::ReadAllBytes($path); $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+            $vi = (Get-Item $path).VersionInfo
+            [ordered]@{ authenticode = [string](Get-AuthenticodeSignature $path).Status; peMachine = ('0x{0:X4}' -f [BitConverter]::ToUInt16($bytes, $pe + 4))
+              productVersion = "$($vi.ProductVersion)".Trim(); fileVersion = "$($vi.FileVersion)".Trim(); company = "$($vi.CompanyName)".Trim(); product = "$($vi.ProductName)".Trim() }
+          }
+          # HCGMail.exe of each architecture, from the portable ZIP. The installer of the same architecture packages the same
+          # publish output (one Executable Maker build produced both), so its HCGMail.exe is this one.
+          $app = @{}
+          foreach ($z in Get-ChildItem $dist -File -Filter '*.zip') {
+            $rid = if ($z.Name -match 'win-arm64') { 'win-arm64' } else { 'win-x64' }
+            $x = Join-Path $env:RUNNER_TEMP ("unzip-" + $rid); Expand-Archive $z.FullName $x -Force
+            $app[$rid] = PeInfo (Get-ChildItem $x -Recurse -Filter HCGMail.exe | Select-Object -First 1).FullName
+            # The .NET runtime bundled in the self-contained app.
+            $core = Get-ChildItem $x -Recurse -Filter System.Private.CoreLib.dll | Select-Object -First 1
+            if ($core) { $runtime = "$((Get-Item $core.FullName).VersionInfo.ProductVersion)".Split('+')[0].Trim() }
+          }
           foreach ($f in Get-ChildItem $dist -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name) {
             $rid = if ($f.Name -match 'win-arm64') { 'win-arm64' } else { 'win-x64' }
-            $exe = $f.FullName
-            if ($f.Extension -eq '.zip') {
-              $x = Join-Path $env:RUNNER_TEMP ("unzip-" + $rid); Expand-Archive $f.FullName $x -Force
-              $exe = (Get-ChildItem $x -Recurse -Filter HCGMail.exe | Select-Object -First 1).FullName
-              # The .NET runtime bundled in the self-contained app.
-              $core = Get-ChildItem $x -Recurse -Filter System.Private.CoreLib.dll | Select-Object -First 1
-              if ($core) { $runtime = (Get-Item $core.FullName).VersionInfo.ProductVersion.Split('+')[0] }
-            }
-            $bytes = [IO.File]::ReadAllBytes($exe); $pe = [BitConverter]::ToInt32($bytes, 0x3C); $machine = [BitConverter]::ToUInt16($bytes, $pe + 4)
-            $vi = (Get-Item $exe).VersionInfo
-            $files += [ordered]@{
-              fileName = $f.Name; kind = $(if ($f.Extension -eq '.zip') { 'portable' } else { 'installer' }); format = $f.Extension.TrimStart('.')
+            $isZip = $f.Extension -eq '.zip'
+            $exeInfo = [ordered]@{ file = 'HCGMail.exe' }; foreach ($k in $app[$rid].Keys) { $exeInfo[$k] = $app[$rid][$k] }
+            $entry = [ordered]@{
+              fileName = $f.Name; kind = $(if ($isZip) { 'portable' } else { 'installer' }); format = $f.Extension.TrimStart('.')
               architecture = $rid.Replace('win-', ''); sizeBytes = $f.Length; sha256 = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-              authenticode = [string](Get-AuthenticodeSignature $f.FullName).Status
-              appExecutable = [ordered]@{ file = 'HCGMail.exe'; authenticode = [string](Get-AuthenticodeSignature $exe).Status
-                peMachine = ('0x{0:X4}' -f $machine); productVersion = $vi.ProductVersion; fileVersion = $vi.FileVersion; company = $vi.CompanyName; product = $vi.ProductName }
+              # A ZIP cannot carry an Authenticode signature; for it only HCGMail.exe inside is checked.
+              authenticode = $(if ($isZip) { 'NotApplicable' } else { [string](Get-AuthenticodeSignature $f.FullName).Status })
+              appExecutable = $exeInfo
             }
+            # Inno Setup's bootstrapper is a 32-bit x86 program on every architecture; its target is set by ArchitecturesAllowed.
+            if (-not $isZip) { $entry.setupBootstrapper = PeInfo $f.FullName }
+            $files += $entry
           }
           [ordered]@{
             product = 'HCG Mail'; version = $env:VERSION; buildNumber = [int]$env:BUILD_NUMBER

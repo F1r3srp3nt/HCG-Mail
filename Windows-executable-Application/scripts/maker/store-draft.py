@@ -76,8 +76,9 @@ for f in ev["files"]:
     launch_state = "passed" if all_passed(launch) else ("failed" if launch else "not-run")
     # Authenticated IMAP/SMTP (sign-in, send, receive) is not exercised on Windows in CI: runtime is partial at best.
     runtime_state = "partial" if (all_passed(tls) and all_passed(cred)) else ("failed" if (tls or cred) else "not-run")
-    unsigned = f["authenticode"] != "Valid" or f["appExecutable"]["authenticode"] != "Valid"
-    signing_evidence = f"Get-AuthenticodeSignature: {f['fileName']} {f['authenticode']}; HCGMail.exe {f['appExecutable']['authenticode']}. HCG Executable Maker does not implement Authenticode."
+    unsigned = f["authenticode"] not in ("Valid", "NotApplicable") or f["appExecutable"]["authenticode"] != "Valid"
+    signing_evidence = (f"Get-AuthenticodeSignature: {f['fileName']} {'(ZIP: cannot be signed)' if f['authenticode'] == 'NotApplicable' else f['authenticode']}; "
+                        f"HCGMail.exe {f['appExecutable']['authenticode']}. HCG Executable Maker does not implement Authenticode.")
     summary_text = (f"HCG Executable Maker engine {ev['build']['toolchain']}. Windows tests: {tests['passed']}/{tests['total']} passed, {tests['failed']} failed. "
                     f"Runtime on Windows {arch} ({rt['windows']['caption'] if rt else 'not run'}, build {rt['windows']['build'] if rt else '-'}): "
                     + (f"{sum(c['passed'] for c in rt['checks'])}/{len(rt['checks'])} checks passed (credential store, TLS accept/reject, start, window rendering, restart). " if rt else "not run. ")
