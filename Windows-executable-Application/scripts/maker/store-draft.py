@@ -50,7 +50,7 @@ for arch in ("x64", "arm64"):
     inst = os.path.join(d, "installer-test.txt")
     r = json.load(open(summary, encoding="utf-8-sig")) if os.path.exists(summary) else None
     inst_text = open(inst, encoding="utf-8-sig", errors="replace").read() if os.path.exists(inst) else ""
-    runtime[arch] = {"summary": r, "installer_passed": bool(inst_text) and "check(s) failed" not in inst_text and "FAIL" not in inst_text,
+    runtime[arch] = {"summary": r, "installer_passed": "Installer verified:" in inst_text and "  FAIL  " not in inst_text,
                      "installer_ran": bool(inst_text)}
 
 def checks(arch, needle):
@@ -59,6 +59,8 @@ def checks(arch, needle):
 
 def all_passed(lst): return bool(lst) and all(c["passed"] for c in lst)
 
+if not ev["files"]:
+    sys.exit("build-evidence.json lists no files: refusing to write an empty draft")
 files, artifacts, summary_rows = [], [], []
 for f in ev["files"]:
     path = os.path.join(a.dist, f["fileName"])

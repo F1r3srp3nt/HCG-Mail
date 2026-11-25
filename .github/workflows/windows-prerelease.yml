@@ -62,13 +62,21 @@ jobs:
           Get-ChildItem $dist -File | Sort-Object Name | ForEach-Object {
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } | Set-Content "$dist\SHA256SUMS.txt" -Encoding ascii
           Get-Content "$dist\SHA256SUMS.txt"
+          # The SDK the build used is the one HCG Mail's global.json selects in its own folder (the runner also has newer ones).
+          Push-Location hcg-mail/Windows-executable-Application; $sdk = (dotnet --version); Pop-Location
+          $inno = ((& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" '/?' 2>&1) | Select-String 'Inno Setup' | Select-Object -First 1).ToString().Trim()
           $files = @()
-          foreach ($f in Get-ChildItem $dist -File -Exclude SHA256SUMS.txt | Sort-Object Name) {
+          $runtime = $null
+          # (Get-ChildItem <folder> -Exclude … returns nothing without a wildcard in the path: filter instead.)
+          foreach ($f in Get-ChildItem $dist -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name) {
             $rid = if ($f.Name -match 'win-arm64') { 'win-arm64' } else { 'win-x64' }
             $exe = $f.FullName
             if ($f.Extension -eq '.zip') {
               $x = Join-Path $env:RUNNER_TEMP ("unzip-" + $rid); Expand-Archive $f.FullName $x -Force
               $exe = (Get-ChildItem $x -Recurse -Filter HCGMail.exe | Select-Object -First 1).FullName
+              # The .NET runtime bundled in the self-contained app.
+              $core = Get-ChildItem $x -Recurse -Filter System.Private.CoreLib.dll | Select-Object -First 1
+              if ($core) { $runtime = (Get-Item $core.FullName).VersionInfo.ProductVersion.Split('+')[0] }
             }
             $bytes = [IO.File]::ReadAllBytes($exe); $pe = [BitConverter]::ToInt32($bytes, 0x3C); $machine = [BitConverter]::ToUInt16($bytes, $pe + 4)
             $vi = (Get-Item $exe).VersionInfo
@@ -84,7 +92,7 @@ jobs:
             product = 'HCG Mail'; version = $env:VERSION; buildNumber = [int]$env:BUILD_NUMBER
             source = [ordered]@{ repository = '${{ github.repository }}'; commit = '${{ github.sha }}'; branch = '${{ github.ref_name }}' }
             build = [ordered]@{ provider = 'github-actions'; runId = '${{ github.run_id }}'; runAttempt = '${{ github.run_attempt }}'; runner = "$env:ImageOS $env:ImageVersion"
-              toolchain = ".NET SDK $(dotnet --version); HCG Executable Maker engine $env:MAKER_COMMIT; Inno Setup $((Get-Item "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe").VersionInfo.ProductVersion)" }
+              toolchain = ".NET SDK $sdk (HCG Mail global.json), .NET runtime $runtime; HCG Executable Maker engine $($env:MAKER_COMMIT.Substring(0,12)); $inno" }
             codeSigning = 'unsigned: HCG Executable Maker does not implement Authenticode; Windows SmartScreen warns'
             files = $files
           } | ConvertTo-Json -Depth 6 | Set-Content "$ev\build-evidence.json" -Encoding utf8
@@ -164,7 +172,8 @@ jobs:
         shell: pwsh
         run: |
           $setup = (Get-ChildItem dist -Filter "HCGMail-$env:VERSION-win-${{ matrix.arch }}-Setup.exe" | Select-Object -First 1).FullName
-          ./maker/tools/installer-test/Test-Installer.ps1 -Setup $setup -AppName 'HCG Mail' -ExeName 'HCGMail.exe' -Version $env:VERSION -LaunchSeconds 20 |
+          # *>&1: the test reports with Write-Host (the information stream), which a plain pipe does not carry.
+          ./maker/tools/installer-test/Test-Installer.ps1 -Setup $setup -AppName 'HCG Mail' -ExeName 'HCGMail.exe' -Version $env:VERSION -LaunchSeconds 20 *>&1 |
             Tee-Object -FilePath "$env:RUNNER_TEMP\runtime-portable\installer-test.txt"
       - uses: actions/upload-artifact@v4
         if: always()
