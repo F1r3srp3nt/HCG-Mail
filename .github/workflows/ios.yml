@@ -246,12 +246,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Run 45656262522: the macos-15 image's oldest runtime is iOS 18.5; Xcode 27 cannot download iOS 16.4 or 17.5
-          # ("not available for download"); the macos-14 image did not start. The macos-15 image's own Xcode is older,
-          # so it is asked for the older runtimes.
+          # The oldest iOS that GitHub-hosted runners offer here is 18.5 (macos-15 image). iOS 16.4 and 17.5 cannot be
+          # obtained: Xcode 27 reports them "not available for download" (run 45656262522), the macos-15 image's download
+          # fails ("Unable to connect to simulator", run 45663905117) and the macos-14 image does not start. So iOS 16 and
+          # 17 need a physical device (or a self-hosted Mac with those runtimes); this job covers iOS 18.5.
           - { label: "macos-15 image, oldest preinstalled", runner: macos-15, download: "" }
-          - { label: "macos-15 image + downloaded iOS 17.5", runner: macos-15, download: "17.5" }
-          - { label: "macos-15 image + downloaded iOS 16.4", runner: macos-15, download: "16.4" }
     steps:
       - uses: actions/download-artifact@v4
         with:
