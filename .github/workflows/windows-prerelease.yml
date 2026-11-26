@@ -15,10 +15,9 @@ permissions:
 env:
   VERSION: 0.1.0-beta.1
   BUILD_NUMBER: 1
-  # HCG Executable Maker with --package-windows (Windows Release Passports, Store submission manifest, Authenticode
-  # Signing Doctor, bootstrapper vs installed-program architecture). Validated on feature/windows-packaging; re-pin to
-  # the main merge commit once it is merged.
-  MAKER_COMMIT: 4c946ff65c47ef3f5b403e9a0835721bb4ad9699
+  # HCG Executable Maker main with --package-windows (Windows Release Passports, Store submission manifest,
+  # Authenticode Signing Doctor, bootstrapper vs installed-program architecture).
+  MAKER_COMMIT: ea0e019986a7e0e5b7a7123e78f40269946f12fb
   # HCG Repo main with the Release Passport v1 schema (final).
   HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
   DOTNET_NOLOGO: 1
