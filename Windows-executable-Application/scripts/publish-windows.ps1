@@ -4,7 +4,7 @@
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 [xml]$props = Get-Content 'Directory.Build.props'
-$version = $props.Project.PropertyGroup.InformationalVersion
+$version = @($props.Project.PropertyGroup.Version | Where-Object { $_ })[0]
 $out = 'artifacts\publish\win-x64'
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 dotnet publish src\HCG.Mail.App -c Release -r win-x64 --self-contained true `

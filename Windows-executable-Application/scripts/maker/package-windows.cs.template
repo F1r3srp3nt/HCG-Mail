@@ -1,0 +1,122 @@
+// HCG Mail for Windows, packaged by HCG Executable Maker's own engine (inspection, build, Inno Setup installer and
+// portable ZIP), unchanged. This is Executable Maker's headless self-package script (tools/self-package/self-package.cs)
+// with HCG Mail's identity instead of Executable Maker's; the CI workflow windows-prerelease.yml replaces @MAKER@ with a
+// checkout of Executable Maker at the pinned commit and runs it on a Windows runner.
+//   dotnet run --no-cache package-windows.cs -- <HCG Mail Windows source> <output-dir> --version 0.1.0-beta.1
+//        [--targets win-x64,win-arm64] [--dist <dir>] [--installer]
+// Nothing is signed: Executable Maker never code-signs (Authenticode is not implemented), and the artifacts say so.
+#:property JsonSerializerIsReflectionEnabledByDefault=true
+#:property PublishAot=false
+#:project @MAKER@/src/HCG.ExecutableMaker.Infrastructure/HCG.ExecutableMaker.Infrastructure.csproj
+#:project @MAKER@/src/HCG.ExecutableMaker.ProjectInspection/HCG.ExecutableMaker.ProjectInspection.csproj
+#:project @MAKER@/src/HCG.ExecutableMaker.BuildEngine/HCG.ExecutableMaker.BuildEngine.csproj
+using HCG.ExecutableMaker.BuildEngine;
+using HCG.ExecutableMaker.Core;
+using HCG.ExecutableMaker.Domain;
+using HCG.ExecutableMaker.Infrastructure.Import;
+using HCG.ExecutableMaker.Infrastructure.Persistence;
+using HCG.ExecutableMaker.Infrastructure.Processes;
+using HCG.ExecutableMaker.Infrastructure.Toolchains;
+using HCG.ExecutableMaker.Packaging;
+using HCG.ExecutableMaker.Packaging.Packagers;
+using HCG.ExecutableMaker.ProjectInspection;
+using HCG.ExecutableMaker.ProjectInspection.DotNet;
+using Microsoft.Extensions.Logging.Abstractions;
+
+if (args.Length < 2) { Console.Error.WriteLine("Usage: package-windows.cs <source> <output-dir> --version x.y.z[-label] [--targets rid,rid] [--dist dir] [--installer]"); return 2; }
+string? Option(string name) { var i = Array.IndexOf(args, name); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
+var source = Path.GetFullPath(args[0]);
+var output = Path.GetFullPath(args[1]);
+var version = Option("--version") ?? throw new ArgumentException("--version is required");
+var targets = (Option("--targets") ?? "win-x64").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+var dist = Option("--dist") is { } d ? Path.GetFullPath(d) : null;
+var installer = args.Contains("--installer");
+if (PathGuard.IsWithin(source, output) || (dist is not null && PathGuard.IsWithin(source, dist)))
+{
+    Console.Error.WriteLine("Choose output and dist directories outside the source (they would be imported on the next run).");
+    return 2;
+}
+
+var paths = new AppPaths(Path.Combine(Path.GetTempPath(), "hcg-mail-pack-" + Guid.NewGuid().ToString("N")[..8]));
+var db = new SqliteDatabase(paths);
+var runner = new ProcessRunner();
+var toolchains = new ToolchainService(new ToolchainDetector(runner, new ExecutableLocator(), paths, TimeProvider.System));
+var projects = new ProjectService(new ProjectImporter(paths, TimeProvider.System),
+    new ProjectInspectionService([new DotNetProjectInspector(TimeProvider.System)], TimeProvider.System),
+    new SqliteProjectRepository(db), new SqliteSettingsStore(db), toolchains, paths, TimeProvider.System, NullLogger<ProjectService>.Instance);
+var builds = new BuildService(new LocalProcessBuildWorker(runner), toolchains, new SqliteBuildRepository(db),
+    new PackagingRegistry([new PortableFolderPackager(), new PortableZipPackager(), new InnoSetupPackager(runner)]),
+    paths, TimeProvider.System);
+
+var report = await toolchains.GetAsync();
+Console.WriteLine($"Host: {report.Host.DisplayName} · .NET SDK {report.Find(ToolchainIds.DotNetSdk)?.Version ?? "missing"}");
+var import = await projects.ImportDirectoryAsync(source, null, CancellationToken.None);
+var analysis = import.Project.Analysis!;
+Console.WriteLine($"Imported {import.FileCount} files. Primary: {analysis.PrimaryProjectPath} ({analysis.ApplicationType}, {analysis.Support})");
+if (analysis.Support != SupportLevel.Supported || analysis.PrimaryProjectPath is null || !analysis.PrimaryProjectPath.EndsWith("HCG.Mail.App.csproj", StringComparison.Ordinal))
+{
+    Console.Error.WriteLine("Inspection did not select HCG Mail's desktop app (src/HCG.Mail.App): " + analysis.SupportSummary);
+    return 1;
+}
+var icon = Path.Combine(import.Project.SourceDirectory, "src", "HCG.Mail.App", "Assets", "Icons", "hcg-mail.png");
+if (!File.Exists(icon)) { Console.Error.WriteLine("HCG Mail's icon is missing: " + icon); return 1; }
+if (dist is not null) Directory.CreateDirectory(dist);
+
+var failures = 0;
+foreach (var rid in targets)
+{
+    var arch = rid switch { "win-x64" => TargetArchitecture.X64, "win-arm64" => TargetArchitecture.Arm64, _ => throw new ArgumentException($"Unsupported target '{rid}'.") };
+    var options = PackagingCatalog.Evaluate(new PackagingContext(TargetPlatform.Windows, report.Host, report, IsGuiApplication: true));
+    var formats = new List<PackagingFormat> { PackagingFormat.PortableZip };
+    if (installer)
+    {
+        var setup = options.First(o => o.Format == PackagingFormat.WindowsInstallerExe);
+        if (!setup.IsAvailable) { Console.Error.WriteLine($"{rid}: Windows installer requested but unavailable — {setup.Reason}"); failures++; continue; }
+        formats.Add(PackagingFormat.WindowsInstallerExe);
+    }
+    var settings = new BuildSettings
+    {
+        ProjectRelativePath = analysis.PrimaryProjectPath,
+        Platform = TargetPlatform.Windows,
+        Architecture = arch,
+        OutputDirectory = output,
+        Configuration = BuildConfigurationKind.Release,
+        Identity = new AppIdentity
+        {
+            // ApplicationId seeds the installer's AppId (Inno Setup): keep it stable so later versions upgrade in place.
+            ApplicationName = "HCG Mail", Publisher = "Hakmi Capital Group", Version = version,
+            ApplicationId = "com.hakmicapitalgroup.hcgmail", IconSourcePath = icon,
+            Description = "Private email for your own IMAP/SMTP mailbox.",
+        },
+        PackagingFormats = formats,
+    };
+    Console.WriteLine($"── {rid}: {string.Join(", ", formats.Select(f => f.DisplayName()))}");
+    var build = await builds.RunAsync(new BuildRequest
+    {
+        Project = import.Project, Settings = settings, TrustAcknowledged = true, AllowOverwriteOutput = true, AssemblyName = "HCGMail",
+    }, new ConsoleObserver(), CancellationToken.None);
+    Console.WriteLine($"{rid}: {build.Status} {build.FailureReason} in {build.Duration}");
+    foreach (var art in build.Artifacts)
+    {
+        Console.WriteLine($"  {art.Path}  {art.SizeBytes / 1048576.0:F1} MB  sha256={art.Sha256}  {art.Verification}");
+        foreach (var c in art.Checks)
+            Console.WriteLine($"     - {c.Status}: {c.Name} — {c.Detail}");
+    }
+    if (build.Status != BuildStatus.Succeeded) { failures++; continue; }
+    if (dist is not null)
+        foreach (var art in build.Artifacts.Where(a => a.Kind == ArtifactKind.File))
+        {
+            var suffix = art.Path.EndsWith("-Setup.exe", StringComparison.Ordinal) ? "-Setup.exe" : Path.GetExtension(art.Path);
+            File.Copy(art.Path, Path.Combine(dist, $"HCGMail-{version}-{rid}{suffix}"), overwrite: true);
+        }
+}
+return failures == 0 ? 0 : 1;
+
+sealed class ConsoleObserver : IBuildObserver
+{
+    public void OnStage(BuildStage stage, string description) => Console.WriteLine($"   [{stage}] {description}");
+    public void OnLog(BuildLogLine line)
+    {
+        if (line.Kind is BuildLogKind.Error or BuildLogKind.Warning) Console.WriteLine($"   {line.Kind.ToString().ToUpperInvariant()}: {line.Text}");
+    }
+}

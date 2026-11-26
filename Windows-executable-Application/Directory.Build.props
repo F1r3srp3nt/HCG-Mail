@@ -7,7 +7,10 @@
     <AnalysisLevel>latest</AnalysisLevel>
 
     <Version>0.1.0</Version>
-    <InformationalVersion>0.1.0-mvp</InformationalVersion>
+    <!-- Shown in Settings › About. Follows Version unless set: a build stamped with a pre-release version
+         (-p:Version=0.1.0-beta.1, as HCG Executable Maker does) shows exactly that. Version itself stays numeric
+         here because the iOS app uses it as CFBundleShortVersionString. -->
+    <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Company>Hakmi Capital Group</Company>
     <Product>HCG Mail</Product>

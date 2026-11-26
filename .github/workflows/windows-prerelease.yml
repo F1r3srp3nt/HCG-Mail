@@ -1,0 +1,237 @@
+# HCG Mail for Windows, public testing prerelease: built and packaged by HCG Executable Maker's engine (pinned) on a
+# Windows runner, then tested on real Windows (x64 and ARM64 runners). Publishes nothing: the artifacts and evidence are
+# for the owner's review and the HCG Store draft. Not code-signed (Executable Maker does not implement Authenticode);
+# the evidence says so.
+name: Windows prerelease
+
+on:
+  push:
+    branches: ['windows/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VERSION: 0.1.0-beta.1
+  BUILD_NUMBER: 1
+  # HCG Executable Maker main (Inno Setup installer, portable ZIP, installer test).
+  MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
+  # HCG Repo main with the Release Passport v1 schema (final).
+  HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
+  DOTNET_NOLOGO: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  package:
+    name: Package with HCG Executable Maker (win-x64, win-arm64; installer and portable ZIP)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: hcg-mail
+      - uses: actions/checkout@v5
+        with:
+          repository: F1r3srp3nt/HCG-Executable-Maker
+          ref: ${{ env.MAKER_COMMIT }}
+          path: maker
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Inno Setup 6 (Executable Maker's Windows installer tool)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          (Get-Item "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe").VersionInfo.ProductVersion
+      - name: Package (Executable Maker's engine, HCG Mail identity)
+        shell: pwsh
+        run: |
+          $maker = (Resolve-Path maker).Path.Replace('\', '/')
+          $pack = Join-Path $env:RUNNER_TEMP 'pack'; New-Item -ItemType Directory -Force $pack | Out-Null
+          (Get-Content hcg-mail/Windows-executable-Application/scripts/maker/package-windows.cs.template -Raw).Replace('@MAKER@', $maker) |
+            Set-Content (Join-Path $pack 'package-windows.cs') -Encoding utf8
+          dotnet run --no-cache (Join-Path $pack 'package-windows.cs') -- (Resolve-Path hcg-mail/Windows-executable-Application).Path `
+            "$env:RUNNER_TEMP\out" --version $env:VERSION --targets win-x64,win-arm64 --dist "$env:RUNNER_TEMP\dist" --installer |
+            Tee-Object -FilePath "$env:RUNNER_TEMP\package.log"
+          if ($LASTEXITCODE -ne 0) { throw "packaging failed ($LASTEXITCODE)" }
+      - name: Evidence — checksums, sizes, Authenticode status, version info, architecture
+        shell: pwsh
+        run: |
+          $dist = "$env:RUNNER_TEMP\dist"; $ev = "$env:RUNNER_TEMP\evidence"; New-Item -ItemType Directory -Force $ev | Out-Null
+          Get-ChildItem $dist -File | Sort-Object Name | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } | Set-Content "$dist\SHA256SUMS.txt" -Encoding ascii
+          Get-Content "$dist\SHA256SUMS.txt"
+          # The SDK the build used is the one HCG Mail's global.json selects in its own folder (the runner also has newer ones).
+          Push-Location hcg-mail/Windows-executable-Application; $sdk = (dotnet --version); Pop-Location
+          # Inno Setup's own version, from its uninstall registration (ISCC /? prints no version number and exits 1).
+          $innoKey = Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1', 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1' -ErrorAction SilentlyContinue | Select-Object -First 1
+          $inno = "Inno Setup $(if ($innoKey) { $innoKey.DisplayVersion } else { (Get-Item "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe").VersionInfo.FileVersion })"
+          $files = @()
+          $runtime = $null
+          # (Get-ChildItem <folder> -Exclude … returns nothing without a wildcard in the path: filter instead.)
+          function PeInfo([string] $path) {
+            $bytes = [IO.File]::ReadAllBytes($path); $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+            $vi = (Get-Item $path).VersionInfo
+            [ordered]@{ authenticode = [string](Get-AuthenticodeSignature $path).Status; peMachine = ('0x{0:X4}' -f [BitConverter]::ToUInt16($bytes, $pe + 4))
+              productVersion = "$($vi.ProductVersion)".Trim(); fileVersion = "$($vi.FileVersion)".Trim(); company = "$($vi.CompanyName)".Trim(); product = "$($vi.ProductName)".Trim() }
+          }
+          # HCGMail.exe of each architecture, from the portable ZIP. The installer of the same architecture packages the same
+          # publish output (one Executable Maker build produced both), so its HCGMail.exe is this one.
+          $app = @{}
+          foreach ($z in Get-ChildItem $dist -File -Filter '*.zip') {
+            $rid = if ($z.Name -match 'win-arm64') { 'win-arm64' } else { 'win-x64' }
+            $x = Join-Path $env:RUNNER_TEMP ("unzip-" + $rid); Expand-Archive $z.FullName $x -Force
+            $app[$rid] = PeInfo (Get-ChildItem $x -Recurse -Filter HCGMail.exe | Select-Object -First 1).FullName
+            # The .NET runtime bundled in the self-contained app.
+            $core = Get-ChildItem $x -Recurse -Filter System.Private.CoreLib.dll | Select-Object -First 1
+            if ($core) { $runtime = "$((Get-Item $core.FullName).VersionInfo.ProductVersion)".Split('+')[0].Trim() }
+          }
+          foreach ($f in Get-ChildItem $dist -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name) {
+            $rid = if ($f.Name -match 'win-arm64') { 'win-arm64' } else { 'win-x64' }
+            $isZip = $f.Extension -eq '.zip'
+            $exeInfo = [ordered]@{ file = 'HCGMail.exe' }; foreach ($k in $app[$rid].Keys) { $exeInfo[$k] = $app[$rid][$k] }
+            $entry = [ordered]@{
+              fileName = $f.Name; kind = $(if ($isZip) { 'portable' } else { 'installer' }); format = $f.Extension.TrimStart('.')
+              architecture = $rid.Replace('win-', ''); sizeBytes = $f.Length; sha256 = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              # A ZIP cannot carry an Authenticode signature; for it only HCGMail.exe inside is checked.
+              authenticode = $(if ($isZip) { 'NotApplicable' } else { [string](Get-AuthenticodeSignature $f.FullName).Status })
+              appExecutable = $exeInfo
+            }
+            # Inno Setup's bootstrapper is a 32-bit x86 program on every architecture; its target is set by ArchitecturesAllowed.
+            if (-not $isZip) { $entry.setupBootstrapper = PeInfo $f.FullName }
+            $files += $entry
+          }
+          [ordered]@{
+            product = 'HCG Mail'; version = $env:VERSION; buildNumber = [int]$env:BUILD_NUMBER
+            source = [ordered]@{ repository = '${{ github.repository }}'; commit = '${{ github.sha }}'; branch = '${{ github.ref_name }}' }
+            build = [ordered]@{ provider = 'github-actions'; runId = '${{ github.run_id }}'; runAttempt = '${{ github.run_attempt }}'; runner = "$env:ImageOS $env:ImageVersion"
+              toolchain = ".NET SDK $sdk (HCG Mail global.json), .NET runtime $runtime; HCG Executable Maker engine $($env:MAKER_COMMIT.Substring(0,12)); $inno" }
+            codeSigning = 'unsigned: HCG Executable Maker does not implement Authenticode; Windows SmartScreen warns'
+            files = $files
+          } | ConvertTo-Json -Depth 6 | Set-Content "$ev\build-evidence.json" -Encoding utf8
+          Get-Content "$ev\build-evidence.json"
+          Copy-Item "$env:RUNNER_TEMP\package.log" $ev
+          # The app executable must be the right architecture (x64 0x8664, ARM64 0xAA64) and stamped with this version.
+          foreach ($f in $files) {
+            $want = if ($f.architecture -eq 'arm64') { '0xAA64' } else { '0x8664' }
+            if ($f.appExecutable.peMachine -ne $want) { throw "$($f.fileName): HCGMail.exe is $($f.appExecutable.peMachine), expected $want" }
+            if ($f.appExecutable.productVersion -notlike "$env:VERSION*") { throw "$($f.fileName): product version $($f.appExecutable.productVersion), expected $env:VERSION" }
+          }
+          exit 0   # every check above passed; do not inherit a native tool's exit code
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hcg-mail-windows-${{ env.VERSION }}
+          path: ${{ runner.temp }}/dist
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hcg-mail-windows-build-evidence
+          path: ${{ runner.temp }}/evidence
+          retention-days: 90
+
+  tests:
+    name: Regression tests on Windows
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: Windows-executable-Application
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: dotnet test (Release) — includes the real Windows Credential Manager round trip
+        run: dotnet test HCG.Mail.sln -c Release --logger "trx;LogFilePrefix=windows" --results-directory "${{ runner.temp }}/test-results"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-windows-test-results
+          path: ${{ runner.temp }}/test-results
+          retention-days: 30
+
+  runtime:
+    name: Runtime on real Windows (${{ matrix.arch }})
+    needs: package
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x64, runner: windows-latest }
+          - { arch: arm64, runner: windows-11-arm }
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: hcg-mail
+      - uses: actions/checkout@v5
+        with:
+          repository: F1r3srp3nt/HCG-Executable-Maker
+          ref: ${{ env.MAKER_COMMIT }}
+          path: maker
+          sparse-checkout: tools/installer-test
+      - uses: actions/download-artifact@v4
+        with:
+          name: hcg-mail-windows-${{ env.VERSION }}
+          path: dist
+      - name: Portable ZIP — credential store, TLS validation, start-up, rendering, restart
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter "HCGMail-$env:VERSION-win-${{ matrix.arch }}.zip" | Select-Object -First 1
+          $dir = Join-Path $env:RUNNER_TEMP 'portable'; Expand-Archive $zip.FullName $dir -Force
+          $exe = (Get-ChildItem $dir -Recurse -Filter HCGMail.exe | Select-Object -First 1).FullName
+          ./hcg-mail/Windows-executable-Application/scripts/windows-runtime-check.ps1 -Exe $exe -Out "$env:RUNNER_TEMP\runtime-portable"
+      - name: Installer — silent install, files, shortcuts, registration, launch, silent uninstall (Executable Maker's test)
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem dist -Filter "HCGMail-$env:VERSION-win-${{ matrix.arch }}-Setup.exe" | Select-Object -First 1).FullName
+          # *>&1: the test reports with Write-Host (the information stream), which a plain pipe does not carry.
+          ./maker/tools/installer-test/Test-Installer.ps1 -Setup $setup -AppName 'HCG Mail' -ExeName 'HCGMail.exe' -Version $env:VERSION -LaunchSeconds 20 *>&1 |
+            Tee-Object -FilePath "$env:RUNNER_TEMP\runtime-portable\installer-test.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-windows-runtime-${{ matrix.arch }}
+          path: ${{ runner.temp }}/runtime-portable
+          retention-days: 30
+
+  store-draft:
+    name: HCG Store draft body and Release Passports (from the evidence; nothing is sent)
+    needs: [package, tests, runtime]
+    if: always() && needs.package.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: hcg-mail
+      - uses: actions/checkout@v5
+        with:
+          repository: F1r3srp3nt/HCG-repo
+          ref: ${{ env.HCG_REPO_COMMIT }}
+          path: hcg-repo
+          sparse-checkout: docs/schemas
+      - uses: actions/download-artifact@v4
+        with: { name: 'hcg-mail-windows-${{ env.VERSION }}', path: dist }
+      - uses: actions/download-artifact@v4
+        with: { name: hcg-mail-windows-build-evidence, path: evidence }
+      - uses: actions/download-artifact@v4
+        with: { name: hcg-mail-windows-test-results, path: tests }
+      - uses: actions/download-artifact@v4
+        with: { name: hcg-mail-windows-runtime-x64, path: runtime/x64 }
+      - uses: actions/download-artifact@v4
+        with: { name: hcg-mail-windows-runtime-arm64, path: runtime/arm64 }
+      - name: Generate and validate
+        run: |
+          pip install --quiet jsonschema
+          python3 -I hcg-mail/Windows-executable-Application/scripts/maker/store-draft.py --dist dist --evidence evidence/build-evidence.json \
+            --runtime runtime --tests tests --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out store-draft | tee -a "$GITHUB_STEP_SUMMARY"
+          cp dist/SHA256SUMS.txt store-draft/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-windows-store-draft
+          path: store-draft
+          retention-days: 90

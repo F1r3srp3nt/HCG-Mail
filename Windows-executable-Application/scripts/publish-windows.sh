@@ -6,7 +6,7 @@
 # More info → Run anyway). Production signing requires a certificate and founder approval.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VERSION=$(sed -n 's:.*<InformationalVersion>\(.*\)</InformationalVersion>.*:\1:p' Directory.Build.props)
+VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Directory.Build.props | head -1)
 OUT=artifacts/publish/win-x64
 rm -rf "$OUT"
 dotnet publish src/HCG.Mail.App -c Release -r win-x64 --self-contained true \
