@@ -31,7 +31,8 @@ public class RealAccountModeTests
         PresetId = "domene.no",
     };
 
-    private static async Task<(ServiceProvider Services, MainWindow Window, MainWindowViewModel Vm)> StartNormalAsync(string dataDir)
+    private static async Task<(ServiceProvider Services, MainWindow Window, MainWindowViewModel Vm)> StartNormalAsync(string dataDir,
+        Action<IServiceCollection>? configure = null, double width = 1440, double height = 900)
     {
         var paths = new AppPaths(dataDir);
         var services = AppServices.Build(new AppMode(IsPreview: false), s =>
@@ -40,10 +41,11 @@ public class RealAccountModeTests
             s.AddSingleton<ICredentialVault>(new SessionCredentialVault()); // empty: no password stored
             s.AddSingleton<IAccountStore>(new JsonAccountStore(paths, NullLogger<JsonAccountStore>.Instance));
             s.AddSingleton<IAppSettingsStore>(new JsonAppSettingsStore(paths, NullLogger<JsonAppSettingsStore>.Instance));
+            configure?.Invoke(s);
         });
         services.GetRequiredService<ThemeService>().ApplySaved();
         var vm = services.GetRequiredService<MainWindowViewModel>();
-        var window = new MainWindow { DataContext = vm, Width = 1440, Height = 900 };
+        var window = new MainWindow { DataContext = vm, Width = width, Height = height };
         services.GetRequiredService<DialogService>().Attach(window);
         window.Show();
         await vm.InitializeAsync();
@@ -64,9 +66,13 @@ public class RealAccountModeTests
             Assert.Empty(vm.MessageList.Items);
             Assert.Null(vm.SelectedAccount);
             Assert.Contains("Manual refresh", vm.StatusText);
-            // Both sign-in providers are offered next to IMAP; their dialogs explain when a build lacks configuration.
-            Assert.True(HasVisibleButton(window, "AddMicrosoftAccountButton"));
-            Assert.True(HasVisibleButton(window, "AddGoogleAccountButton"));
+            // This test build has no Microsoft or Google client ID: neither sign-in is offered, and the welcome text does
+            // not mention them (Settings says they are not set up in this build).
+            Assert.False(HasVisibleButton(window, "AddMicrosoftAccountButton"));
+            Assert.False(HasVisibleButton(window, "AddGoogleAccountButton"));
+            Assert.DoesNotContain("Microsoft", vm.WelcomeText);
+            Assert.DoesNotContain("Google", vm.WelcomeText);
+            Assert.Contains("IMAP and SMTP", vm.WelcomeText);
             UiHarness.Capture(window, "20-normal-first-run-logo");
             window.Close();
             await vm.DisposeAsync();
@@ -205,6 +211,87 @@ public class RealAccountModeTests
         var ratio = bitmap.PixelSize.Width / (double)bitmap.PixelSize.Height;
         Assert.InRange(ratio, 2.1, 2.25);              // supplied artwork crop: 1520 × 700
         Assert.True(bitmap.PixelSize.Height >= 4 * 38); // ≥ 4× the 38 px display height for high-DPI screens
+    }
+
+    [AvaloniaFact]
+    public async Task A_configured_sign_in_provider_is_offered_and_named()
+    {
+        var dir = Directory.CreateTempSubdirectory("hcg-mail-configured-").FullName;
+        try
+        {
+            var microsoft = Substitute.For<IMicrosoftAuth>();
+            microsoft.IsConfigured.Returns(true);
+            var (services, window, vm) = await StartNormalAsync(dir, s => s.AddSingleton(microsoft));
+            Assert.True(HasVisibleButton(window, "AddMicrosoftAccountButton"));
+            Assert.False(HasVisibleButton(window, "AddGoogleAccountButton"));
+            Assert.Contains("Microsoft account", vm.WelcomeText);
+            Assert.DoesNotContain("Google", vm.WelcomeText);
+            window.Close();
+            await vm.DisposeAsync();
+            await services.DisposeAsync();
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [AvaloniaFact]
+    public void The_drawn_title_bar_shows_only_caption_buttons_under_the_apps_own_title()
+    {
+        var window = new MainWindow();
+        Assert.True(window.MinWidth >= 256 + 400 + 1 + 380, "the window's minimum width must fit the three columns at their default widths");
+        Assert.Equal(Avalonia.Controls.Chrome.TitleBarDecorations.MinimizeButton | Avalonia.Controls.Chrome.TitleBarDecorations.MaximizeButton
+                     | Avalonia.Controls.Chrome.TitleBarDecorations.CloseButton,
+            Avalonia.Controls.Chrome.WindowDrawnDecorations.GetTitleBarDecorations(window));
+        Assert.Equal("HCG Mail", window.Title); // still the taskbar and Alt+Tab name
+    }
+
+    [AvaloniaTheory]
+    [InlineData(1044, 788, false)] // the window size of the Windows prerelease screenshots, which showed clipped text
+    [InlineData(1040, 620, false)] // the window's minimum size
+    [InlineData(1040, 620, true)]  // with both sign-in providers configured: the longest labels, the tallest card
+    public async Task Welcome_card_text_and_labels_fit_inside_the_card(int width, int height, bool providersConfigured)
+    {
+        var dir = Directory.CreateTempSubdirectory("hcg-mail-welcome-").FullName;
+        try
+        {
+            var (services, window, vm) = await StartNormalAsync(dir, s =>
+            {
+                if (!providersConfigured) return;
+                var microsoft = Substitute.For<IMicrosoftAuth>(); microsoft.IsConfigured.Returns(true);
+                var google = Substitute.For<IGoogleAuth>(); google.IsConfigured.Returns(true);
+                s.AddSingleton(microsoft); s.AddSingleton(google);
+            }, width, height);
+            var visuals = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(window).ToList();
+            var welcome = visuals.OfType<Avalonia.Controls.TextBlock>().First(t => t.Name == "WelcomeText");
+            var card = Avalonia.VisualTree.VisualExtensions.GetVisualAncestors(welcome).OfType<Avalonia.Controls.Border>().First(b => b.Classes.Contains("card"));
+            var cardBox = card.Bounds.Deflate(card.Padding);
+            // Every text in the card ends inside the card's content box (nothing is cut off at the right edge).
+            foreach (var text in Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(card).OfType<Avalonia.Controls.TextBlock>().Where(t => t.IsEffectivelyVisible))
+            {
+                var right = Avalonia.VisualExtensions.TranslatePoint(text, new Avalonia.Point(text.Bounds.Width, 0), card)!.Value.X;
+                Assert.True(right <= card.Bounds.Width - card.Padding.Right + 0.5,
+                    $"'{text.Text}' ends at {right:0.0}, beyond the card's content edge {card.Bounds.Width - card.Padding.Right:0.0} (window {width}x{height})");
+                // A text is never laid out wider than it is allowed to be (that is what was clipped before).
+                Assert.True(text.DesiredSize.Width <= text.Bounds.Width + 0.5, $"'{text.Text}' needs {text.DesiredSize.Width:0.0} but has {text.Bounds.Width:0.0}");
+            }
+            Assert.True(cardBox.Width > 0);
+            // The whole card is inside the window horizontally (at 1000 px the reader column used to be pushed past the edge)…
+            var cardRight = Avalonia.VisualExtensions.TranslatePoint(card, new Avalonia.Point(card.Bounds.Width, 0), window)!.Value.X;
+            Assert.True(cardRight <= width + 0.5, $"the card ends at {cardRight:0.0}, beyond the window's width {width}");
+            // …and reachable vertically: on a short window it scrolls instead of being cut off at the bottom.
+            var scroller = Avalonia.VisualTree.VisualExtensions.GetVisualAncestors(card).OfType<Avalonia.Controls.ScrollViewer>().First(v => v.Name == "WelcomeScroller");
+            Assert.True(scroller.Extent.Height >= card.Bounds.Height, $"the card ({card.Bounds.Height:0}) is taller than what the scroller can show ({scroller.Extent.Height:0})");
+            UiHarness.Capture(window, $"21-welcome-{width}x{height}{(providersConfigured ? "-providers" : "")}");
+            window.Close();
+            await vm.DisposeAsync();
+            await services.DisposeAsync();
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
     }
 
     private static bool HasVisibleButton(Avalonia.Visual root, string name) =>

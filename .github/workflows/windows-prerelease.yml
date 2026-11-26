@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 env:
-  VERSION: 0.1.0-beta.1
-  BUILD_NUMBER: 1
+  VERSION: 0.1.0-beta.2
+  BUILD_NUMBER: 2
   # HCG Executable Maker main (Inno Setup installer, portable ZIP, installer test).
   MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
   # HCG Repo main with the Release Passport v1 schema (final).
@@ -197,9 +197,75 @@ jobs:
           path: ${{ runner.temp }}/runtime-portable
           retention-days: 30
 
+  mailbox:
+    # Authenticated IMAP and SMTP against the owner's DEDICATED TEST MAILBOX, from encrypted repository secrets
+    # (HCG_TEST_MAILBOX_*; see docs/DEDICATED_TEST_MAILBOX.md). Without them this job records "not run" and the
+    # prerelease is not marked as mailbox-tested. Same source commit as the packaged app, Release build, run natively
+    # on each architecture; it exercises the app's own mail, TLS and credential-store code, not the window UI.
+    name: Authenticated IMAP/SMTP with the dedicated test mailbox (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1   # one mailbox: one run at a time
+      matrix:
+        include:
+          - { arch: x64, runner: windows-latest }
+          - { arch: arm64, runner: windows-11-arm }
+    defaults:
+      run:
+        working-directory: Windows-executable-Application
+    env:
+      HCG_TEST_MAILBOX_ADDRESS: ${{ secrets.HCG_TEST_MAILBOX_ADDRESS }}
+      HCG_TEST_MAILBOX_USERNAME: ${{ secrets.HCG_TEST_MAILBOX_USERNAME }}
+      HCG_TEST_MAILBOX_PASSWORD: ${{ secrets.HCG_TEST_MAILBOX_PASSWORD }}
+      HCG_TEST_MAILBOX_IMAP_HOST: ${{ secrets.HCG_TEST_MAILBOX_IMAP_HOST }}
+      HCG_TEST_MAILBOX_IMAP_PORT: ${{ secrets.HCG_TEST_MAILBOX_IMAP_PORT }}
+      HCG_TEST_MAILBOX_IMAP_SECURITY: ${{ secrets.HCG_TEST_MAILBOX_IMAP_SECURITY }}
+      HCG_TEST_MAILBOX_SMTP_HOST: ${{ secrets.HCG_TEST_MAILBOX_SMTP_HOST }}
+      HCG_TEST_MAILBOX_SMTP_PORT: ${{ secrets.HCG_TEST_MAILBOX_SMTP_PORT }}
+      HCG_TEST_MAILBOX_SMTP_SECURITY: ${{ secrets.HCG_TEST_MAILBOX_SMTP_SECURITY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Dedicated mailbox tests (connection test, wrong password, send to itself and receive, credential store and restart)
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP 'mailbox'; New-Item -ItemType Directory -Force $out | Out-Null
+          $configured = [bool]($env:HCG_TEST_MAILBOX_ADDRESS -and $env:HCG_TEST_MAILBOX_PASSWORD -and $env:HCG_TEST_MAILBOX_IMAP_HOST -and $env:HCG_TEST_MAILBOX_SMTP_HOST)
+          $result = [ordered]@{ arch = '${{ matrix.arch }}'; configured = $configured; ran = $false; passed = $false; total = 0; executed = 0; failed = 0; skipped = 0; tests = @() }
+          $result.windows = "$((Get-CimInstance Win32_OperatingSystem).Caption) build $((Get-CimInstance Win32_OperatingSystem).BuildNumber) $env:PROCESSOR_ARCHITECTURE"
+          if (-not $configured) {
+            Write-Host 'No dedicated test mailbox configured (repository secrets HCG_TEST_MAILBOX_*): authenticated IMAP/SMTP NOT RUN.'
+            $result | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $out 'mailbox-e2e.json') -Encoding utf8
+            exit 0
+          }
+          dotnet test tests/HCG.Mail.Tests/HCG.Mail.Tests.csproj -c Release --filter "FullyQualifiedName~DedicatedMailboxTests" `
+            --logger "trx;LogFileName=mailbox.trx" --logger "console;verbosity=normal" --results-directory $out
+          $code = $LASTEXITCODE
+          $trx = [xml](Get-Content (Join-Path $out 'mailbox.trx') -Raw)
+          $c = $trx.TestRun.ResultSummary.Counters
+          $result.ran = $true
+          $result.total = [int]$c.total; $result.executed = [int]$c.executed; $result.failed = [int]$c.failed
+          $result.skipped = [int]$c.notExecuted
+          $result.tests = @($trx.TestRun.Results.UnitTestResult | ForEach-Object { [ordered]@{ name = ($_.testName -replace '^.*\.', ''); outcome = $_.outcome } })
+          # Every test must have run and passed: a skip (e.g. no persistent credential store) is not a pass.
+          $result.passed = ($code -eq 0 -and $result.total -ge 4 -and $result.failed -eq 0 -and @($result.tests | Where-Object { $_.outcome -ne 'Passed' }).Count -eq 0)
+          $result | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $out 'mailbox-e2e.json') -Encoding utf8
+          Get-Content (Join-Path $out 'mailbox-e2e.json')
+          if (-not $result.passed) { Write-Host 'Dedicated mailbox tests FAILED'; exit 1 }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-windows-mailbox-${{ matrix.arch }}
+          path: ${{ runner.temp }}/mailbox
+          retention-days: 30
+
   store-draft:
     name: HCG Store draft body and Release Passports (from the evidence; nothing is sent)
-    needs: [package, tests, runtime]
+    needs: [package, tests, runtime, mailbox]
     if: always() && needs.package.result == 'success'
     runs-on: ubuntu-24.04
     steps:
@@ -222,11 +288,17 @@ jobs:
         with: { name: hcg-mail-windows-runtime-x64, path: runtime/x64 }
       - uses: actions/download-artifact@v4
         with: { name: hcg-mail-windows-runtime-arm64, path: runtime/arm64 }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: hcg-mail-windows-mailbox-x64, path: mailbox/x64 }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: hcg-mail-windows-mailbox-arm64, path: mailbox/arm64 }
       - name: Generate and validate
         run: |
           pip install --quiet jsonschema
           python3 -I "hcg-mail/HCG Mail Project/Desktop/scripts/maker/store-draft.py" --dist dist --evidence evidence/build-evidence.json \
-            --runtime runtime --tests tests --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
+            --runtime runtime --tests tests --mailbox mailbox --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out store-draft | tee -a "$GITHUB_STEP_SUMMARY"
           cp dist/SHA256SUMS.txt store-draft/
       - uses: actions/upload-artifact@v4

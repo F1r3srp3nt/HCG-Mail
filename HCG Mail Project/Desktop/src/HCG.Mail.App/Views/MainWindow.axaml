@@ -3,14 +3,18 @@
         xmlns:vm="using:HCG.Mail.App.ViewModels"
         xmlns:views="using:HCG.Mail.App.Views"
         xmlns:controls="using:HCG.Mail.App.Controls"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="HCG.Mail.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="HCG Mail"
         Icon="/Assets/Icons/hcg-mail.ico"
-        Width="1380" Height="880" MinWidth="1000" MinHeight="620"
+        Width="1380" Height="880" MinWidth="1040" MinHeight="620"
         WindowStartupLocation="CenterScreen"
         ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaTitleBarHeightHint="38">
+        ExtendClientAreaTitleBarHeightHint="38"
+        chrome:WindowDrawnDecorations.TitleBarDecorations="MinimizeButton, MaximizeButton, CloseButton">
+  <!-- The title bar below shows HCG Mail's own title, so the drawn decorations show only the caption buttons (no second
+       "HCG Mail" title text under ours, no full-screen button). Window.Title stays "HCG Mail" for the taskbar. -->
 
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+N" Command="{Binding ComposeCommand}" />
@@ -49,6 +53,8 @@
     <!-- Three panes -->
     <Grid Grid.Row="2">
       <Grid.ColumnDefinitions>
+        <!-- MinWidth of the window (1040) covers these columns at their default and minimum widths (256 + 400 + 1 + 380):
+             below that the reader column was pushed past the window edge and cut off. -->
         <ColumnDefinition Width="256" MinWidth="220" />
         <ColumnDefinition Width="400" MinWidth="300" />
         <ColumnDefinition Width="1" />
