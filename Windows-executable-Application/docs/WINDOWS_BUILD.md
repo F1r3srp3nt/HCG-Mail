@@ -71,6 +71,29 @@ Run these before the Domene.no checklist:
    menu entry and uninstaller; optional auto-update channel (would be a visible, opt-in network
    feature).
 
+## Packaging with HCG Executable Maker (`windows-prerelease.yml`)
+
+The prerelease workflow calls Executable Maker's headless command at a pinned commit (`MAKER_COMMIT`):
+
+```
+HCGExecutableMaker --package-windows --identity scripts/maker/app.json --source . \
+    --project src/HCG.Mail.App/HCG.Mail.App.csproj --targets win-x64,win-arm64 --formats installer,zip \
+    --dist <dir> --provider github-actions --run-id <the workflow run's ID>
+```
+
+- `scripts/maker/app.json` holds HCG Mail's identity: name, publisher, application ID (it seeds the installer's
+  AppId, so installs upgrade in place), icon, distribution file names and the Store product. Nothing of Executable
+  Maker's own name or icon goes into the installer.
+- For each file it writes the SHA-256, a Release Passport (build half) and Authenticode facts. The bootstrapper
+  (Inno Setup's x86 loader) is recorded separately from the installed `HCGMail.exe` (x64 or ARM64).
+- `store-submission.json` holds the deployed HCG Store's exact request bodies for a **private** draft. Nothing is sent.
+  `scripts/maker/store-draft.py` adds HCG Mail's own runtime and installer evidence and refuses to continue if
+  Executable Maker's manifest describes different bytes.
+- The deployed Store accepts only these artifact fields: `fileName`, `platform`, `format`, `sizeBytes`, `sha256`,
+  `architectures`, `minimumOs`, `signing`, `kind` and `package`. Provenance is kept beside each body, under `provenance`.
+- Signing stays off until a certificate is approved. Executable Maker signs only with `--approve-signing` and a
+  timestamp URL, then verifies the signature and the timestamp.
+
 ## Publishing a GitHub release
 
 `.github/workflows/release-windows.yml` builds and publishes the Windows build when started by hand on

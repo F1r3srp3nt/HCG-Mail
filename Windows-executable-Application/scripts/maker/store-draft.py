@@ -6,7 +6,9 @@ and installer-test.txt, the Windows test results (.trx), and HCG Repo's release-
 
 Outputs, in --out:
   store-release-draft.json   the exact body for HCG Store's POST /api/v1/publishing/releases (a PRIVATE DRAFT) and one
-                             ArtifactInput per file for POST .../releases/:id/artifacts. Nothing is sent here.
+                             ArtifactInput per file for POST .../releases/:id/artifacts, with only the fields the deployed
+                             Store's strict schema accepts; provenance and the validation report are kept beside each
+                             body ("provenance"), never inside it. Nothing is sent here.
   passports/<file>.json      one hcg.release-passport v1 per file, validated against the schema.
   SUMMARY.md                 what the evidence shows, per file.
 Nothing is invented: a field without evidence is null, "not-run" or "not-recorded".
@@ -21,6 +23,7 @@ ap.add_argument("--tests", required=True, help="folder with the Windows .trx res
 ap.add_argument("--schema", required=True, help="HCG Repo docs/schemas/release-passport-v1.schema.json")
 ap.add_argument("--run-url", required=True)
 ap.add_argument("--out", required=True)
+ap.add_argument("--maker-manifest", help="HCG Executable Maker's store-submission.json; its files must be exactly these (name, SHA-256, size)")
 a = ap.parse_args()
 
 ev = json.load(open(a.evidence, encoding="utf-8-sig"))
@@ -78,23 +81,28 @@ for f in ev["files"]:
     runtime_state = "partial" if (all_passed(tls) and all_passed(cred)) else ("failed" if (tls or cred) else "not-run")
     unsigned = f["authenticode"] not in ("Valid", "NotApplicable") or f["appExecutable"]["authenticode"] != "Valid"
     signing_evidence = (f"Get-AuthenticodeSignature: {f['fileName']} {'(ZIP: cannot be signed)' if f['authenticode'] == 'NotApplicable' else f['authenticode']}; "
-                        f"HCGMail.exe {f['appExecutable']['authenticode']}. HCG Executable Maker does not implement Authenticode.")
+                        f"HCGMail.exe {f['appExecutable']['authenticode']}. No code-signing certificate is configured.")
     summary_text = (f"HCG Executable Maker engine {ev['build']['toolchain']}. Windows tests: {tests['passed']}/{tests['total']} passed, {tests['failed']} failed. "
                     f"Runtime on Windows {arch} ({rt['windows']['caption'] if rt else 'not run'}, build {rt['windows']['build'] if rt else '-'}): "
                     + (f"{sum(c['passed'] for c in rt['checks'])}/{len(rt['checks'])} checks passed (credential store, TLS accept/reject, start, window rendering, restart). " if rt else "not run. ")
                     + (f"Installer lifecycle (install, shortcuts, registration, launch, uninstall): {install_state}. " if kind == "installer" else "")
                     + "Authenticated IMAP/SMTP (sign-in, send, receive) not exercised on Windows in CI.")
+    # The deployed HCG Store's ArtifactInput is strict: these keys only. It answers 400 invalid_request for
+    # sourceCommit, buildProvider, toolchain, validationReport or replaces, so those are kept in "provenance" beside it.
     artifacts.append({
-        "fileName": f["fileName"], "platform": "windows", "format": f["format"], "sizeBytes": f["sizeBytes"], "sha256": f["sha256"],
-        "architectures": [arch], "minimumOs": MIN_OS[arch],
-        "signing": {"status": "unsigned" if unsigned else "signed", "evidence": signing_evidence, "tool": "PowerShell Get-AuthenticodeSignature"},
-        "kind": "installer" if kind == "installer" else "portable-app",
-        "package": None, "sourceCommit": src["commit"], "buildProvider": "github-actions",
-        "toolchain": ev["build"]["toolchain"][:200],
-        "validationReport": {"tool": "HCG Mail windows-prerelease.yml (HCG Executable Maker checks, Windows tests, runtime check, installer test)",
-                             "passed": tests["failed"] == 0 and launch_state == "passed" and runtime_state in ("partial", "passed") and install_state in ("passed", "not-applicable"),
-                             "summary": summary_text[:4000]},
-        "replaces": None,
+        "declare": {
+            "fileName": f["fileName"], "platform": "windows", "format": f["format"], "sizeBytes": f["sizeBytes"], "sha256": f["sha256"],
+            "architectures": [arch], "minimumOs": MIN_OS[arch],
+            "signing": {"status": "unsigned" if unsigned else "signed", "evidence": signing_evidence, "tool": "PowerShell Get-AuthenticodeSignature"},
+            "kind": "installer" if kind == "installer" else "portable-app",
+            "package": None,
+        },
+        "provenance": {
+            "sourceCommit": src["commit"], "buildProvider": "github-actions", "toolchain": ev["build"]["toolchain"][:200],
+            "validationReport": {"tool": "HCG Mail windows-prerelease.yml (HCG Executable Maker checks, Windows tests, runtime check, installer test)",
+                                 "passed": tests["failed"] == 0 and launch_state == "passed" and runtime_state in ("partial", "passed") and install_state in ("passed", "not-applicable"),
+                                 "summary": summary_text[:4000]},
+        },
     })
     passport = {
         "format": "hcg.release-passport", "formatVersion": 1,
@@ -134,6 +142,15 @@ for f in ev["files"]:
     files.append(passport)
     summary_rows.append((f, arch, kind, install_state, launch_state, runtime_state, unsigned))
 
+# Executable Maker's manifest must describe exactly these bytes.
+if a.maker_manifest:
+    mm = json.load(open(a.maker_manifest, encoding="utf-8-sig"))
+    assert mm.get("format") == "hcg.store-submission" and mm["release"]["eligibility"] == "private" and mm.get("publishes") is False, "unexpected Maker manifest"
+    theirs = sorted((x["declare"]["fileName"], x["declare"]["sha256"], x["declare"]["sizeBytes"]) for x in mm["artifacts"])
+    ours = sorted((x["declare"]["fileName"], x["declare"]["sha256"], x["declare"]["sizeBytes"]) for x in artifacts)
+    if theirs != ours:
+        sys.exit(f"Executable Maker's store-submission.json does not match the evidence:\n  maker {theirs}\n  here  {ours}")
+
 # Validate every passport against HCG Repo's schema.
 import jsonschema
 schema = json.load(open(a.schema, encoding="utf-8"))
@@ -156,7 +173,8 @@ release = {
 }
 os.makedirs(os.path.join(a.out, "passports"), exist_ok=True)
 json.dump({"_note": "Body for HCG Store POST /api/v1/publishing/releases (creates a PRIVATE DRAFT) and the ArtifactInput for each file. "
-                    "Not sent: the HCG Store publishing server is not deployed and no account holds store.publish. "
+                    "Not sent: the deployed HCG Store has publishing disabled and no account holds store.publish. "
+                    "Each artifact's 'declare' is the ArtifactInput body; 'provenance' is not sent (the Store's schema refuses it). "
                     "'Public Prerelease' maps to channel 'beta' with a SemVer pre-release version; 'temporarily free' maps to "
                     "distribution 'free' plus the release notes (the Store has no time-limited free price).",
            "release": release, "artifacts": artifacts}, open(os.path.join(a.out, "store-release-draft.json"), "w"), indent=2)

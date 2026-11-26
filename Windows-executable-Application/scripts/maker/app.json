@@ -1,0 +1,27 @@
+{
+  "name": "HCG Mail",
+  "publisher": "Hakmi Capital Group",
+  "applicationId": "com.hakmicapitalgroup.hcgmail",
+  "version": "0.1.0-beta.1",
+  "description": "Private email for your own IMAP/SMTP mailbox.",
+  "icon": "../../src/HCG.Mail.App/Assets/Icons/hcg-mail.png",
+  "assemblyName": "HCGMail",
+  "executable": "HCGMail.exe",
+  "buildNumber": "1",
+  "productKey": "hcg-mail",
+  "edition": "windows-desktop",
+  "distName": "HCGMail-{version}-{rid}",
+  "store": {
+    "productId": "hcg-mail",
+    "editionId": "windows-desktop",
+    "channel": "beta",
+    "distribution": "free",
+    "releaseNotes": [
+      "HCG Mail 0.1.0-beta.1 for Windows: public testing prerelease, free during testing (temporary; not a permanent free price).",
+      "IMAP/SMTP email for your own mailbox. Passwords in Windows Credential Manager; TLS with certificate validation only.",
+      "Installer (per-user, no administrator rights) or portable ZIP, for x64 and ARM64. Self-contained: no .NET installation needed.",
+      "Not code-signed: Windows SmartScreen warns. Compare the SHA-256 checksum before running.",
+      "Microsoft and Google sign-in are not set up in this build."
+    ]
+  }
+}

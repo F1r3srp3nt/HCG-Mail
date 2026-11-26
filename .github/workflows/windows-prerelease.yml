@@ -1,7 +1,7 @@
-# HCG Mail for Windows, public testing prerelease: built and packaged by HCG Executable Maker's engine (pinned) on a
-# Windows runner, then tested on real Windows (x64 and ARM64 runners). Publishes nothing: the artifacts and evidence are
-# for the owner's review and the HCG Store draft. Not code-signed (Executable Maker does not implement Authenticode);
-# the evidence says so.
+# HCG Mail for Windows, public testing prerelease: built and packaged by HCG Executable Maker (pinned) with its headless
+# --package-windows command and HCG Mail's own identity (scripts/maker/app.json), then tested on real Windows (x64 and
+# ARM64 runners). Publishes nothing: the artifacts and evidence are for the owner's review and a PRIVATE HCG Store draft.
+# Not code-signed (no certificate is configured): Executable Maker's Authenticode Signing Doctor and the passports say so.
 name: Windows prerelease
 
 on:
@@ -15,8 +15,10 @@ permissions:
 env:
   VERSION: 0.1.0-beta.1
   BUILD_NUMBER: 1
-  # HCG Executable Maker main (Inno Setup installer, portable ZIP, installer test).
-  MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
+  # HCG Executable Maker with --package-windows (Windows Release Passports, Store submission manifest, Authenticode
+  # Signing Doctor, bootstrapper vs installed-program architecture). Validated on feature/windows-packaging; re-pin to
+  # the main merge commit once it is merged.
+  MAKER_COMMIT: 904acfd923180f53e598ac2bad5095cb1e53e693
   # HCG Repo main with the Release Passport v1 schema (final).
   HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
   DOTNET_NOLOGO: 1
@@ -44,23 +46,34 @@ jobs:
         run: |
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
           (Get-Item "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe").VersionInfo.ProductVersion
-      - name: Package (Executable Maker's engine, HCG Mail identity)
+      - name: Package with HCG Executable Maker (--package-windows, HCG Mail identity)
         shell: pwsh
         run: |
-          $maker = (Resolve-Path maker).Path.Replace('\', '/')
-          $pack = Join-Path $env:RUNNER_TEMP 'pack'; New-Item -ItemType Directory -Force $pack | Out-Null
-          (Get-Content hcg-mail/Windows-executable-Application/scripts/maker/package-windows.cs.template -Raw).Replace('@MAKER@', $maker) |
-            Set-Content (Join-Path $pack 'package-windows.cs') -Encoding utf8
-          dotnet run --no-cache (Join-Path $pack 'package-windows.cs') -- (Resolve-Path hcg-mail/Windows-executable-Application).Path `
-            "$env:RUNNER_TEMP\out" --version $env:VERSION --targets win-x64,win-arm64 --dist "$env:RUNNER_TEMP\dist" --installer |
+          dotnet build maker/src/HCG.ExecutableMaker.App -c Release -v q
+          if ($LASTEXITCODE -ne 0) { throw "Executable Maker build failed ($LASTEXITCODE)" }
+          $maker = (Resolve-Path maker/src/HCG.ExecutableMaker.App/bin/Release/net10.0/HCGExecutableMaker.dll).Path
+          "MAKER=$maker" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          # The SDK HCG Mail's global.json selects in its own folder (the runner also has newer ones).
+          Push-Location hcg-mail/Windows-executable-Application; $sdk = (dotnet --version); Pop-Location
+          # Builds win-x64 and win-arm64 (dotnet publish, self-contained), packages each as Inno Setup installer and portable
+          # ZIP, verifies them, and writes per file: SHA-256, a Release Passport (build half) and, for the set, SHA256SUMS.txt
+          # and store-submission.json (the deployed HCG Store's exact request bodies for a PRIVATE draft; nothing is sent).
+          dotnet $maker --package-windows --identity hcg-mail/Windows-executable-Application/scripts/maker/app.json `
+            --source hcg-mail/Windows-executable-Application --project src/HCG.Mail.App/HCG.Mail.App.csproj `
+            --version $env:VERSION --build-number $env:BUILD_NUMBER --targets win-x64,win-arm64 --formats installer,zip `
+            --out "$env:RUNNER_TEMP\out" --dist "$env:RUNNER_TEMP\dist" --built-with ".NET SDK $sdk (HCG Mail global.json)" `
+            --provider github-actions --run-id ${{ github.run_id }} |
             Tee-Object -FilePath "$env:RUNNER_TEMP\package.log"
           if ($LASTEXITCODE -ne 0) { throw "packaging failed ($LASTEXITCODE)" }
       - name: Evidence — checksums, sizes, Authenticode status, version info, architecture
         shell: pwsh
         run: |
           $dist = "$env:RUNNER_TEMP\dist"; $ev = "$env:RUNNER_TEMP\evidence"; New-Item -ItemType Directory -Force $ev | Out-Null
-          Get-ChildItem $dist -File | Sort-Object Name | ForEach-Object {
-            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } | Set-Content "$dist\SHA256SUMS.txt" -Encoding ascii
+          # The downloadable files only (Maker also writes passports, SHA256SUMS.txt and store-submission.json beside them).
+          $downloads = Get-ChildItem $dist -File | Where-Object { $_.Extension -in '.exe', '.zip' } | Sort-Object Name
+          $sums = $downloads | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
+          $makerSums = Get-Content "$dist\SHA256SUMS.txt" | Where-Object { $_ }
+          if (Compare-Object $sums $makerSums) { throw "SHA256SUMS.txt written by Executable Maker does not match the files" }
           Get-Content "$dist\SHA256SUMS.txt"
           # The SDK the build used is the one HCG Mail's global.json selects in its own folder (the runner also has newer ones).
           Push-Location hcg-mail/Windows-executable-Application; $sdk = (dotnet --version); Pop-Location
@@ -87,7 +100,7 @@ jobs:
             $core = Get-ChildItem $x -Recurse -Filter System.Private.CoreLib.dll | Select-Object -First 1
             if ($core) { $runtime = "$((Get-Item $core.FullName).VersionInfo.ProductVersion)".Split('+')[0].Trim() }
           }
-          foreach ($f in Get-ChildItem $dist -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name) {
+          foreach ($f in $downloads) {
             $rid = if ($f.Name -match 'win-arm64') { 'win-arm64' } else { 'win-x64' }
             $isZip = $f.Extension -eq '.zip'
             $exeInfo = [ordered]@{ file = 'HCGMail.exe' }; foreach ($k in $app[$rid].Keys) { $exeInfo[$k] = $app[$rid][$k] }
@@ -107,11 +120,15 @@ jobs:
             source = [ordered]@{ repository = '${{ github.repository }}'; commit = '${{ github.sha }}'; branch = '${{ github.ref_name }}' }
             build = [ordered]@{ provider = 'github-actions'; runId = '${{ github.run_id }}'; runAttempt = '${{ github.run_attempt }}'; runner = "$env:ImageOS $env:ImageVersion"
               toolchain = ".NET SDK $sdk (HCG Mail global.json), .NET runtime $runtime; HCG Executable Maker engine $($env:MAKER_COMMIT.Substring(0,12)); $inno" }
-            codeSigning = 'unsigned: HCG Executable Maker does not implement Authenticode; Windows SmartScreen warns'
+            codeSigning = 'unsigned: no code-signing certificate is configured; Windows SmartScreen warns'
             files = $files
           } | ConvertTo-Json -Depth 6 | Set-Content "$ev\build-evidence.json" -Encoding utf8
           Get-Content "$ev\build-evidence.json"
           Copy-Item "$env:RUNNER_TEMP\package.log" $ev
+          # Executable Maker's own records: Release Passports (build half), the Store submission manifest, and its
+          # Authenticode Signing Doctor for each file (read from the bytes; compared with Get-AuthenticodeSignature above).
+          Copy-Item "$dist\*.release-passport.json", "$dist\store-submission.json" $ev
+          foreach ($f in $downloads) { dotnet $env:MAKER --windows-signing-doctor $f.FullName *>&1 | Out-File "$ev\signing-doctor-$($f.Name).txt" -Encoding utf8 }
           # The app executable must be the right architecture (x64 0x8664, ARM64 0xAA64) and stamped with this version.
           foreach ($f in $files) {
             $want = if ($f.architecture -eq 'arm64') { '0xAA64' } else { '0x8664' }
@@ -227,8 +244,10 @@ jobs:
           pip install --quiet jsonschema
           python3 -I hcg-mail/Windows-executable-Application/scripts/maker/store-draft.py --dist dist --evidence evidence/build-evidence.json \
             --runtime runtime --tests tests --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
-            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out store-draft | tee -a "$GITHUB_STEP_SUMMARY"
-          cp dist/SHA256SUMS.txt store-draft/
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out store-draft \
+            --maker-manifest dist/store-submission.json | tee -a "$GITHUB_STEP_SUMMARY"
+          test "${PIPESTATUS[0]}" -eq 0
+          cp dist/SHA256SUMS.txt dist/store-submission.json store-draft/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
