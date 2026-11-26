@@ -108,6 +108,9 @@ public static class AppServices
         services.AddSingleton<ILinkOpener, LinkOpener>();
         services.AddSingleton<RemoteImageLoader>();
         services.AddSingleton<MailHealthViewModelFactory>();
+        // Sign-in providers this build is not configured for (no client ID) are not offered: their buttons are hidden and
+        // Settings says the sign-in is not set up in this build. Configured providers are always offered.
+        services.AddSingleton(new SignInPresentation(OfferUnconfiguredProviders: false));
         services.AddSingleton<MainWindowViewModel>();
 
         configure?.Invoke(services);

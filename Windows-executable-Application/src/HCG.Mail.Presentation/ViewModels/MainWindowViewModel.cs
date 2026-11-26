@@ -142,6 +142,23 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     /// <summary>Whether "Add Microsoft account" is offered: always when configured; otherwise per <see cref="SignInPresentation"/>.</summary>
     public bool ShowMicrosoftSignIn => _microsoftAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders;
 
+    /// <summary>Whether "Add Google account" is offered: always when configured; otherwise per <see cref="SignInPresentation"/>.</summary>
+    public bool ShowGoogleSignIn => _googleAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders;
+
+    /// <summary>The welcome text: names only the sign-in methods this build offers.</summary>
+    public string WelcomeText
+    {
+        get
+        {
+            var text = "Connect your existing email account using IMAP and SMTP, for example privately hosted domain email such as Domene.no.";
+            var others = new List<string>();
+            if (ShowMicrosoftSignIn) others.Add("a Microsoft account (Outlook.com, Hotmail, Microsoft 365)");
+            if (ShowGoogleSignIn) others.Add("a Google account (Gmail, Google Workspace)");
+            if (others.Count > 0) text += " You can also sign in with " + string.Join(" or ", others) + ".";
+            return text + " No HCG account is required.";
+        }
+    }
+
     public string MicrosoftSignInStatus => _microsoftAuth.IsConfigured
         ? "Microsoft sign-in is available for Outlook.com, Hotmail and Microsoft 365 accounts."
         : _microsoftAuth.ConfigurationProblem ?? "Microsoft sign-in is not available.";
@@ -740,7 +757,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             SelectedAccount = avm;
             await ConnectAccountAsync(avm);
         }, onUseMicrosoft: ShowMicrosoftSignIn ? AddMicrosoftAccountAsync : null,
-           onUseGoogle: _googleAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders ? AddGoogleAccountAsync : null);
+           onUseGoogle: ShowGoogleSignIn ? AddGoogleAccountAsync : null);
         await _dialogs.ShowAccountSetupAsync(vm);
     }
 
