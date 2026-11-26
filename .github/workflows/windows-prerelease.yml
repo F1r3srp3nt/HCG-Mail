@@ -18,7 +18,7 @@ env:
   # HCG Executable Maker with --package-windows (Windows Release Passports, Store submission manifest, Authenticode
   # Signing Doctor, bootstrapper vs installed-program architecture). Validated on feature/windows-packaging; re-pin to
   # the main merge commit once it is merged.
-  MAKER_COMMIT: 904acfd923180f53e598ac2bad5095cb1e53e693
+  MAKER_COMMIT: 4c946ff65c47ef3f5b403e9a0835721bb4ad9699
   # HCG Repo main with the Release Passport v1 schema (final).
   HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
   DOTNET_NOLOGO: 1
@@ -65,6 +65,7 @@ jobs:
             --provider github-actions --run-id ${{ github.run_id }} |
             Tee-Object -FilePath "$env:RUNNER_TEMP\package.log"
           if ($LASTEXITCODE -ne 0) { throw "packaging failed ($LASTEXITCODE)" }
+          if (-not (Test-Path "$env:RUNNER_TEMP\dist\SHA256SUMS.txt")) { throw "Executable Maker reported success but wrote no distribution folder" }
       - name: Evidence — checksums, sizes, Authenticode status, version info, architecture
         shell: pwsh
         run: |
