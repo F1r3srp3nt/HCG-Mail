@@ -121,7 +121,7 @@ public sealed class JsonMailCache : IMailCache
             {
                 _logger.LogWarning("Could not delete the offline copy of account {AccountId} ({Error})", accountId, ex.GetType().Name);
             }
-            // Even if a file could not be deleted, without its key it can no longer be read.
+            // Even if a file could not be deleted, HCG Mail can no longer decrypt it once the key is gone.
             _protector.DeleteKey(Purpose, accountId);
         }
     }
@@ -134,7 +134,7 @@ public sealed class JsonMailCache : IMailCache
         {
             try
             {
-                // Folders of accounts removed earlier (their keys are already gone, so these are unreadable leftovers).
+                // Folders of accounts removed earlier (their keys were deleted with the account).
                 if (Directory.Exists(_paths.OfflineDirectory))
                     Directory.Delete(_paths.OfflineDirectory, recursive: true);
             }

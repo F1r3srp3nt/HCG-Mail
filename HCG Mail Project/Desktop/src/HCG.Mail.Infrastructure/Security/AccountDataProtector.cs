@@ -10,7 +10,8 @@ namespace HCG.Mail.Infrastructure.Security;
 /// random 256-bit key, created on first use and kept only in the operating system's credential store (Windows Credential
 /// Manager, macOS/iOS Keychain) — never in a file, and never next to the data it protects. The associated data binds every
 /// file to its account, purpose and place, so a file copied into another account's folder, or to another slot, does not
-/// decrypt (protection against cross-account access). Deleting the key makes every remaining copy unreadable.
+/// decrypt (protection against cross-account access). Deleting the key from the store means HCG Mail can no longer decrypt the
+/// remaining copies; copies of the store in backups made earlier are outside HCG Mail's control (docs/OFFLINE_DATA_SECURITY.md).
 /// </summary>
 public sealed class AccountDataProtector
 {
@@ -72,7 +73,7 @@ public sealed class AccountDataProtector
         }
     }
 
-    /// <summary>Deletes the key: everything it protected becomes unreadable (crypto-shredding).</summary>
+    /// <summary>Deletes the key from the credential store, so the data it protected can no longer be decrypted with it.</summary>
     public void DeleteKey(string purpose, string accountId)
     {
         var name = KeyName(purpose, accountId);

@@ -261,4 +261,64 @@ public sealed class OfflineSecurityTests : IDisposable
         cache.Clear(["acct-a"]);
         Assert.Equal("Keep me", Assert.Single(store.Load()).Message.Subject); // unsent mail survives deleting offline copies
     }
+
+    /// <summary>
+    /// The key lifecycle in the real operating-system store (Windows Credential Manager on the Windows runners, the login
+    /// Keychain on macOS). Skipped on Linux, which has no persistent store HCG Mail can use.
+    /// </summary>
+    [Fact]
+    public async Task Keys_live_only_in_the_os_store_and_are_deleted_with_the_account()
+    {
+        var vault = CredentialVaultFactory.CreateForCurrentPlatform();
+        if (!vault.IsPersistent)
+            return;
+        var account = "lifecycle-test-" + Guid.NewGuid().ToString("N");
+        var cacheKey = AccountDataProtector.KeyName(JsonMailCache.Purpose, account);
+        var outboxKey = AccountDataProtector.KeyName(JsonOutboxStore.Purpose, account);
+        try
+        {
+            var protector = new AccountDataProtector(vault, NullLogger<AccountDataProtector>.Instance);
+            var cache = new JsonMailCache(new AppPaths(_dir), () => _policy, protector, NullLogger<JsonMailCache>.Instance);
+            var outbox = new JsonOutboxStore(new AppPaths(_dir), protector, NullLogger<JsonOutboxStore>.Instance);
+            cache.SaveMessage(account, Message(1));
+            outbox.Put(new OutboxItem("lifecycle0001", account, OutboxKind.Send, Outgoing("Pending"), DateTimeOffset.Now));
+
+            // Two different 256-bit keys, both in the OS store, neither in any file.
+            var keyA = Convert.FromBase64String((await vault.GetAsync(cacheKey))!);
+            var keyB = Convert.FromBase64String((await vault.GetAsync(outboxKey))!);
+            Assert.Equal(32, keyA.Length);
+            Assert.Equal(32, keyB.Length);
+            Assert.False(keyA.AsSpan().SequenceEqual(keyB));
+            foreach (var file in AllFiles())
+            {
+                var bytes = File.ReadAllBytes(file);
+                Assert.False(bytes.AsSpan().IndexOf(keyA) >= 0 || bytes.AsSpan().IndexOf(keyB) >= 0, "a key is stored in " + file);
+                Assert.DoesNotContain(Convert.ToBase64String(keyA), File.ReadAllText(file));
+            }
+
+            // A fresh process (new protector, nothing cached in memory) reads both through the OS store.
+            var fresh = new AccountDataProtector(vault, NullLogger<AccountDataProtector>.Instance);
+            Assert.Equal(Secret, new JsonMailCache(new AppPaths(_dir), () => _policy, fresh, NullLogger<JsonMailCache>.Instance)
+                .LoadMessage(account, new MessageRef("INBOX", 1, 1))!.Value.TextBody);
+            Assert.Single(new JsonOutboxStore(new AppPaths(_dir), fresh, NullLogger<JsonOutboxStore>.Instance).Load(), i => i.AccountId == account);
+
+            // Removing the account: the copy's files and key go; a copy of a file taken before cannot be decrypted afterwards.
+            var saved = Directory.EnumerateFiles(Path.Combine(_dir, "offline"), "*.bin", SearchOption.AllDirectories).First();
+            var stolen = File.ReadAllBytes(saved);
+            var slot = "messages/" + Path.GetFileNameWithoutExtension(saved);
+            cache.DeleteAccount(account);
+            outbox.DeleteAccount(account);
+            Assert.Null(await vault.GetAsync(cacheKey));
+            Assert.Null(await vault.GetAsync(outboxKey));
+            Assert.Equal(0, cache.SizeOf(account));
+            Assert.Empty(new JsonOutboxStore(new AppPaths(_dir), fresh, NullLogger<JsonOutboxStore>.Instance).Load().Where(i => i.AccountId == account));
+            var afterRemoval = new AccountDataProtector(vault, NullLogger<AccountDataProtector>.Instance);
+            Assert.Null(afterRemoval.Unprotect(JsonMailCache.Purpose, account, slot, stolen));
+        }
+        finally
+        {
+            await vault.DeleteAsync(cacheKey);
+            await vault.DeleteAsync(outboxKey);
+        }
+    }
 }

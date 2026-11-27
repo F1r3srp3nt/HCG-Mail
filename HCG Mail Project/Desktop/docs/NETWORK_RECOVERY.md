@@ -120,7 +120,7 @@ When the server cannot be reached, the session goes offline:
 - **Encrypted.** Every file is encrypted with AES-256-GCM (`AccountDataProtector`).
 - **One key per account and purpose** (offline copy, Outbox), a random 256-bit key. It is created on first use and kept only in the operating system's credential store: Windows Credential Manager, or the macOS/iOS Keychain. It is never written to a file and never stored next to the data.
 - **Isolated per account.** Each account has its own folder and key. The associated data binds every file to its account, purpose and slot, so a file copied into another account's folder, or to another place, does not decrypt; it is deleted when found.
-- **Crypto-shredding.** Removing an account, turning offline copies off, or *Delete offline copies* deletes the files **and the keys**. A copy taken before deletion can no longer be decrypted.
+- **Deletion.** Removing an account, turning offline copies off, or *Delete offline copies* deletes the files and the keys from the credential store; HCG Mail can then no longer decrypt a copy taken earlier. Backups made before are outside its control: see `docs/OFFLINE_DATA_SECURITY.md` for what is verified and where the protection ends.
 - **Without a persistent credential store** (Linux), keys exist only while HCG Mail runs. Copies are then unreadable after it closes and are deleted, and the Outbox is kept in memory for the session.
 - **Local only.** Nothing here is ever sent anywhere: HCG Mail never synchronizes offline copies or the Outbox to HCG infrastructure or anyone else. The cache has no network dependency (tested).
 

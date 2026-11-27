@@ -10,7 +10,7 @@ namespace HCG.Mail.Infrastructure.Storage;
 /// The Outbox on disk: one private file per waiting message or draft, written atomically (a crash never leaves half a
 /// message), with its attachments inside so the originals can be moved or deleted. The message is encrypted with the
 /// account's own Outbox key (<see cref="AccountDataProtector"/>, kept only in the credential store); the envelope shows only
-/// the item id and the account it belongs to, and the encryption binds the message to both, so an item can never be read,
+/// the item id and the account it belongs to, and the encryption binds the message to both, so an item cannot be read,
 /// or sent, as another account's.
 /// </summary>
 public sealed class JsonOutboxStore(AppPaths paths, AccountDataProtector protector, ILogger<JsonOutboxStore> logger) : IOutboxStore

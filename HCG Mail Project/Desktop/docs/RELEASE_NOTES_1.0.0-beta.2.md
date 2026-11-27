@@ -36,7 +36,8 @@ New in this version, HCG Mail keeps a copy of the mail you read (not attachments
 messages in the Outbox. Both are encrypted on this PC with a separate key per account, kept only in Windows Credential
 Manager, and never uploaded to HCG or anyone else. In Settings › Storage you choose how long copies are kept (7 days to a
 year, 30 days by default) and how much space each account may use, see the space used, and delete one account's copy or
-all of them; removing an account deletes its copy, its Outbox and their keys.
+all of them. Removing an account deletes its copy, its Outbox and their keys from this PC; backups of the PC made earlier
+can still contain older encrypted copies and keys. Details: `docs/OFFLINE_DATA_SECURITY.md`.
 
 The Network Doctor contacts a few public hosts only while you run it; they are listed in the window. Choose Google, Apple
 or Microsoft for these checks, or turn them off (only your own mail servers are then contacted), in Settings › Privacy &

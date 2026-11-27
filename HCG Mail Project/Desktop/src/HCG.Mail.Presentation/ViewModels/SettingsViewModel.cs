@@ -130,7 +130,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (row is null)
             return;
         _main.DeleteOfflineCopy(row.Account);
-        OfflineCopiesStatus = $"The offline copy of {row.Account.EmailAddress} and its key were deleted.";
+        OfflineCopiesStatus = $"The offline copy of {row.Account.EmailAddress} and its key were deleted from this {PlatformText.Device}.";
         RefreshOfflineUsage();
     }
 

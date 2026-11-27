@@ -74,6 +74,13 @@ foreach ($t in $tls) {
     $code = Run @('--diagnose-tls', $t.Target)
     $host_, $port = $t.Target.Split(':')
     $file = Join-Path $data "tls-diagnosis-$host_-$port.txt"
+    # A public test host that did not answer in time says nothing about HCG Mail: try once more. The verdict stays strict:
+    # a second timeout still fails the check.
+    if ((Test-Path $file) -and ((Get-Content $file -Raw) -match 'FAILED after .* Timeout')) {
+        Write-Host "      (network timeout reaching $($t.Target); retrying once)"
+        Start-Sleep -Seconds 5
+        $code = Run @('--diagnose-tls', $t.Target)
+    }
     if (Test-Path $file) { Get-Content $file | ForEach-Object { Write-Host "      $_" } }
     if ($t.Valid) { Check ($code -eq 0) "TLS accepted: $($t.Target) ($($t.What), exit $code)" }
     # A refusal counts only when the certificate or TLS check refused it, not when the host could not be reached.
