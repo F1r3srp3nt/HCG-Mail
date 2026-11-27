@@ -132,6 +132,46 @@ button + Volume Up).
 
 The full 14-area plan, which is also what TestFlight testers follow, is **[TESTFLIGHT_PLAN.md](TESTFLIGHT_PLAN.md)**.
 
+## 6. Archive and IPA from the command line (and HCG Executable Maker)
+
+The .NET iOS SDK makes both itself: `ArchiveOnBuild` writes the `.xcarchive`, `BuildIpa` the `.ipa`. Nothing is
+uploaded. Run from `HCG Mail Project/iOS`, with Xcode 27.2 selected (§1) and the identity and profile from §3.
+
+**Name your signing once, outside the repository** (either way; command-line `-p:` values win):
+
+```bash
+cp signing.local.example.props signing.local.props     # ignored by git
+# edit: HcgIosSigningIdentity = "Apple Development: <Name> (<TEAMID>)", HcgIosProvisioningProfile = <profile name or UUID>
+```
+or pass `-p:CodesignKey="Apple Development: <Name> (<TEAMID>)" -p:CodesignProvision="<profile>"` to each command.
+`scripts/find-dev-signing.py` prints a matching pair. Simulator builds are not affected: they stay ad-hoc signed.
+
+**Development-signed build for a physical device** (`artifacts/ios/device-signed/Release/HCGMail.iOS.app`, where
+`scripts/install-device.sh --no-build` installs it from; §4 does the same in one step and also finds the signing):
+```bash
+dotnet build src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -o ../../artifacts/ios/device-signed/Release
+```
+
+**XCArchive and IPA, at fixed paths** (one command; `ArchiveDir` is the `.xcarchive` itself, not a folder for it):
+```bash
+A="$(cd ../.. && pwd)/artifacts/ios"
+rm -rf "$A/archive/HCGMail.iOS.xcarchive"
+dotnet publish src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:ApplicationVersion=1 \
+  -p:ArchiveOnBuild=true -p:ArchiveDir="$A/archive/HCGMail.iOS.xcarchive" \
+  -p:BuildIpa=true -p:IpaPackagePath="$A/ipa/HCGMail.iOS.ipa"
+codesign -dvv "$A/archive/HCGMail.iOS.xcarchive/Products/Applications/HCGMail.iOS.app" 2>&1 | grep -E "Authority=Apple Development|TeamIdentifier"
+shasum -a 256 "$A/ipa/HCGMail.iOS.ipa"
+```
+With a development profile the IPA installs only on the devices in that profile. For TestFlight and the App Store use
+`scripts/export-ipa.sh` with an Apple Distribution identity and App Store profile: same SDK path and the same fixed
+paths, plus the identity and profile checks.
+
+CI runs this exact command on every iOS change (job *Compile for devices*), signed ad hoc because CI holds no
+certificate, and checks the archive and the IPA at these paths. The same job shows why HCG Executable Maker's
+"Archive" and "IPA" outputs stopped with *"dotnet publish succeeded but created no .xcarchive"*: Maker passed a
+parent folder as `ArchiveDir`, so the SDK wrote the archive's contents into that folder and there was no
+`*.xcarchive` inside it to find. The fix is in Maker (pass the `.xcarchive` path); HCG Mail needs no change for it.
+
 ## Troubleshooting
 
 | Message | Cause and fix |

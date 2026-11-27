@@ -22,6 +22,6 @@
            Text="SupportedOSPlatformVersion $(SupportedOSPlatformVersion) is below the minimum iOS version HCG Mail supports and is tested on ($(HcgMinimumIos))." />
     <Message Importance="high"
              Condition="'$(TargetPlatformIdentifier)' == 'ios' And $(RuntimeIdentifier.StartsWith('ios-')) And '$(CodesignKey)' == '' And '$(EnableCodeSigning)' != 'false'"
-             Text="HCG004: device build without CodesignKey/CodesignProvision. The iOS SDK will try to pick an Apple Development identity and profile from this Mac's keychain; if none fits it fails with 'No valid iOS code signing keys'. See README › Run on your own iPhone or iPad, or use scripts/export-ipa.sh." />
+             Text="HCG004: device build without CodesignKey/CodesignProvision. The iOS SDK will try to pick an Apple Development identity and profile from this Mac's keychain; if none fits it fails with 'No valid iOS code signing keys'. Name them with -p:CodesignKey=… -p:CodesignProvision=… or in an untracked signing.local.props (template: signing.local.example.props). See DEVICE_INSTALL.md › Archive and IPA from the command line." />
   </Target>
 </Project>

@@ -51,3 +51,6 @@ unleashed-out/
 !/HCG Mail Distribution/*/README.md
 !/HCG Mail Distribution/*/*/
 !/HCG Mail Distribution/*/*/README.md
+
+# This Mac's iOS signing choice (identity and profile names; template: HCG Mail Project/iOS/signing.local.example.props)
+signing.local.props

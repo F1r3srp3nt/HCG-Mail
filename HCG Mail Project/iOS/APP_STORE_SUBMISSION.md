@@ -144,8 +144,7 @@ python3 -I scripts/verify-ios-build.py app ../artifacts/ios/ipa/HCGMail.iOS.ipa 
 | File | Use |
 |---|---|
 | `artifacts/ios/ipa/HCGMail.iOS.ipa` | **Upload this** with Transporter |
-| `artifacts/ios/archive/HCG Mail <version> (<build>).xcarchive` | Copy of the archive, for your records |
-| `~/Library/Developer/Xcode/Archives/<date>/….xcarchive` (path printed by the script) | The same archive as listed in Xcode › Window › Organizer |
+| `artifacts/ios/archive/HCGMail.iOS.xcarchive` | The archive, written there directly (fixed path); double-click it to add it to Xcode › Window › Organizer |
 | `artifacts/ios/ipa/HCGMail.iOS.ipa.sha256` | SHA-256 of the `.ipa`; re-check before upload with `shasum -a 256 -c HCGMail.iOS.ipa.sha256` (in that folder) |
 | `artifacts/ios/verification.txt` | Every preflight and build check from this run, plus the SHA-256; keep it with the release |
 

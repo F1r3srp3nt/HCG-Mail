@@ -181,7 +181,7 @@ export HCG_IOS_MARKETING_VERSION=1.0.0   # optional: the App Store version (defa
 export HCG_MICROSOFT_CLIENT_ID=<GUID>    # optional: enables Microsoft sign-in
 scripts/export-ipa.sh
 #   → artifacts/ios/ipa/HCGMail.iOS.ipa                      signed .ipa (upload this with Transporter)
-#   → artifacts/ios/archive/HCG Mail <version> (<build>).xcarchive   (+ the original in Xcode's Organizer)
+#   → artifacts/ios/archive/HCGMail.iOS.xcarchive   (double-click to add it to Xcode's Organizer)
 #   → artifacts/ios/verification.txt                         every check, for the release record
 ```
 

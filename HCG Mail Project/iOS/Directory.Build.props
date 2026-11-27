@@ -27,6 +27,16 @@
   <Import Project="$(HcgSharedDir)Directory.Build.props" Condition="'$(HcgSharedRootFound)' == 'true'" />
   <Import Project="$(HcgIosToolchainFile)" />
 
+  <!-- Optional, untracked (.gitignore): this Mac's signing choice for device builds, so a plain
+       `dotnet build/publish -r ios-arm64` (or HCG Executable Maker's "project default" signing) needs no -p arguments.
+       Copy signing.local.example.props to signing.local.props, or point HcgIosSigningProps / HCG_IOS_SIGNING_PROPS
+       at a file elsewhere. It holds the names of a keychain identity and an installed profile only: no keys. -->
+  <PropertyGroup>
+    <HcgIosSigningProps Condition="'$(HcgIosSigningProps)' == ''">$(HCG_IOS_SIGNING_PROPS)</HcgIosSigningProps>
+    <HcgIosSigningProps Condition="'$(HcgIosSigningProps)' == ''">$(MSBuildThisFileDirectory)signing.local.props</HcgIosSigningProps>
+  </PropertyGroup>
+  <Import Project="$(HcgIosSigningProps)" Condition="Exists('$(HcgIosSigningProps)')" />
+
   <!-- Only so the project evaluates far enough to report HCG001 clearly. -->
   <PropertyGroup Condition="'$(HcgSharedRootFound)' != 'true'">
     <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>

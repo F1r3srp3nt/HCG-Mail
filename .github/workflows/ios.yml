@@ -275,13 +275,59 @@ jobs:
           else
             echo "Unexpected: xcodebuild archive exited $rc without the documented message."; exit 1
           fi
+      # .NET's own archive and IPA (ArchiveOnBuild, BuildIpa), as scripts/export-ipa.sh and HCG Executable Maker use
+      # them. CI holds no Apple certificate, so the signing identity is ad hoc ("-", accepted by the SDK for ios-arm64
+      # without a provisioning profile). It comes from an external signing.local.props, the way an owner's Mac names
+      # its development identity and profile. The paths are fixed: ArchiveDir is the .xcarchive itself.
+      - name: Native .NET archive and IPA at fixed paths (ArchiveOnBuild + BuildIpa; ad-hoc test signing from an external signing.local.props)
+        run: |
+          set -euo pipefail
+          out="$(cd ../.. && pwd)/artifacts/ios-archive-check"; rm -rf "$out"; mkdir -p "$out"
+          printf '%s\n' '<Project><PropertyGroup>' '<HcgIosSigningIdentity>-</HcgIosSigningIdentity>' '</PropertyGroup></Project>' > "$RUNNER_TEMP/signing.ci.props"
+          HCG_IOS_SIGNING_PROPS="$RUNNER_TEMP/signing.ci.props" \
+          dotnet publish src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:ApplicationVersion=1 \
+            -p:ArchiveOnBuild=true -p:ArchiveDir="$out/HCGMail.iOS.xcarchive" \
+            -p:BuildIpa=true -p:IpaPackagePath="$out/HCGMail.iOS.ipa" > "$out/publish.log" 2>&1 || { tail -60 "$out/publish.log"; exit 1; }
+          grep -E "HCG004|Created the package" "$out/publish.log" || true
+          ! grep -q "HCG004" "$out/publish.log" || { echo "signing.local.props was not used"; exit 1; }
+          a="$out/HCGMail.iOS.xcarchive"; app="$a/Products/Applications/HCGMail.iOS.app"
+          test -f "$a/Info.plist" && test -f "$app/Info.plist" && test -f "$app/HCGMail.iOS" || { find "$out" -maxdepth 4 | head -40; exit 1; }
+          plutil -p "$a/Info.plist" | tee "$out/archive-Info.plist.txt"
+          plutil -extract ApplicationProperties.ApplicationPath raw "$a/Info.plist" | grep -qx "Applications/HCGMail.iOS.app"
+          [ "$(plutil -extract CFBundleIdentifier raw "$app/Info.plist")" = com.hakmicapitalgroup.hcgmail ]
+          [ "$(plutil -extract DTPlatformName raw "$app/Info.plist")" = iphoneos ]
+          lipo -archs "$app/HCGMail.iOS" | grep -qx arm64
+          codesign --verify --deep --strict "$app"
+          codesign -dvv "$app" 2>&1 | grep -E "^Identifier=|^Signature=" | tee "$out/archive-signature.txt"
+          grep -qx "Signature=adhoc" "$out/archive-signature.txt"
+          test -f "$out/HCGMail.iOS.ipa"
+          unzip -l "$out/HCGMail.iOS.ipa" | grep -q " Payload/HCGMail.iOS.app/HCGMail.iOS$"
+          mkdir -p "$RUNNER_TEMP/ipa" && ditto -x -k "$out/HCGMail.iOS.ipa" "$RUNNER_TEMP/ipa"
+          cmp "$RUNNER_TEMP/ipa/Payload/HCGMail.iOS.app/HCGMail.iOS" "$app/HCGMail.iOS"
+          ( cd "$out" && shasum -a 256 HCGMail.iOS.ipa ) | tee "$out/SHA256SUMS.txt"
+          echo "Archive and IPA written at their fixed paths; the IPA holds the archived app's executable."
+      - name: HCG Executable Maker's current invocation (ArchiveDir = a parent folder) writes the archive INTO that folder
+        run: |
+          set -euo pipefail
+          d="$(cd ../.. && pwd)/artifacts/ios-archive-check/maker-archives"; rm -rf "$d"
+          dotnet publish src/HCG.Mail.iOS/HCG.Mail.iOS.csproj -c Release -f net10.0-ios -r ios-arm64 -p:ApplicationVersion=1 \
+            -p:ArchiveOnBuild=true -p:ArchiveDir="$d" -p:BuildIpa=false -p:CodesignKey=- \
+            -p:UseSharedCompilation=false -nodeReuse:false > "$d.log" 2>&1 || { tail -60 "$d.log"; exit 1; }
+          test -f "$d/Info.plist" && test -d "$d/Products/Applications/HCGMail.iOS.app"
+          n="$(find "$d" -name '*.xcarchive' | wc -l | tr -d ' ')"
+          echo "Archive content directly in $d; *.xcarchive directories inside it: $n"
+          [ "$n" = 0 ]
+          echo "Reproduced: with ArchiveDir=<folder> there is no *.xcarchive to find, which is HCG Executable Maker's error. Pass the .xcarchive path itself."
       - name: The build left the checkout clean
         run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ios-release-check
-          path: artifacts/ios-release-check
+          path: |
+            artifacts/ios-release-check
+            artifacts/ios-archive-check/*.txt
+            artifacts/ios-archive-check/*.log
           if-no-files-found: ignore
           retention-days: 30
 

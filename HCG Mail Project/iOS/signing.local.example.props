@@ -1,0 +1,17 @@
+<Project>
+  <!--
+    Template for signing.local.props (same folder; ignored by git — never commit the copy).
+    Used for device builds only (-r ios-arm64); simulator builds stay ad-hoc signed.
+    Names only: the certificate and its private key stay in this Mac's keychain, the profile in
+    ~/Library/Developer/Xcode/UserData/Provisioning Profiles (or ~/Library/MobileDevice/Provisioning Profiles).
+
+      security find-identity -v -p codesigning        lists the identity names
+      scripts/find-dev-signing.py                     finds a development identity and profile for HCG Mail
+
+    -p:CodesignKey / -p:CodesignProvision on the command line take precedence over this file.
+  -->
+  <PropertyGroup>
+    <HcgIosSigningIdentity>Apple Development: Your Name (TEAMID1234)</HcgIosSigningIdentity>
+    <HcgIosProvisioningProfile>name or UUID of the development profile for com.hakmicapitalgroup.hcgmail</HcgIosProvisioningProfile>
+  </PropertyGroup>
+</Project>
