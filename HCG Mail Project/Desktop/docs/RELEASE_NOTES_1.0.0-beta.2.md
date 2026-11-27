@@ -14,11 +14,27 @@ not replace the beta.1 files: they keep their names and checksums.
 - **The official HCG logo with a transparent background.** No dark rectangle behind the logo in the light theme. The logo
   keeps its geometry, metal and blue light.
 - **A cleaner welcome screen** with the logo and one clear action: Add email account.
+- **Works better on school and other restricted Wi-Fi.**
+  - *Network Doctor* in Mail Health finds out why mail does not work on the current network and says whether it is the
+    network (closed mail ports, a Wi-Fi sign-in page, certificate interception), your password, the mail server or HCG Mail.
+  - When a network blocks your outgoing port, it offers another port your provider documents, if that one works here.
+  - HCG Mail reconnects by itself after the network drops, changes or the computer wakes up (5 seconds, then longer
+    pauses up to 5 minutes), and tells you what it is doing instead of silently stopping. A refused password is never
+    retried automatically.
+  - Mail you have read stays readable offline. Messages and drafts written offline wait in the new Outbox and are sent
+    when the connection returns; a message that may already have been sent is never sent twice without you.
+  - Certificate checks and encryption are never relaxed on any network. See `docs/NETWORK_RECOVERY.md`.
 
 ## Upgrading from 1.0.0-beta.1
 
 Run the new installer: it replaces the program and keeps your accounts, settings and saved passwords (tested).
 Uninstalling HCG Mail never deletes your accounts' settings.
+
+## Privacy
+
+New in this version, HCG Mail keeps a copy of the mail you read (not attachments) in its private data folder for offline
+reading. Turn it off, or delete the copies, in Settings › General; removing an account deletes its copy. The Network Doctor
+contacts a few public hosts only while you run it; they are listed in the window.
 
 ## Known limitations
 

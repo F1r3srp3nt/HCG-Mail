@@ -28,6 +28,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private readonly MailHealthViewModelFactory? _mailHealth;
     private DispatcherTimer? _autoRefresh;
     private readonly IMicrosoftAuth _microsoftAuth;
+    private readonly OutboxService? _outbox;
+    private readonly ConnectionRecoveryService? _recovery;
+    private readonly IMailCache? _mailCache;
     private readonly IGoogleAuth _googleAuth;
     private readonly SignInPresentation _signInPresentation;
     private readonly IDeliveryLog? _deliveryLog;
@@ -81,8 +84,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         IDeliveryLog? deliveryLog = null,
         RemoteImageLoader? remoteImages = null,
         IGoogleAuth? googleAuth = null,
-        SignInPresentation? signInPresentation = null)
+        SignInPresentation? signInPresentation = null,
+        OutboxService? outbox = null,
+        ConnectionRecoveryService? recovery = null,
+        IMailCache? mailCache = null)
     {
+        _outbox = outbox;
+        _recovery = recovery;
+        _mailCache = mailCache;
+        if (_outbox is not null)
+            _outbox.Changed += (_, _) => UiThread.Post(OnConnectionPresentationChanged);
         _signInPresentation = signInPresentation ?? SignInPresentation.Default;
         _googleAuth = googleAuth ?? new UnconfiguredGoogleAuth("Google sign-in is not available in this mode.");
         _mailHealth = mailHealth;
@@ -205,6 +216,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             Accounts.Add(CreateAccountViewModel(account));
 
         await RetryPendingCredentialDeletionsAsync();
+        _outbox?.RecoverInterrupted();
+        _recovery?.Start(ConnectAccountAsync);
 
         var last = Accounts.FirstOrDefault(a => a.Account.Id == _settings.Current.LastAccountId) ?? Accounts.FirstOrDefault();
         SelectedAccount = last;
@@ -286,14 +299,38 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     {
         var vm = new AccountViewModel(account, _sessionFactory, _vault, _loggerFactory.CreateLogger<AccountViewModel>());
         vm.PropertyChanged += OnAccountPropertyChanged;
+        _recovery?.Track(vm);
         return vm;
     }
 
     private async Task ConnectAccountAsync(AccountViewModel account)
     {
         var connected = await account.ConnectAsync();
+        if (connected && _outbox is not null)
+            await _outbox.FlushAsync(account);
         if (account != SelectedAccount)
             return;
+        if (!connected && account.IsShowingOfflineCopy && account.Session is { } offlineSession)
+        {
+            // The server cannot be reached: keep showing the folder from the copy saved on this device.
+            var target = SelectedFolder is { } current && account.FindByFullName(current.FullName) is { } same
+                ? same
+                : account.FindByRole(FolderRole.Inbox) ?? account.AllFolders.FirstOrDefault(f => f.IsAvailable);
+            if (target is not null && target == MessageList.Folder)
+            {
+                MessageList.UseSession(offlineSession);
+                await MessageList.RefreshAsync();
+            }
+            else if (target is not null)
+            {
+                SelectedFolder = target;
+                if (MessageList.Folder != SelectedFolder)
+                    await LoadFolderAsync(SelectedFolder);
+            }
+            OnConnectionPresentationChanged();
+            RefreshCommandStates();
+            return;
+        }
         if (connected)
         {
             var target = SelectedFolder is { } current && account.FindByFullName(current.FullName) is { } same
@@ -337,7 +374,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             return;
         }
         _settings.Update(s => s with { LastAccountId = value.Account.Id });
-        if (value.IsConnected)
+        if (value.IsConnected || value.IsShowingOfflineCopy)
             SelectedFolder = value.FindByRole(FolderRole.Inbox) ?? value.AllFolders.FirstOrDefault(f => f.IsAvailable);
         RefreshCommandStates();
     }
@@ -357,7 +394,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         Reader.Clear();
         await MessageList.LoadAsync(session, folder);
         _lastChecked = DateTimeOffset.Now;
-        if (!MessageList.HasError)
+        if (!MessageList.HasError && session is not IOfflineAwareSession { IsOffline: true })
             SelectedAccount?.MarkSynced();
         UpdateStatusText();
         RefreshCommandStates();
@@ -391,8 +428,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     private void OnAccountPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (sender == SelectedAccount && e.PropertyName is nameof(AccountViewModel.RecoveryText) or nameof(AccountViewModel.IsShowingOfflineCopy)
+            or nameof(AccountViewModel.StatusText) or nameof(AccountViewModel.OfflineCopySavedAt))
+            OnConnectionPresentationChanged();
+        if (e.PropertyName == nameof(AccountViewModel.Status))
+            ComposeCommand.NotifyCanExecuteChanged();
         if (sender != SelectedAccount || e.PropertyName != nameof(AccountViewModel.Status))
             return;
+        OnConnectionPresentationChanged();
         OnPropertyChanged(nameof(ShowNeedsPassword));
         OnPropertyChanged(nameof(ShowNeedsSignIn));
         OnPropertyChanged(nameof(ShowAccountError));
@@ -443,7 +486,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
                 newMessages = await MessageList.RefreshAsync(cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (!MessageList.LastFetchFailed)
+            if (account.Session is IOfflineAwareSession { IsOffline: true } offline)
+            {
+                // The server was not reached: what is shown is the copy on this device. Never report "up to date"; the offline
+                // banner (desktop) or notice (iPhone/iPad) above the list says why and when HCG Mail reconnects, so no
+                // second pop-up repeats it.
+                account.ReportError(offline.OfflineReason ?? new MailOperationException(MailErrorKind.Network, "The server could not be reached."));
+            }
+            else if (!MessageList.LastFetchFailed)
                 ReportRefreshed(account, newMessages);
         }
         catch (Exception ex) when (ex is OperationCanceledException || ex is MailOperationException { Kind: MailErrorKind.Cancelled })
@@ -501,8 +551,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     // ---- message actions ----------------------------------------------------------------------
 
     private bool HasSelection() => MessageList.SelectedItem is not null && SelectedAccount?.IsConnected == true;
-    private bool HasOpenMessage() => Reader.Content is not null && SelectedAccount?.IsConnected == true;
-    private bool CanCompose() => Accounts.Any(a => a.IsConnected);
+
+    // Replies can be written offline: they wait in the Outbox until the account reconnects.
+    private bool HasOpenMessage() => Reader.Content is not null && SelectedAccount is { } a && CanComposeFrom(a);
+    private bool CanCompose() => Accounts.Any(CanComposeFrom);
+
+    /// <summary>Connected, or (with an Outbox) known but unreachable: the message waits in the Outbox.</summary>
+    private bool CanComposeFrom(AccountViewModel account) =>
+        account.IsConnected || (_outbox is not null && account.Status is AccountStatus.Error or AccountStatus.Connecting && !account.UsesOAuth);
 
     private bool CanArchive() =>
         HasSelection() && SelectedAccount!.FindByRole(FolderRole.Archive) is { } archive && archive != SelectedFolder;
@@ -510,7 +566,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [RelayCommand(CanExecute = nameof(CanCompose))]
     private void Compose()
     {
-        var account = SelectedAccount is { IsConnected: true } a ? a : Accounts.First(x => x.IsConnected);
+        var account = SelectedAccount is { } a && CanComposeFrom(a) ? a : Accounts.FirstOrDefault(x => x.IsConnected) ?? Accounts.First(CanComposeFrom);
         OpenCompose(account, new OutgoingMessage());
     }
 
@@ -743,7 +799,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
 
     private void OpenCompose(AccountViewModel account, OutgoingMessage message)
     {
-        var compose = new ComposeViewModel(Accounts.Where(a => a.IsConnected || a == account).ToList(), account, message, _settings, _dialogs, _notifications, OnMessageStored);
+        var compose = new ComposeViewModel(Accounts.Where(a => CanComposeFrom(a) || a == account).ToList(), account, message, _settings, _dialogs, _notifications, OnMessageStored, _outbox);
         _dialogs.ShowCompose(compose);
     }
 
@@ -853,7 +909,69 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             _notifications.Info("Mail Health", "Add an account first.");
             return;
         }
-        _dialogs.ShowMailHealth(_mailHealth.Create(SelectedAccount));
+        _dialogs.ShowMailHealth(_mailHealth.Create(SelectedAccount, ApplyOutgoingServerAsync, _outbox));
+    }
+
+    /// <summary>Opens Mail Health on the Network Doctor and starts it (from the offline banner).</summary>
+    [RelayCommand]
+    private void OpenNetworkDoctor()
+    {
+        if (SelectedAccount is null || _mailHealth is null)
+            return;
+        var health = _mailHealth.Create(SelectedAccount, ApplyOutgoingServerAsync, _outbox);
+        health.StartOnNetworkDoctor = true;
+        _dialogs.ShowMailHealth(health);
+        if (health.Network?.RunCommand.CanExecute(null) == true)
+            _ = health.Network.RunCommand.ExecuteAsync(null);
+    }
+
+    /// <summary>
+    /// The user chose, in the Network Doctor, another documented way to reach the outgoing server that works on this
+    /// network. Only the outgoing port and security mode change; the password stays where it is.
+    /// </summary>
+    public async Task ApplyOutgoingServerAsync(AccountViewModel account, ServerEndpoint smtp)
+    {
+        var updated = account.Account with { Smtp = smtp };
+        var all = Accounts.Select(a => a == account ? updated : a.Account).ToList();
+        _accountStore.Save(all);
+        await account.UpdateAccountAsync(updated);
+        await ConnectAccountAsync(account);
+        _notifications.Success("Outgoing server changed", $"{account.EmailAddress} now sends through {smtp.Host} port {smtp.Port}.");
+    }
+
+    /// <summary>Deletes every account's offline copy of mail from this device (Settings).</summary>
+    public void ClearOfflineCopies() => _mailCache?.Clear();
+
+    // ---- connection state shown above the message list ------------------------------------------
+
+    /// <summary>The selected account cannot reach its server but its folder is on screen (from the copy on this device).</summary>
+    public bool ShowOfflineBanner => SelectedAccount is { HasError: true } && MessageList.Folder is not null;
+
+    public string OfflineBannerTitle => SelectedAccount is { IsShowingOfflineCopy: true } account
+        ? "Offline — showing mail saved on this device" + (account.OfflineCopySavedAt is { } t ? $" (from {t.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture)})" : "")
+        : "Cannot reach the mail server";
+
+    public string OfflineBannerText => SelectedAccount is { } a ? string.Join(" ", new[] { a.StatusText, a.RecoveryText }.Where(t => !string.IsNullOrWhiteSpace(t))) : "";
+
+    public int OutboxCount => SelectedAccount is { } a && _outbox is not null ? _outbox.CountFor(a.Account.Id) : 0;
+
+    public bool HasOutbox => OutboxCount > 0;
+
+    public string OutboxText => OutboxCount switch
+    {
+        0 => "",
+        1 => "1 message in the Outbox",
+        var n => $"{n} messages in the Outbox",
+    };
+
+    private void OnConnectionPresentationChanged()
+    {
+        OnPropertyChanged(nameof(ShowOfflineBanner));
+        OnPropertyChanged(nameof(OfflineBannerTitle));
+        OnPropertyChanged(nameof(OfflineBannerText));
+        OnPropertyChanged(nameof(OutboxCount));
+        OnPropertyChanged(nameof(HasOutbox));
+        OnPropertyChanged(nameof(OutboxText));
     }
 
     [RelayCommand]
@@ -913,7 +1031,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         if (!await _dialogs.ConfirmAsync(
                 "Remove this account?",
                 $"{account.EmailAddress} will be removed from HCG Mail on this {PlatformText.Device}, {secretText}, and its send history on this {PlatformText.Device} will be cleared.\n\n" +
-                $"No email is deleted from the mail server — you can add the account again at any time. HCG Mail does not store message contents on this {PlatformText.Device}, so there are no local messages to delete. Your other accounts are not affected." +
+                $"No email is deleted from the mail server — you can add the account again at any time. The copy of its mail kept on this {PlatformText.Device} for offline reading is deleted" +
+                (_outbox is not null && _outbox.CountFor(account.Id) is > 0 and var waiting ? $", and {waiting} unsent message(s) in its Outbox are discarded" : "") +
+                ". Your other accounts are not affected." +
                 (account.IsMicrosoft ? " To also withdraw HCG Mail's access on Microsoft's side, remove it at account.microsoft.com (personal) or myapps.microsoft.com (work or school)." : "") +
                 (account.IsGoogle ? " To also withdraw HCG Mail's access on Google's side (for all your devices), remove it at myaccount.google.com/permissions." : ""),
                 "Remove account",
@@ -939,13 +1059,16 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         if (vm is not null)
         {
             vm.PropertyChanged -= OnAccountPropertyChanged;
+            _recovery?.Untrack(vm);
             if (SelectedAccount == vm)
                 SelectedAccount = Accounts.FirstOrDefault(a => a != vm);
             Accounts.Remove(vm);
             await ShutDownAccountAsync(vm);
         }
 
-        // 3. Local data of the account: its send history, and (Microsoft) its tokens.
+        // 3. Local data of the account: its offline copy, Outbox, send history, and (Microsoft) its tokens.
+        _mailCache?.DeleteAccount(account.Id);
+        _outbox?.RemoveAccount(account.Id);
         try
         {
             _deliveryLog?.Clear(account.Id);
@@ -1118,6 +1241,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         OnPropertyChanged(nameof(FlagToggleText));
         OnPropertyChanged(nameof(ShowAccountError));
         OnPropertyChanged(nameof(ShowConnecting));
+        OnConnectionPresentationChanged();
     }
 
     public async ValueTask DisposeAsync()

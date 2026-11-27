@@ -16,6 +16,12 @@ public sealed class AppPaths
     public string AccountsFile => Path.Combine(DataDirectory, "accounts.json");
     public string DeliveryHistoryFile => Path.Combine(DataDirectory, "delivery-history.json");
 
+    /// <summary>Copies of mail kept for reading without a connection (one folder per account).</summary>
+    public string OfflineDirectory => Path.Combine(DataDirectory, "offline");
+
+    /// <summary>Messages and drafts waiting to be handed to the server.</summary>
+    public string OutboxDirectory => Path.Combine(DataDirectory, "outbox");
+
     /// <param name="appName">The folder name on Windows, macOS and iOS ("HCG Mail"); the iOS jailbreak edition passes
     /// its own name so its data stays apart from HCG Mail's.</param>
     public static AppPaths ForCurrentUser(string appName = "HCG Mail")

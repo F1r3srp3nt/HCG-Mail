@@ -87,6 +87,13 @@ public sealed partial class MailHealthViewModel : ObservableObject
     public ConnectionHealthViewModel? Connection { get; init; }
     public bool HasConnection => Connection is not null;
 
+    /// <summary>Mail Health › Network Doctor for the live account; null for accounts it does not apply to (Microsoft/Google sign-in).</summary>
+    public NetworkDoctorViewModel? Network { get; init; }
+    public bool HasNetwork => Network is not null;
+
+    /// <summary>Open on the Network Doctor tab (from the offline banner).</summary>
+    public bool StartOnNetworkDoctor { get; set; }
+
     public string AccountAddress => _account.EmailAddress;
     public string Domain => DomainNames.DomainOf(_account.EmailAddress) ?? _account.EmailAddress;
     public string WindowTitle => $"Mail Health — {AccountAddress}";

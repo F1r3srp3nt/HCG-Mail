@@ -3,6 +3,7 @@
         xmlns:vm="using:HCG.Mail.App.ViewModels"
         xmlns:dl="using:HCG.Mail.Email.Deliverability"
         xmlns:controls="using:HCG.Mail.App.Controls"
+        xmlns:core="using:HCG.Mail.Core.Network"
         x:Class="HCG.Mail.App.Views.MailHealthWindow"
         x:DataType="vm:MailHealthViewModel"
         Title="{Binding WindowTitle}"
@@ -97,6 +98,132 @@
     </Border>
 
     <TabControl x:Name="Tabs" Grid.Row="1" Margin="12,6,12,0">
+      <!-- Network Doctor: is it the network, the password, the server or HCG Mail? -->
+      <TabItem x:Name="NetworkTab" Header="Network Doctor" IsVisible="{Binding HasNetwork}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="10,12,10,20" Spacing="14" DataContext="{Binding Network}">
+            <Border Classes="card" Padding="16,14">
+              <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                <Border Classes="badge" Width="132" VerticalAlignment="Top" Margin="0,2,14,0" IsVisible="{Binding HasDiagnosis}"
+                        Classes.verified="{Binding IsHealthy}" Classes.warning="{Binding IsWarning}" Classes.failed="{Binding IsProblem}">
+                  <TextBlock x:Name="NetworkVerdictCategory" Text="{Binding CategoryLabel}" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="4">
+                  <TextBlock x:Name="NetworkHeadline" Text="{Binding Headline}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding HasDiagnosis}" />
+                  <TextBlock Text="Find out why mail does not work on this network" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding !HasDiagnosis}" />
+                  <TextBlock x:Name="NetworkExplanation" Classes="detail" Text="{Binding Explanation}" IsVisible="{Binding HasDiagnosis}" />
+                  <TextBlock Classes="detail" IsVisible="{Binding !HasDiagnosis}"
+                             Text="Checks the device's connection, Wi-Fi sign-in pages, name lookups, certificate interception, whether this network allows mail ports, and your incoming and outgoing servers — and says whether the network, your password, the server or HCG Mail is the cause." />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                  <Button x:Name="CopyNetworkReportButton" Classes="toolbar" Click="OnCopyNetworkReport"
+                          ToolTip.Tip="Copy the results as text for support. Passwords, tokens and message content are never included; addresses keep only their domain.">
+                    <TextBlock Text="Copy report" />
+                  </Button>
+                  <Button x:Name="RunNetworkDoctorButton" Classes="primary" Command="{Binding RunCommand}">
+                    <TextBlock Text="Run Network Doctor" />
+                  </Button>
+                </StackPanel>
+                <ItemsControl Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,10,0,0" ItemsSource="{Binding Actions}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Classes="action" Text="{Binding StringFormat='• {0}'}" Margin="0,2" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Classes="caption" Margin="0,8,0,0" TextWrapping="Wrap" Text="{Binding StatusText}" />
+              </Grid>
+            </Border>
+
+            <Border Classes="card" Padding="16,12" IsVisible="{Binding HasAlternatives}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Another way to send that works on this network" FontWeight="SemiBold" />
+                <ItemsControl x:Name="AlternativeList" ItemsSource="{Binding Alternatives}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="core:AlternativeEndpoint">
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,4">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                          <TextBlock Classes="detail" Text="{Binding Source, StringFormat='{}{0}. Fully encrypted; the certificate is verified.'}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="subtle" Content="Use this" VerticalAlignment="Center"
+                                Command="{Binding $parent[ItemsControl].((vm:NetworkDoctorViewModel)DataContext).UseAlternativeCommand}" CommandParameter="{Binding}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="16,8" IsVisible="{Binding HasDiagnosis}">
+              <ItemsControl x:Name="NetworkRows" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:NetworkCheckRowViewModel">
+                    <Grid ColumnDefinitions="110,*" Margin="0,7">
+                      <Border Classes="badge" HorizontalAlignment="Left" VerticalAlignment="Top"
+                              Classes.verified="{Binding IsOk}" Classes.warning="{Binding IsWarning}" Classes.failed="{Binding IsProblem}">
+                        <TextBlock Text="{Binding ResultLabel}" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12.5" Foreground="{DynamicResource Hcg.Text.Secondary}" />
+                      </StackPanel>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+
+            <Border Classes="card" Padding="16,12" IsVisible="{Binding HasOutbox}">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Outbox" FontWeight="SemiBold" />
+                <TextBlock Classes="detail" Text="Messages wait here while the server cannot be reached and are sent automatically when the account reconnects. A message that may already have been sent is never sent again without you." />
+                <ItemsControl x:Name="OutboxList" ItemsSource="{Binding Outbox}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:OutboxItemViewModel">
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,6">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding Subject}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="detail" Text="{Binding Recipients, StringFormat='To {0}'}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="action" Text="{Binding StateText}" />
+                          <TextBlock Classes="detail" Text="{Binding Detail}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                          <Button Classes="subtle" Content="Send again" IsVisible="{Binding CanSendAgain}"
+                                  Command="{Binding $parent[ItemsControl].((vm:NetworkDoctorViewModel)DataContext).SendAgainCommand}" CommandParameter="{Binding}" />
+                          <Button Classes="subtle" Content="Discard"
+                                  Command="{Binding $parent[ItemsControl].((vm:NetworkDoctorViewModel)DataContext).DiscardCommand}" CommandParameter="{Binding}" />
+                        </StackPanel>
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="16,12">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Connection recovery" FontWeight="SemiBold" />
+                <TextBlock Classes="detail" Text="{Binding RecoveryText}" />
+                <TextBlock Classes="detail" Text="{Binding VpnText}" />
+                <TextBlock Text="Recent network events" FontWeight="SemiBold" Margin="0,8,0,0" />
+                <ItemsControl x:Name="NetworkEvents" ItemsSource="{Binding Events}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:NetworkEventViewModel">
+                      <Grid ColumnDefinitions="72,*" Margin="0,2">
+                        <TextBlock Classes="detail" Text="{Binding Time}" />
+                        <TextBlock Grid.Column="1" Classes="detail" Text="{Binding Description}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="caption" Margin="0,8,0,0" TextWrapping="Wrap" Text="{Binding PrivacyText}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
       <!-- Connection: what HCG Mail observed or measured for this account -->
       <TabItem x:Name="ConnectionTab" Header="Connection" IsVisible="{Binding HasConnection}">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled">

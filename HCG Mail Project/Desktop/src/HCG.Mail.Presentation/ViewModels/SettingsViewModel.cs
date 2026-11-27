@@ -41,6 +41,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private RefreshOption _selectedRefresh;
     [ObservableProperty] private ViewModeOption _selectedViewMode;
     [ObservableProperty] private bool _loadRemoteImagesAutomatically;
+    [ObservableProperty] private bool _reconnectAutomatically;
+    [ObservableProperty] private bool _keepOfflineCopies;
+    [ObservableProperty] private string? _offlineCopiesStatus;
 
     public SettingsViewModel(AppSettingsService settings, ThemeService themes, IDialogService dialogs, AppPaths paths, ICredentialVault vault, MainWindowViewModel main)
     {
@@ -64,6 +67,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         _selectedRefresh = RefreshOptions.FirstOrDefault(o => o.Minutes == s.AutomaticRefreshMinutes) ?? RefreshOptions[0];
         _selectedViewMode = ViewModeOptions.First(o => o.Mode == s.DefaultMessageView);
         _loadRemoteImagesAutomatically = s.LoadRemoteImagesAutomatically;
+        _reconnectAutomatically = s.ReconnectAutomatically;
+        _keepOfflineCopies = s.KeepOfflineCopies;
     }
 
     public IReadOnlyList<RefreshOption> RefreshOptions { get; } =
@@ -131,6 +136,25 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnAskWhereToSaveAttachmentsChanged(bool value) => _settings.Update(s => s with { AskWhereToSaveAttachments = value });
     partial void OnSelectedViewModeChanged(ViewModeOption value) => _settings.Update(s => s with { DefaultMessageView = value.Mode });
     partial void OnLoadRemoteImagesAutomaticallyChanged(bool value) => _settings.Update(s => s with { LoadRemoteImagesAutomatically = value });
+    partial void OnReconnectAutomaticallyChanged(bool value) => _settings.Update(s => s with { ReconnectAutomatically = value });
+
+    partial void OnKeepOfflineCopiesChanged(bool value)
+    {
+        _settings.Update(s => s with { KeepOfflineCopies = value });
+        if (!value)
+        {
+            // Turning the copies off removes the ones already kept: nothing of the mail stays on this device.
+            _main.ClearOfflineCopies();
+            OfflineCopiesStatus = "Offline copies were deleted from this " + PlatformText.Device + ".";
+        }
+    }
+
+    [RelayCommand]
+    private void DeleteOfflineCopies()
+    {
+        _main.ClearOfflineCopies();
+        OfflineCopiesStatus = "Offline copies were deleted from this " + PlatformText.Device + ". New ones are kept as you read mail" + (KeepOfflineCopies ? "." : " only if you turn the option on again.");
+    }
 
     partial void OnSelectedRefreshChanged(RefreshOption value)
     {

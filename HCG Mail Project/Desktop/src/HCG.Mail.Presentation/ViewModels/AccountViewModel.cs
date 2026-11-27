@@ -62,6 +62,25 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
     [ObservableProperty] private string? _lastErrorMessage;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(Health))] private DateTimeOffset? _lastErrorAt;
 
+    /// <summary>What happens next after a connection problem ("Reconnecting automatically at 14:05 (attempt 3)").</summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasRecoveryText))] private string? _recoveryText;
+
+    [ObservableProperty] private DateTimeOffset? _nextReconnectAt;
+
+    /// <summary>The server cannot be reached and the folders and messages shown are the copy saved on this device.</summary>
+    [ObservableProperty] private bool _isShowingOfflineCopy;
+
+    public bool HasRecoveryText => !string.IsNullOrEmpty(RecoveryText);
+
+    public void SetRecovery(string? text, DateTimeOffset? next)
+    {
+        RecoveryText = text;
+        NextReconnectAt = next;
+    }
+
+    /// <summary>When the copy on screen was saved, if the account is showing its offline copy.</summary>
+    public DateTimeOffset? OfflineCopySavedAt => (Session as IOfflineAwareSession)?.CopySavedAt;
+
     public AccountHealth Health => Status switch
     {
         AccountStatus.Connecting => AccountHealth.Connecting,
@@ -169,6 +188,8 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         await DisposeSessionAsync();
         var session = _sessionFactory.Create(Account, password);
         session.StateChanged += OnSessionStateChanged;
+        if (session is IOfflineAwareSession offlineAware)
+            offlineAware.OfflineChanged += OnOfflineChanged;
         Session = session;
 
         SetStatus(AccountStatus.Connecting, "Connecting…");
@@ -177,6 +198,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
             await session.ConnectAsync();
             await RefreshFoldersAsync();
             LastConnectedAt = DateTimeOffset.Now;
+            IsShowingOfflineCopy = false;
             SetStatus(AccountStatus.Connected, "Connected");
             return true;
         }
@@ -184,9 +206,49 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         {
             RecordError(ex);
             SetStatus(ex.Kind == MailErrorKind.ReconnectRequired ? AccountStatus.NeedsSignIn : AccountStatus.Error, ex.UserMessage);
+            await TryShowOfflineCopyAsync(session);
             return false;
         }
     }
+
+    /// <summary>The server cannot be reached: show the folders saved on this device, so mail stays readable.</summary>
+    private async Task TryShowOfflineCopyAsync(IMailSession session)
+    {
+        if (session is not IOfflineAwareSession { IsOffline: true } || Session != session)
+        {
+            IsShowingOfflineCopy = false;
+            return;
+        }
+        try
+        {
+            await RefreshFoldersAsync();
+            IsShowingOfflineCopy = AllFolders.Any(f => f.IsAvailable);
+        }
+        catch (MailOperationException)
+        {
+            IsShowingOfflineCopy = false; // nothing saved yet (first use, or offline copies turned off)
+        }
+    }
+
+    private void OnOfflineChanged(object? sender, EventArgs e) => UiThread.Post(() =>
+    {
+        if (sender != Session || sender is not IOfflineAwareSession session)
+            return;
+        if (session.IsOffline)
+        {
+            // The connection failed while in use: keep what is on screen (now the offline copy) and say why.
+            if (session.OfflineReason is { } reason)
+                RecordError(reason);
+            IsShowingOfflineCopy = AllFolders.Any(f => f.IsAvailable);
+            if (Status == AccountStatus.Connected)
+                SetStatus(AccountStatus.Error, session.OfflineReason?.UserMessage ?? "Connection lost");
+        }
+        else
+        {
+            IsShowingOfflineCopy = false;
+        }
+        OnPropertyChanged(nameof(OfflineCopySavedAt));
+    });
 
     public async Task RefreshFoldersAsync(CancellationToken cancellationToken = default)
     {
@@ -240,6 +302,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         await DisposeSessionAsync();
         StandardFolders.Clear();
         OtherFolders.Clear();
+        IsShowingOfflineCopy = false;
         OnPropertyChanged(nameof(HasOtherFolders));
     }
 
@@ -262,6 +325,8 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         if (Session is { } session)
         {
             session.StateChanged -= OnSessionStateChanged;
+            if (session is IOfflineAwareSession offlineAware)
+                offlineAware.OfflineChanged -= OnOfflineChanged;
             Session = null;
             await session.DisposeAsync();
         }
@@ -282,7 +347,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
                 LastErrorKind = null;
                 LastErrorMessage = "Connection lost";
                 LastErrorAt = DateTimeOffset.Now;
-                SetStatus(AccountStatus.Error, "Connection lost — will retry on the next refresh");
+                SetStatus(AccountStatus.Error, "The connection to the server was lost.");
                 break;
         }
     });

@@ -294,11 +294,15 @@ public class LocalMailServerTests
         ola.StateChanged += (_, s) => states.Add(s);
 
         // Forcibly disconnect every IMAP session of this user on the server.
-        using (var kick = Process.Start(new ProcessStartInfo("doveadm", "-c /srv/hcgmail-test/dovecot.conf kick ola@hcgmail.test")
+        // The test server runs as root (started with sudo on CI runners); its admin socket is root-only.
+        var asRoot = Environment.UserName == "root";
+        using (var kick = Process.Start(new ProcessStartInfo(asRoot ? "doveadm" : "sudo",
+                   (asRoot ? "" : "-n doveadm ") + "-c /srv/hcgmail-test/dovecot.conf kick ola@hcgmail.test")
                { RedirectStandardOutput = true, RedirectStandardError = true })!)
         {
+            var error = await kick.StandardError.ReadToEndAsync();
             await kick.WaitForExitAsync();
-            Assert.Equal(0, kick.ExitCode);
+            Assert.True(kick.ExitCode == 0, $"doveadm kick exited with {kick.ExitCode}: {error}");
         }
         await Task.Delay(500);
 

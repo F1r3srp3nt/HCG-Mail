@@ -42,6 +42,16 @@ public sealed record AppSettings
     public int AutomaticRefreshMinutes { get; init; }
 
     public static readonly IReadOnlyList<int> AutomaticRefreshChoices = [0, 5, 15, 30, 60];
+
+    /// <summary>
+    /// After a connection problem (no network, a timeout, a blocked port, sleep), reconnect by itself with increasing pauses
+    /// (5 s up to 5 minutes) and at once when the network changes, then send what waits in the Outbox. A refused password is
+    /// never retried automatically. This only repairs a failed connection; it does not check for new mail on a timer.
+    /// </summary>
+    public bool ReconnectAutomatically { get; init; } = true;
+
+    /// <summary>Keep a copy of the folder list, recent messages and opened messages on this device for reading while offline.</summary>
+    public bool KeepOfflineCopies { get; init; } = true;
     public string? LastAccountId { get; init; }
 
     /// <summary>

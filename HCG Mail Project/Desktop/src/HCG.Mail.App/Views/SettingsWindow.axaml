@@ -64,6 +64,23 @@
                 <ToggleSwitch IsChecked="{Binding ConnectOnStartup}" OnContent="Connect to my accounts when HCG Mail starts" OffContent="Connect to my accounts when HCG Mail starts" />
               </StackPanel>
             </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Connection problems and offline use" />
+                <ToggleSwitch x:Name="ReconnectAutomaticallySwitch" IsChecked="{Binding ReconnectAutomatically}"
+                              OnContent="Reconnect automatically after a connection problem" OffContent="Reconnect automatically after a connection problem" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="After the network drops, changes or the computer wakes up, HCG Mail reconnects by itself (pausing 5 seconds, then longer, up to 5 minutes between attempts) and then sends what waits in the Outbox. A refused password is never retried automatically. This does not check for new mail on a timer." />
+                <ToggleSwitch x:Name="KeepOfflineCopiesSwitch" IsChecked="{Binding KeepOfflineCopies}"
+                              OnContent="Keep a copy of my mail on this computer for reading offline" OffContent="Keep a copy of my mail on this computer for reading offline" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="The folder list, the newest messages of folders you open and the messages you read are kept in HCG Mail's private data folder (not attachments). Turning this off deletes them." />
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <Button Classes="subtle" Content="Delete offline copies" Command="{Binding DeleteOfflineCopiesCommand}" />
+                  <TextBlock Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding OfflineCopiesStatus}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

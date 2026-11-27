@@ -1,3 +1,4 @@
+using HCG.Mail.Core.Services;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -32,6 +33,7 @@ public sealed partial class ComposeViewModel : ObservableObject
     private readonly IUserPrompts _dialogs;
     private readonly INotificationService _notifications;
     private readonly Action<AccountViewModel, FolderRole>? _onStored;
+    private readonly OutboxService? _outbox;
     private readonly string _messageId;
     private MessageRef? _draftRef;
     private string _savedSnapshot;
@@ -63,8 +65,10 @@ public sealed partial class ComposeViewModel : ObservableObject
         AppSettingsService settings,
         IUserPrompts dialogs,
         INotificationService notifications,
-        Action<AccountViewModel, FolderRole>? onStored = null)
+        Action<AccountViewModel, FolderRole>? onStored = null,
+        OutboxService? outbox = null)
     {
+        _outbox = outbox;
         _initial = initial;
         _settings = settings;
         _dialogs = dialogs;
@@ -125,14 +129,19 @@ public sealed partial class ComposeViewModel : ObservableObject
     public string WindowTitle => (string.IsNullOrWhiteSpace(Subject) ? HeadingFor(_initial.Kind) : Subject) + " — HCG Mail";
     public string Heading => HeadingFor(_initial.Kind);
 
-    public string? FromWarning => SelectedFrom.IsConnected ? null : $"{SelectedFrom.EmailAddress} is not connected ({SelectedFrom.StatusText}).";
+    public string? FromWarning => SelectedFrom.IsConnected ? null
+        : _outbox is not null ? $"{SelectedFrom.EmailAddress} is offline. Sending puts the message in the Outbox; it goes out automatically when the account reconnects."
+        : $"{SelectedFrom.EmailAddress} is not connected ({SelectedFrom.StatusText}).";
+
+    /// <summary>The account cannot reach its server now: send and save go to the Outbox on this device.</summary>
+    private bool UseOutbox => _outbox is not null && (SelectedFrom.Session is null || SelectedFrom.Session is IOfflineAwareSession { IsOffline: true } || !SelectedFrom.IsConnected);
 
     public bool IsDirty => Snapshot() != _savedSnapshot;
 
     /// <summary>Raised when the window should close (after sending or discarding).</summary>
     public event EventHandler? CloseRequested;
 
-    private bool CanUseServer() => !IsBusy && SelectedFrom.Session is not null;
+    private bool CanUseServer() => !IsBusy && (SelectedFrom.Session is not null || _outbox is not null);
 
     [RelayCommand(CanExecute = nameof(CanUseServer))]
     private async Task SendAsync()
@@ -166,6 +175,11 @@ public sealed partial class ComposeViewModel : ObservableObject
             return;
 
         var account = SelectedFrom;
+        if (UseOutbox)
+        {
+            QueueForSending(account, message, "The account is offline");
+            return;
+        }
         var session = account.Session!;
         IsBusy = true;
         SetStatus("Sending…", error: false);
@@ -188,6 +202,12 @@ public sealed partial class ComposeViewModel : ObservableObject
             PossiblyAlreadySent = true;
             SetStatus("Sending result unknown: " + ex.UserMessage + " The message may already have been sent. Check your Sent folder before sending again.", error: true);
         }
+        catch (MailOperationException ex) when (_outbox is not null && OfflineCapableConnectivity(ex))
+        {
+            // The connection failed before the server received the message: it waits in the Outbox instead of being lost.
+            IsBusy = false;
+            QueueForSending(account, message, "The server could not be reached (" + ex.UserMessage + ")");
+        }
         catch (MailOperationException ex)
         {
             SetStatus("Not sent: " + ex.UserMessage, error: true);
@@ -201,6 +221,26 @@ public sealed partial class ComposeViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    private static bool OfflineCapableConnectivity(MailOperationException ex) =>
+        !ex.OutcomeUnknown && Core.Network.ReconnectPolicy.ModeFor(ex.Kind) != Core.Network.RecoveryMode.Never;
+
+    private void QueueForSending(AccountViewModel account, OutgoingMessage message, string why)
+    {
+        try
+        {
+            _outbox!.Enqueue(account.Account.Id, message, OutboxKind.Send, _settings.Current.SaveCopyToSentFolder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SetStatus("Not sent, and it could not be put in the Outbox (" + ex.Message + "). Keep this window open and try again.", error: true);
+            return;
+        }
+        _notifications.Info("Saved in the Outbox",
+            $"{why}. “{(string.IsNullOrWhiteSpace(message.Subject) ? "(no subject)" : message.Subject)}” will be sent automatically when {account.EmailAddress} reconnects.");
+        _savedSnapshot = Snapshot();
+        CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>The last send attempt lost its connection after the server started receiving the message.</summary>
@@ -249,7 +289,7 @@ public sealed partial class ComposeViewModel : ObservableObject
     {
         if (!IsDirty || IsBusy)
             return !IsBusy;
-        var canSave = SelectedFrom.Session is not null;
+        var canSave = SelectedFrom.Session is not null || _outbox is not null;
         var choice = await _dialogs.ChooseAsync(
             "Save this message as a draft?",
             canSave ? "Your message has not been sent." : "Your message has not been sent, and the account is not connected so it cannot be saved as a draft.",
@@ -275,21 +315,28 @@ public sealed partial class ComposeViewModel : ObservableObject
     /// </summary>
     public async Task<bool> AutosaveAsync()
     {
-        if (!IsDirty || IsBusy || SelectedFrom.Session is null)
+        if (!IsDirty || IsBusy || (SelectedFrom.Session is null && _outbox is null))
             return false;
         BuildMessage(out var invalid);
         if (invalid.Count > 0)
             return false;
         if (!await SaveDraftCoreAsync())
             return false;
-        SetStatus($"Draft saved automatically at {DateTime.Now.ToString("HH:mm", CultureInfo.CurrentCulture)}.", error: false);
+        SetStatus(_lastDraftSavedLocally
+            ? $"Offline: draft saved on this device automatically at {DateTime.Now.ToString("HH:mm", CultureInfo.CurrentCulture)}. It is copied to your Drafts folder when the account reconnects."
+            : $"Draft saved automatically at {DateTime.Now.ToString("HH:mm", CultureInfo.CurrentCulture)}.", error: false);
         return true;
     }
 
+    private bool _lastDraftSavedLocally;
+
     private async Task<bool> SaveDraftCoreAsync()
     {
+        _lastDraftSavedLocally = false;
         var message = BuildMessage(out var invalid);
         var account = SelectedFrom;
+        if (UseOutbox)
+            return SaveDraftLocally(account, message, invalid);
         if (account.Session is null)
             return false;
         IsBusy = true;
@@ -304,6 +351,11 @@ public sealed partial class ComposeViewModel : ObservableObject
             _onStored?.Invoke(account, FolderRole.Drafts);
             return true;
         }
+        catch (MailOperationException ex) when (_outbox is not null && OfflineCapableConnectivity(ex))
+        {
+            IsBusy = false;
+            return SaveDraftLocally(account, message, invalid);
+        }
         catch (MailOperationException ex)
         {
             SetStatus("Draft not saved: " + ex.UserMessage, error: true);
@@ -313,6 +365,25 @@ public sealed partial class ComposeViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>Offline: the draft is kept on this device and copied to the Drafts folder when the account reconnects.</summary>
+    private bool SaveDraftLocally(AccountViewModel account, OutgoingMessage message, List<string> invalid)
+    {
+        try
+        {
+            _outbox!.Enqueue(account.Account.Id, message, OutboxKind.Draft, saveCopyToSent: false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            SetStatus("Draft not saved (" + ex.Message + ").", error: true);
+            return false;
+        }
+        _savedSnapshot = Snapshot();
+        _lastDraftSavedLocally = true;
+        var note = invalid.Count > 0 ? $" Invalid addresses were left out: {string.Join(", ", invalid)}." : "";
+        SetStatus($"Offline: draft saved on this device at {DateTime.Now.ToString("HH:mm", CultureInfo.CurrentCulture)}. It is copied to your Drafts folder when the account reconnects.{note}", error: invalid.Count > 0);
+        return true;
     }
 
     internal OutgoingMessage BuildMessage(out List<string> invalid)

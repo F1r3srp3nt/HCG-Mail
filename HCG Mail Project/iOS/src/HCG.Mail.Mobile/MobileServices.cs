@@ -1,3 +1,7 @@
+using HCG.Mail.Infrastructure.Network;
+using HCG.Mail.Email.Offline;
+using HCG.Mail.Core.Compose;
+using HCG.Mail.Core.Network;
 using HCG.Mail.App.Preview;
 using HCG.Mail.App.Services;
 using HCG.Mail.App.ViewModels;
@@ -70,7 +74,12 @@ public static class MobileServices
             services.AddSingleton<ICredentialVault>(vault);
             services.AddSingleton<IAccountStore>(accounts);
             services.AddSingleton<IAppSettingsStore>(new InMemoryAppSettingsStore());
-            services.AddSingleton<IMailSessionFactory, PreviewMailSessionFactory>();
+            services.AddSingleton<PreviewMailSessionFactory>();
+            services.AddSingleton<INetworkMonitor, ManualNetworkMonitor>();
+            services.AddSingleton<IMailCache, NoMailCache>();
+            services.AddSingleton<IOutboxStore, InMemoryOutboxStore>();
+            services.AddSingleton<IMailSessionFactory>(sp => new OfflineCapableSessionFactory(sp.GetRequiredService<PreviewMailSessionFactory>(),
+                sp.GetRequiredService<IMailCache>(), sp.GetRequiredService<INetworkMonitor>(), sp.GetRequiredService<ILoggerFactory>()));
             services.AddSingleton<IConnectionTester, PreviewConnectionTester>();
             services.AddSingleton<IDeliveryLog, InMemoryDeliveryLog>();
             services.AddSingleton<IMailDns, OfflineMailDns>();
@@ -82,7 +91,14 @@ public static class MobileServices
             services.AddSingleton(platform.CredentialVault);
             services.AddSingleton<IAccountStore, JsonAccountStore>();
             services.AddSingleton<IAppSettingsStore, JsonAppSettingsStore>();
-            services.AddSingleton<IMailSessionFactory, MailSessionFactory>();
+            services.AddSingleton<MailSessionFactory>();
+            services.AddSingleton<INetworkMonitor, SystemNetworkMonitor>();
+            services.AddSingleton<IMailCache>(sp => new JsonMailCache(sp.GetRequiredService<AppPaths>(),
+                () => sp.GetRequiredService<AppSettingsService>().Current.KeepOfflineCopies, sp.GetRequiredService<ILogger<JsonMailCache>>()));
+            services.AddSingleton<IOutboxStore, JsonOutboxStore>();
+            // Every session keeps mail readable offline and fails fast while the server cannot be reached.
+            services.AddSingleton<IMailSessionFactory>(sp => new OfflineCapableSessionFactory(sp.GetRequiredService<MailSessionFactory>(),
+                sp.GetRequiredService<IMailCache>(), sp.GetRequiredService<INetworkMonitor>(), sp.GetRequiredService<ILoggerFactory>()));
             // A build without the Microsoft capability never activates Microsoft sign-in; existing accounts stay as they are.
             services.AddSingleton(platform.Capabilities.MicrosoftSignIn
                 ? platform.MicrosoftAuth
@@ -98,6 +114,14 @@ public static class MobileServices
         services.AddSingleton<IMailClientFactory, MailClientFactory>();
         services.AddSingleton<IDnsResolver, SystemDnsResolver>();
         services.AddSingleton<ITcpProbe, SystemTcpProbe>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<INetworkInterfaces, SystemNetworkInterfaces>();
+        services.AddSingleton<IHttpProbe, SystemHttpProbe>();
+        services.AddSingleton<NetworkDoctor>();
+        // Optional: a host that ships HCG VPN registers its own IHcgVpn. HCG Mail never requires it.
+        services.AddSingleton<IHcgVpn, NoHcgVpn>();
+        services.AddSingleton<OutboxService>();
+        services.AddSingleton<ConnectionRecoveryService>();
         services.AddSingleton<IHtmlToTextConverter, HtmlToTextConverter>();
         services.AddSingleton<IHtmlSanitizer, MailHtmlSanitizer>();
         // Messages are laid out at phone width: the sender's phone breakpoints (@media max-width) apply, as in Apple Mail.

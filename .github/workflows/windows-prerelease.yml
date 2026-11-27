@@ -288,8 +288,15 @@ jobs:
         env: { HCG_MAIL_E2E: '1' }
         run: |
           mkdir -p "$RUNNER_TEMP/e2e"
+          rc=0
           dotnet test tests/HCG.Mail.Tests/HCG.Mail.Tests.csproj -c Release --filter "FullyQualifiedName~Integration" \
-            --logger "trx;LogFileName=e2e.trx" --logger "console;verbosity=normal" --results-directory "$RUNNER_TEMP/e2e"
+            --logger "trx;LogFileName=e2e.trx" --logger "console;verbosity=normal" --results-directory "$RUNNER_TEMP/e2e" || rc=1
+          # The application (headless) on restricted networks: Wi-Fi drop with offline reading and Outbox delivery, sleep,
+          # silently dead connections, and the Network Doctor telling firewall, outage and wrong password apart.
+          dotnet test tests/HCG.Mail.App.Tests/HCG.Mail.App.Tests.csproj -c Release \
+            --filter "FullyQualifiedName~RestrictedNetworkE2ETests|FullyQualifiedName~RealServerUiTests" --blame-hang-timeout 5m \
+            --logger "trx;LogFileName=e2e-app.trx" --logger "console;verbosity=normal" --results-directory "$RUNNER_TEMP/e2e" || rc=1
+          exit $rc
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: hcg-mail-local-mail-server-e2e, path: '${{ runner.temp }}/e2e', retention-days: 90 }
@@ -402,6 +409,7 @@ jobs:
         with: { name: hcg-mail-local-mail-server-e2e, path: e2e }
       - name: Generate and validate
         run: |
+          set -o pipefail  # the draft script's verdict must not be hidden by tee
           pip install --quiet jsonschema
           python3 -I "hcg-mail/HCG Mail Project/Desktop/scripts/maker/store-draft.py" --display display --upgrade upgrade --e2e e2e --dist dist --evidence evidence/build-evidence.json \
             --runtime runtime --tests tests --mailbox mailbox --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
