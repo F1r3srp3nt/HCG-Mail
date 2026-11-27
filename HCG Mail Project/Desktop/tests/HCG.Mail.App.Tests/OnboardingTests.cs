@@ -56,8 +56,8 @@ public class OnboardingTests
     }
 
     [Theory]
-    [InlineData("someone@outlook.com", "Microsoft sign-in")]
-    [InlineData("someone@hotmail.no", "Microsoft sign-in")]
+    [InlineData("someone@outlook.com", "cannot be added in this beta")]
+    [InlineData("someone@hotmail.no", "cannot be added in this beta")]
     [InlineData("someone@proton.me", "Proton Mail Bridge")]
     public void Addresses_that_cannot_use_a_password_here_say_why(string address, string expected)
     {

@@ -15,8 +15,8 @@ permissions:
   contents: read
 
 env:
-  VERSION: 1.0.0-beta.1
-  BUILD_NUMBER: 3
+  VERSION: 1.0.0-beta.2
+  BUILD_NUMBER: 4
   MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
   HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
   DOTNET_NOLOGO: 1

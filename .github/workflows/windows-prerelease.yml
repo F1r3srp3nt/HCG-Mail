@@ -15,8 +15,12 @@ permissions:
   contents: read
 
 env:
-  VERSION: 1.0.0-beta.1
-  BUILD_NUMBER: 3
+  VERSION: 1.0.0-beta.2
+  BUILD_NUMBER: 4
+  # The published 1.0.0-beta.1 (HCG Store), for the upgrade check: run, artifact and the x64 installer's SHA-256.
+  PREVIOUS_VERSION: 1.0.0-beta.1
+  PREVIOUS_RUN_ID: 45935461816
+  PREVIOUS_X64_SETUP_SHA256: a4ffe0add9138feddbca34bbae69775470471ed2b45f1f78f07fcaff39260f9d
   # HCG Executable Maker main (Inno Setup installer, portable ZIP, installer test).
   MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
   # HCG Repo main with the Release Passport v1 schema (final).
@@ -199,6 +203,92 @@ jobs:
           path: ${{ runner.temp }}/runtime-portable
           retention-days: 30
 
+  display:
+    name: Display scaling 100–200 % and both themes on real Windows (x64)
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+        with: { path: hcg-mail, sparse-checkout: 'HCG Mail Project/Desktop/scripts' }
+      - uses: actions/download-artifact@v4
+        with: { name: 'hcg-mail-windows-${{ env.VERSION }}', path: dist }
+      - name: HCG Mail at each display scaling, in HCG Dark and HCG Light
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter "HCGMail-$env:VERSION-win-x64.zip" | Select-Object -First 1
+          $dir = Join-Path $env:RUNNER_TEMP 'portable'; Expand-Archive $zip.FullName $dir -Force
+          $exe = (Get-ChildItem $dir -Recurse -Filter HCGMail.exe | Select-Object -First 1).FullName
+          $rc = 0
+          foreach ($theme in 'HcgFuture', 'HcgClassic') {
+            & './hcg-mail/HCG Mail Project/Desktop/scripts/windows-display-scaling.ps1' -Exe $exe -Out "$env:RUNNER_TEMP\display\$theme" -Theme $theme
+            if ($LASTEXITCODE -ne 0) { $rc = 1 }
+          }
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: hcg-mail-windows-display, path: '${{ runner.temp }}/display', retention-days: 90 }
+
+  upgrade:
+    name: Upgrade from the published 1.0.0-beta.1 with existing user data (x64)
+    needs: package
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+        with: { path: hcg-mail, sparse-checkout: "HCG Mail Project/Desktop/scripts\nHCG Mail Project/Desktop/tests/fixtures" }
+      - uses: actions/download-artifact@v4
+        with: { name: 'hcg-mail-windows-${{ env.VERSION }}', path: dist }
+      - name: The published 1.0.0-beta.1 installer (from its release run; checksum must match the published file)
+        uses: actions/download-artifact@v4
+        with:
+          name: hcg-mail-windows-${{ env.PREVIOUS_VERSION }}
+          path: previous
+          run-id: ${{ env.PREVIOUS_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Install beta.1, add its user data and a saved password, upgrade to beta.2, start, uninstall
+        shell: pwsh
+        run: |
+          $old = Join-Path (Resolve-Path previous) "HCGMail-$env:PREVIOUS_VERSION-win-x64-Setup.exe"
+          $sha = (Get-FileHash $old -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha -ne $env:PREVIOUS_X64_SETUP_SHA256) { throw "The beta.1 installer is not the published file ($sha)" }
+          $new = (Get-ChildItem dist -Filter "HCGMail-$env:VERSION-win-x64-Setup.exe" | Select-Object -First 1).FullName
+          & './hcg-mail/HCG Mail Project/Desktop/scripts/windows-upgrade-check.ps1' -OldSetup $old -OldVersion $env:PREVIOUS_VERSION `
+            -NewSetup $new -NewVersion $env:VERSION -Fixture (Resolve-Path './hcg-mail/HCG Mail Project/Desktop/tests/fixtures/beta1-user-data') `
+            -Out "$env:RUNNER_TEMP\upgrade"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: hcg-mail-windows-upgrade, path: '${{ runner.temp }}/upgrade', retention-days: 90 }
+
+  local-mail-server:
+    # The app's own mail engine (the same code in every build) against a real Dovecot/Postfix server on this runner:
+    # IMAP and SMTP over TLS with certificate and revocation (CRL) validation, sanitized test users only, nothing leaves
+    # the machine. Complements the dedicated-mailbox job, which needs the owner's test-mailbox secrets.
+    name: IMAP/SMTP end to end against a local TLS mail server (Linux runner)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: HCG Mail Project/Desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with: { dotnet-version: '10.0.x' }
+      - name: Start the disposable Dovecot/Postfix server (test CA, CRL, users ola and kari)
+        run: sudo bash tests/integration-server/setup-local-mail-server.sh start
+      - name: dotnet test — local server end-to-end suites (HCG_MAIL_E2E=1)
+        env: { HCG_MAIL_E2E: '1' }
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e"
+          dotnet test tests/HCG.Mail.Tests/HCG.Mail.Tests.csproj -c Release --filter "FullyQualifiedName~Integration" \
+            --logger "trx;LogFileName=e2e.trx" --logger "console;verbosity=normal" --results-directory "$RUNNER_TEMP/e2e"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: hcg-mail-local-mail-server-e2e, path: '${{ runner.temp }}/e2e', retention-days: 90 }
+
   mailbox:
     # Authenticated IMAP and SMTP against the owner's DEDICATED TEST MAILBOX, from encrypted repository secrets
     # (HCG_TEST_MAILBOX_*; see docs/DEDICATED_TEST_MAILBOX.md). Without them this job records "not run" and the
@@ -267,7 +357,7 @@ jobs:
 
   store-draft:
     name: HCG Store draft body and Release Passports (from the evidence; nothing is sent)
-    needs: [package, tests, runtime, mailbox]
+    needs: [package, tests, runtime, mailbox, display, upgrade, local-mail-server]
     if: always() && needs.package.result == 'success'
     runs-on: ubuntu-24.04
     steps:
@@ -296,10 +386,19 @@ jobs:
       - uses: actions/download-artifact@v4
         continue-on-error: true
         with: { name: hcg-mail-windows-mailbox-arm64, path: mailbox/arm64 }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: hcg-mail-windows-display, path: display }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: hcg-mail-windows-upgrade, path: upgrade }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: hcg-mail-local-mail-server-e2e, path: e2e }
       - name: Generate and validate
         run: |
           pip install --quiet jsonschema
-          python3 -I "hcg-mail/HCG Mail Project/Desktop/scripts/maker/store-draft.py" --dist dist --evidence evidence/build-evidence.json \
+          python3 -I "hcg-mail/HCG Mail Project/Desktop/scripts/maker/store-draft.py" --display display --upgrade upgrade --e2e e2e --dist dist --evidence evidence/build-evidence.json \
             --runtime runtime --tests tests --mailbox mailbox --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out store-draft | tee -a "$GITHUB_STEP_SUMMARY"
           cp dist/SHA256SUMS.txt store-draft/

@@ -156,9 +156,9 @@
       <SolidColorBrush x:Key="Hcg.Brush.Avatar" Color="#2F6AA3" />
       <SolidColorBrush x:Key="Hcg.Brush.AccentLine" Color="#D3DAE2" />
 
-      <SolidColorBrush x:Key="Hcg.Brush.LogoBacking" Color="#0E1319" />
-      <Thickness x:Key="Hcg.LogoPadding">4,2</Thickness>
-      <x:Double x:Key="Hcg.LogoHeight">34</x:Double>
+      <SolidColorBrush x:Key="Hcg.Brush.LogoBacking" Color="Transparent" />
+      <Thickness x:Key="Hcg.LogoPadding">0</Thickness>
+      <x:Double x:Key="Hcg.LogoHeight">38</x:Double>
       <BoxShadows x:Key="Hcg.Shadow.Glow">0 1 2 0 #1F0B1E33</BoxShadows>
       <BoxShadows x:Key="Hcg.Shadow.GlowSoft">0 0 0 0 #00000000</BoxShadows>
       <BoxShadows x:Key="Hcg.Shadow.Card">0 2 10 0 #140B1E33</BoxShadows>

@@ -209,7 +209,7 @@ public class RealAccountModeTests
         Assert.True(AssetLoader.Exists(uri));
         using var bitmap = new Avalonia.Media.Imaging.Bitmap(AssetLoader.Open(uri));
         var ratio = bitmap.PixelSize.Width / (double)bitmap.PixelSize.Height;
-        Assert.InRange(ratio, 2.1, 2.25);              // supplied artwork crop: 1520 × 700
+        Assert.InRange(ratio, 2.30, 2.38);             // compact transparent master: 1624 × 694 (assets/branding/make-transparent-logo.py)
         Assert.True(bitmap.PixelSize.Height >= 4 * 38); // ≥ 4× the 38 px display height for high-DPI screens
     }
 

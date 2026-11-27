@@ -10,7 +10,7 @@
     <!-- HCG Mail 1.0 Public Beta. The label is added to the version shown in Settings › About (1.0.0-beta.1). A build
          stamped with a full pre-release version (-p:Version=1.0.0-beta.1, as HCG Executable Maker does) shows exactly
          that. Version itself stays numeric here because the iOS app uses it as CFBundleShortVersionString. -->
-    <HcgPrereleaseLabel Condition="'$(HcgPrereleaseLabel)' == ''">beta.1</HcgPrereleaseLabel>
+    <HcgPrereleaseLabel Condition="'$(HcgPrereleaseLabel)' == ''">beta.2</HcgPrereleaseLabel>
     <InformationalVersion Condition="'$(InformationalVersion)' == '' and !$(Version.Contains('-')) and '$(HcgPrereleaseLabel)' != 'none'">$(Version)-$(HcgPrereleaseLabel)</InformationalVersion>
     <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>

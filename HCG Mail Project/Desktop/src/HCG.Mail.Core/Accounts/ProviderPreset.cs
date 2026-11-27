@@ -116,9 +116,9 @@ public static class ProviderPresets
             return null;
         var name = domain.Split('.')[0];
         if (name is "outlook" or "hotmail" or "live" or "msn" or "passport")
-            return "Outlook.com and Hotmail mailboxes: Microsoft no longer accepts the account password over IMAP and SMTP in other mail apps; " +
-                   "it requires Microsoft sign-in, which is not part of HCG Mail 1.0 Public Beta. Microsoft 365 work or school mailboxes " +
-                   "work only if your organization still allows IMAP and SMTP with a password.";
+            return "Outlook.com and Hotmail mailboxes cannot be added in this beta: Microsoft no longer accepts the account password " +
+                   "over IMAP and SMTP in other mail apps. Microsoft 365 work or school mailboxes work only if your organization still " +
+                   "allows IMAP and SMTP with a password.";
         if (domain is "proton.me" or "protonmail.com" or "protonmail.ch" or "pm.me")
             return "Proton Mail works with other mail apps only through Proton Mail Bridge (paid plans). Install Bridge, then enter the " +
                    "server names, ports and the Bridge password that Bridge shows.";

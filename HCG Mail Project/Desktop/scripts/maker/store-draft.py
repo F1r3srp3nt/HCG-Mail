@@ -20,6 +20,9 @@ ap.add_argument("--evidence", required=True, help="build-evidence.json")
 ap.add_argument("--runtime", required=True, help="folder holding one sub-folder per runtime job (x64, arm64)")
 ap.add_argument("--tests", required=True, help="folder with the Windows .trx results")
 ap.add_argument("--mailbox", help="folder holding one sub-folder per mailbox job (x64, arm64); absent = not run")
+ap.add_argument("--display", help="folder with <theme>/display-scaling.json (windows-display-scaling.ps1); absent = not run")
+ap.add_argument("--upgrade", help="folder with upgrade.json (windows-upgrade-check.ps1); absent = not run")
+ap.add_argument("--e2e", help="folder with e2e.trx (IMAP/SMTP against the local TLS mail server); absent = not run")
 ap.add_argument("--schema", required=True, help="HCG Repo docs/schemas/release-passport-v1.schema.json")
 ap.add_argument("--run-url", required=True)
 ap.add_argument("--out", required=True)
@@ -62,6 +65,47 @@ for arch in ("x64", "arm64"):
     r = json.load(open(m, encoding="utf-8-sig")) if m and os.path.exists(m) else None
     state = "not-run" if not r or not r.get("ran") else ("passed" if r.get("passed") else "failed")
     mailbox[arch] = {"state": state, "result": r}
+
+# Display scaling (x64), per theme: offered scalings must render and close, at the scaling Windows applies to the window.
+display = {}
+for path in glob.glob(os.path.join(a.display, "*", "display-scaling.json")) if a.display else []:
+    d = json.load(open(path, encoding="utf-8-sig"))
+    display[os.path.basename(os.path.dirname(path))] = d
+def display_text():
+    if not display:
+        return "Display scaling: not run."
+    parts = []
+    for theme, d in sorted(display.items()):
+        name = {"HcgFuture": "HCG Dark", "HcgClassic": "HCG Light"}.get(theme, theme)
+        cells = []
+        for sc in d["scales"]:
+            if not sc["available"]:
+                cells.append(f"{sc['scale']} % not offered by the runner display ({d['resolution']})")
+            else:
+                ok = sc["rendered"] and sc["closed"] and sc["windowScale"] == sc["scale"]
+                cells.append(f"{sc['scale']} % {'passed' if ok else 'FAILED'}")
+        parts.append(f"{name}: " + ", ".join(cells))
+    return "Display scaling on " + next(iter(display.values()))["windows"] + " — " + "; ".join(parts) + "."
+display_ok = bool(display) and all(sc["rendered"] and sc["closed"] and sc["windowScale"] == sc["scale"]
+                                   for d in display.values() for sc in d["scales"] if sc["available"])
+
+upgrade = json.load(open(os.path.join(a.upgrade, "upgrade.json"), encoding="utf-8-sig")) if a.upgrade and os.path.exists(os.path.join(a.upgrade, "upgrade.json")) else None
+upgrade_state = "not-run" if not upgrade else ("passed" if upgrade["failures"] == 0 else "failed")
+def upgrade_text():
+    if not upgrade:
+        return "Upgrade from the published earlier version: not run."
+    return (f"Upgrade {upgrade['from']} → {upgrade['to']} on {upgrade['windows']} with existing user data and a saved password: {upgrade_state}, "
+            f"{sum(c['passed'] for c in upgrade['checks'])}/{len(upgrade['checks'])} checks (registration, program version, data and password kept, "
+            "starts with the account, uninstall keeps user data).")
+
+e2e = {"total": 0, "passed": 0, "failed": 0}
+for trx in glob.glob(os.path.join(a.e2e, "**", "*.trx"), recursive=True) if a.e2e else []:
+    c = ET.parse(trx).getroot().find(".//t:Counters", ns)
+    e2e["total"] += int(c.get("total")); e2e["passed"] += int(c.get("passed")); e2e["failed"] += int(c.get("failed"))
+e2e_state = "not-run" if e2e["total"] == 0 else ("passed" if e2e["failed"] == 0 and e2e["passed"] > 0 else "failed")
+def e2e_text():
+    return ("IMAP/SMTP end to end against a local Dovecot/Postfix server with TLS and CRL validation (the app's mail engine, Linux runner): "
+            + ("not run." if e2e_state == "not-run" else f"{e2e_state}, {e2e['passed']} passed, {e2e['failed']} failed of {e2e['total']}."))
 
 def mailbox_text(arch):
     m = mailbox[arch]
@@ -107,7 +151,8 @@ for f in ev["files"]:
                     f"Runtime on Windows {arch} ({rt['windows']['caption'] if rt else 'not run'}, build {rt['windows']['build'] if rt else '-'}): "
                     + (f"{sum(c['passed'] for c in rt['checks'])}/{len(rt['checks'])} checks passed (credential store, TLS accept/reject, start, window rendering, restart). " if rt else "not run. ")
                     + (f"Installer lifecycle (install, shortcuts, registration, launch, uninstall): {install_state}. " if kind == "installer" else "")
-                    + mailbox_text(arch))
+                    + mailbox_text(arch) + " " + e2e_text() + " " + display_text()
+                    + (" " + upgrade_text() if kind == "installer" and arch == "x64" else ""))
     artifacts.append({
         "fileName": f["fileName"], "platform": "windows", "format": f["format"], "sizeBytes": f["sizeBytes"], "sha256": f["sha256"],
         "architectures": [arch], "minimumOs": MIN_OS[arch],
@@ -116,7 +161,8 @@ for f in ev["files"]:
         "package": None, "sourceCommit": src["commit"], "buildProvider": "github-actions",
         "toolchain": ev["build"]["toolchain"][:200],
         "validationReport": {"tool": "HCG Mail windows-prerelease.yml (HCG Executable Maker checks, Windows tests, runtime check, installer test, dedicated mailbox test)",
-                             "passed": tests["failed"] == 0 and launch_state == "passed" and runtime_state in ("partial", "passed") and install_state in ("passed", "not-applicable"),
+                             "passed": tests["failed"] == 0 and launch_state == "passed" and runtime_state in ("partial", "passed") and install_state in ("passed", "not-applicable")
+                                       and display_ok and e2e_state != "failed" and not (kind == "installer" and arch == "x64" and upgrade_state != "passed"),
                              "summary": summary_text[:4000]},
         "replaces": None,
     })
@@ -134,10 +180,13 @@ for f in ev["files"]:
             "static_inspection": {"state": "passed", "detail": "HCG Executable Maker artifact checks; PE machine type and version info verified"},
             "maintainer_script_review": {"state": "not-applicable", "detail": "Windows installer, not a Debian package"},
             "script_free_lifecycle": {"state": "not-applicable", "detail": "Debian lifecycle level; see device_installation for the Windows installer"},
-            "device_installation": {"state": install_state, "detail": "GitHub-hosted Windows runner, silent per-user install and uninstall (HCG Executable Maker Test-Installer.ps1)" if kind == "installer" else "portable: no installation"},
-            "application_launch": {"state": launch_state, "detail": "main window shown and rendered on start and restart, on a GitHub-hosted Windows runner"},
+            "device_installation": {"state": ("failed" if kind == "installer" and arch == "x64" and upgrade_state == "failed" else install_state),
+                                    "detail": ("GitHub-hosted Windows runner, silent per-user install and uninstall (HCG Executable Maker Test-Installer.ps1)"
+                                               + ("; " + upgrade_text() if arch == "x64" else "")) [:1000] if kind == "installer" else "portable: no installation"},
+            "application_launch": {"state": launch_state if display_ok or not display else "failed",
+                                   "detail": ("main window shown and rendered on start and restart, on a GitHub-hosted Windows runner. " + display_text())[:1000]},
             "runtime_verification": {"state": runtime_state, "detail": ("Credential Manager round trip and TLS certificate validation: "
-                                     + ("passed" if all_passed(tls) and all_passed(cred) else "not passed") + ". " + mailbox_text(arch))[:1000]},
+                                     + ("passed" if all_passed(tls) and all_passed(cred) else "not passed") + ". " + mailbox_text(arch) + " " + e2e_text())[:1000]},
         }},
         "device_evidence": [],
         "compatibility_status": f"Launch verified on a GitHub-hosted Windows {arch} runner (build {rt['windows']['build'] if rt else '-'}); not on a user's PC yet",
@@ -167,9 +216,11 @@ for p in files: jsonschema.validate(p, schema)
 notes = [
     f"HCG Mail {version} for Windows: public testing prerelease, free during testing (temporary; not a permanent free price).",
     "IMAP/SMTP email for your own mailbox. Passwords in Windows Credential Manager; TLS with certificate validation only.",
+    "New: the official HCG logo with a transparent background in both themes, one HCG Mail wordmark (no overlapping title "
+    "text), a cleaner welcome screen, and account setup focused on IMAP and SMTP.",
+    "Installing over 1.0.0-beta.1 keeps your accounts, settings and saved passwords.",
     "Installer (per-user, no administrator rights) or portable ZIP, for x64 and ARM64. Self-contained: no .NET installation needed.",
     "Not code-signed: Windows SmartScreen warns. Compare the SHA-256 checksum before running.",
-    "Microsoft and Google sign-in are not available in this build (the options are hidden). Use IMAP/SMTP.",
 ]
 release = {
     "productId": "hcg-mail", "editionId": "windows-desktop", "version": version, "build": build_no, "channel": "beta",
@@ -191,8 +242,9 @@ with open(os.path.join(a.out, "SUMMARY.md"), "w") as s:
     s.write(f"# HCG Mail for Windows {version} (build {build_no})\n\nSource {src['repository']} {src['commit']} · {a.run_url}\n\n")
     s.write(f"Windows regression tests: {tests['passed']} passed, {tests['failed']} failed, {tests['skipped']} skipped (of {tests['total']}).\n\n")
     for arch in ("x64", "arm64"): s.write(f"- {mailbox_text(arch)}\n")
+    s.write(f"- {e2e_text()}\n- {display_text()}\n- {upgrade_text()}\n")
     s.write("\n| File | Size | SHA-256 | Signed | Install | Launch | Runtime | Mailbox IMAP/SMTP |\n|---|---|---|---|---|---|---|---|\n")
     for f, arch, kind, i, l, r, mb, uns in summary_rows:
         s.write(f"| `{f['fileName']}` | {f['sizeBytes']:,} | `{f['sha256']}` | {'no' if uns else 'yes'} | {i} | {l} | {r} | {mb} |\n")
 print(open(os.path.join(a.out, "SUMMARY.md")).read())
-sys.exit(0 if tests["failed"] == 0 else 1)
+sys.exit(0 if tests["failed"] == 0 and (display_ok or not display) and upgrade_state != "failed" and e2e_state != "failed" else 1)

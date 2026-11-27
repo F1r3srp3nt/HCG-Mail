@@ -26,7 +26,9 @@
       <ScrollViewer x:Name="WelcomeScroller" IsVisible="{Binding ShowWelcome}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
       <Border Classes="card" MaxWidth="520" Padding="34,30" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24">
         <StackPanel Spacing="14">
-          <views:BrandMark HorizontalAlignment="Left" />
+          <!-- The HCG logo alone: the HCG Mail wordmark is shown once, in the sidebar. -->
+          <Image x:Name="WelcomeLogo" Source="/Assets/Branding/hcg-logo.png" Height="46" Stretch="Uniform" HorizontalAlignment="Left"
+                 RenderOptions.BitmapInterpolationMode="HighQuality" ToolTip.Tip="Hakmi Capital Group" />
           <Rectangle Height="1" Fill="{DynamicResource Hcg.Brush.AccentLine}" Margin="0,6" />
           <TextBlock Classes="h1" Text="Welcome to HCG Mail" />
           <TextBlock x:Name="WelcomeText" Classes="muted" TextWrapping="Wrap" LineHeight="20" Text="{Binding WelcomeText}" />

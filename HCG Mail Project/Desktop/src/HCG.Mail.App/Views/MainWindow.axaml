@@ -13,8 +13,10 @@
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="38"
         chrome:WindowDrawnDecorations.TitleBarDecorations="MinimizeButton, MaximizeButton, CloseButton">
-  <!-- The title bar below shows HCG Mail's own title, so the drawn decorations show only the caption buttons (no second
-       "HCG Mail" title text under ours, no full-screen button). Window.Title stays "HCG Mail" for the taskbar. -->
+  <!-- The window shows exactly one HCG Mail wordmark: the brand mark at the top of the sidebar. The title bar is a plain
+       drag area with the caption buttons only. Drawing a second "HCG MAIL" title there overlapped the system's own
+       caption text on some Windows versions and display scalings. Window.Title stays "HCG Mail" for the taskbar,
+       Alt+Tab and screen readers. -->
 
   <Window.KeyBindings>
     <KeyBinding Gesture="Ctrl+N" Command="{Binding ComposeCommand}" />
@@ -32,13 +34,6 @@
     <Border x:Name="TitleBar" Grid.Row="0" Height="38" Background="{DynamicResource Hcg.Bg.TitleBar}"
             BorderBrush="{DynamicResource Hcg.Border.Subtle}" BorderThickness="0,0,0,1"
             IsVisible="{Binding $parent[Window].IsExtendedIntoWindowDecorations}">
-      <Grid ColumnDefinitions="Auto,*">
-        <StackPanel x:Name="TitleContent" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center" Margin="16,0,0,0" IsHitTestVisible="False">
-          <TextBlock Classes="wordmark" Text="HCG MAIL" FontSize="11" LetterSpacing="2.6" VerticalAlignment="Center" />
-          <Rectangle Width="1" Height="12" Fill="{DynamicResource Hcg.Border.Strong}" VerticalAlignment="Center" />
-          <TextBlock Text="Hakmi Capital Group" FontSize="11" Foreground="{DynamicResource Hcg.Text.Tertiary}" VerticalAlignment="Center" />
-        </StackPanel>
-      </Grid>
     </Border>
 
     <!-- Development preview banner -->
