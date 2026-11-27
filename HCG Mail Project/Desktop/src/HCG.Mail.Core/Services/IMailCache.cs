@@ -4,6 +4,17 @@ namespace HCG.Mail.Core.Services;
 
 public sealed record CachedValue<T>(T Value, DateTimeOffset SavedAt);
 
+/// <summary>What the user chose for offline copies (Settings › Storage).</summary>
+public sealed record OfflineCachePolicy(bool Enabled, int RetentionDays, int StorageLimitMegabytes)
+{
+    public static readonly IReadOnlyList<int> RetentionChoices = [7, 30, 90, 365];
+    public static readonly IReadOnlyList<int> StorageLimitChoices = [50, 100, 250, 500, 1000];
+    public static OfflineCachePolicy Default { get; } = new(true, 30, 250);
+
+    public TimeSpan Retention => TimeSpan.FromDays(RetentionDays);
+    public long StorageLimitBytes => StorageLimitMegabytes * 1024L * 1024L;
+}
+
 /// <summary>
 /// The copy of each account's mail kept on this device for reading without a connection: the folder list, the newest page of
 /// each opened folder and the messages that were opened. Stored in the user's private HCG Mail data folder, removed with the
@@ -12,6 +23,12 @@ public sealed record CachedValue<T>(T Value, DateTimeOffset SavedAt);
 public interface IMailCache
 {
     bool IsEnabled { get; }
+
+    /// <summary>Why offline copies cannot be kept on this system, or null when they can.</summary>
+    string? UnavailableReason { get; }
+
+    /// <summary>True when copies survive a restart (their keys are in a persistent credential store).</summary>
+    bool SurvivesRestart { get; }
 
     void SaveFolders(string accountId, IReadOnlyList<MailFolder> folders);
     CachedValue<IReadOnlyList<MailFolder>>? LoadFolders(string accountId);
@@ -28,15 +45,28 @@ public interface IMailCache
     /// <summary>Drops a message that was deleted or moved on the server.</summary>
     void Remove(string accountId, MessageRef message);
 
+    /// <summary>Deletes the account's copy and its encryption key.</summary>
     void DeleteAccount(string accountId);
 
-    void Clear();
+    /// <summary>Deletes the copies and keys of these accounts.</summary>
+    void Clear(IEnumerable<string> accountIds);
+
+    /// <summary>Applies retention and storage limits (at start-up and after the user changes them).</summary>
+    void EnforcePolicy(IEnumerable<string> accountIds);
+
+    /// <summary>Bytes the account's copy uses on disk.</summary>
+    long SizeOf(string accountId);
 }
 
 /// <summary>For preview mode and tests: keeps nothing.</summary>
 public sealed class NoMailCache : IMailCache
 {
     public bool IsEnabled => false;
+    public string? UnavailableReason => "Offline copies are not kept in this mode.";
+    public bool SurvivesRestart => false;
+    public void Clear(IEnumerable<string> accountIds) { }
+    public void EnforcePolicy(IEnumerable<string> accountIds) { }
+    public long SizeOf(string accountId) => 0;
     public void SaveFolders(string accountId, IReadOnlyList<MailFolder> folders) { }
     public CachedValue<IReadOnlyList<MailFolder>>? LoadFolders(string accountId) => null;
     public void SavePage(string accountId, FolderPage page) { }
@@ -46,7 +76,6 @@ public sealed class NoMailCache : IMailCache
     public void UpdateFlags(string accountId, IReadOnlyList<MessageRef> messages, MessageFlags flags, bool add) { }
     public void Remove(string accountId, MessageRef message) { }
     public void DeleteAccount(string accountId) { }
-    public void Clear() { }
 }
 
 /// <summary>

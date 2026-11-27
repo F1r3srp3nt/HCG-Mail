@@ -72,7 +72,8 @@ public sealed partial class NetworkDoctorViewModel : ObservableObject
 
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(UseAlternativeCommand))] private bool _isRunning;
     [ObservableProperty] private string _statusText = "The Network Doctor has not run in this window yet.";
-    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasDiagnosis), nameof(Headline), nameof(Explanation), nameof(CategoryLabel), nameof(IsHealthy), nameof(IsProblem), nameof(IsWarning))]
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasDiagnosis), nameof(Headline), nameof(Explanation), nameof(CategoryLabel), nameof(IsHealthy), nameof(IsProblem), nameof(IsWarning),
+        nameof(ConfidenceLabel), nameof(ConfidenceText), nameof(IsConfirmed), nameof(PrivacyText))]
     private NetworkDiagnosis? _diagnosis;
 
     public NetworkDoctorViewModel(AccountViewModel account, NetworkDoctor doctor, ICredentialVault vault, INetworkMonitor monitor, IHcgVpn vpn,
@@ -104,12 +105,17 @@ public sealed partial class NetworkDoctorViewModel : ObservableObject
     public string Explanation => Diagnosis?.Explanation ?? "";
     public string CategoryLabel => Diagnosis?.CategoryLabel ?? "";
     public bool IsHealthy => Diagnosis?.Category == VerdictCategory.Healthy;
-    public bool IsProblem => Diagnosis?.Category is VerdictCategory.NoConnection or VerdictCategory.NetworkRestriction or VerdictCategory.Credentials or VerdictCategory.ServerProblem or VerdictCategory.ApplicationProblem;
-    public bool IsWarning => Diagnosis?.Category == VerdictCategory.Unknown;
+    // Red only for confirmed problems; a likely or undetermined cause is shown as a warning, never as a definite finding.
+    public bool IsProblem => Diagnosis is { Confidence: DiagnosisConfidence.Confirmed, Category: not VerdictCategory.Healthy };
+    public bool IsWarning => Diagnosis is { Confidence: not DiagnosisConfidence.Confirmed };
     public bool HasAlternatives => Alternatives.Count > 0;
     public bool HasOutbox => Outbox.Count > 0;
     public bool IsAvailable => !_account.UsesOAuth;
-    public string PrivacyText => _doctor.Options.ContactedHostsText;
+    public string PrivacyText => _doctor.Provider.ContactedHostsText;
+
+    public string ConfidenceLabel => Diagnosis?.ConfidenceLabel ?? "";
+    public string ConfidenceText => Diagnosis?.ConfidenceText ?? "";
+    public bool IsConfirmed => Diagnosis?.Confidence == DiagnosisConfidence.Confirmed;
 
     public string VpnText => _vpn.State switch
     {
@@ -245,7 +251,8 @@ public sealed partial class NetworkDoctorViewModel : ObservableObject
         sb.AppendLine($"Account state: {_account.StatusText} {_account.RecoveryText}".TrimEnd());
         if (Diagnosis is { } d)
         {
-            sb.AppendLine($"Verdict: {d.CategoryLabel} — {d.Headline} ({d.Verdict})");
+            sb.AppendLine($"Verdict: {d.CategoryLabel} — {d.Headline} ({d.Verdict}; {d.ConfidenceLabel})");
+            sb.AppendLine(d.ConfidenceText);
             sb.AppendLine(d.Explanation);
             foreach (var a in d.Actions)
                 sb.AppendLine("  • " + a);
@@ -255,6 +262,7 @@ public sealed partial class NetworkDoctorViewModel : ObservableObject
         sb.AppendLine("Recent network events:");
         foreach (var e in Events)
             sb.AppendLine($"  {e.Time} {e.Description}");
+        sb.AppendLine($"Connectivity checks: {_report?.Provider.DisplayName ?? _doctor.Provider.DisplayName}");
         sb.AppendLine($"VPN: {VpnText}");
         sb.AppendLine($"Outbox: {Outbox.Count} item(s)" + (Outbox.Count > 0 ? " — " + string.Join("; ", Outbox.Select(o => $"{o.Kind}: {o.StateText}")) : ""));
         return LogRedactor.Redact(sb.ToString());

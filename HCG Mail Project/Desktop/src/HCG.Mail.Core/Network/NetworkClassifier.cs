@@ -32,7 +32,7 @@ public static class NetworkClassifier
         // 2. Wi-Fi sign-in page
         if (o.CaptivePortal == true)
             return Make(NetworkVerdict.CaptivePortal, VerdictCategory.NetworkRestriction,
-                "This Wi-Fi needs you to sign in first",
+                "This Wi-Fi probably needs you to sign in first",
                 "The network answered a simple web request with its own page" + At(o.CaptivePortalAddress) +
                 ". Until you sign in or accept its terms, it blocks other traffic, including mail. " + NoBypass,
                 ["Open a web browser and complete the network's sign-in or terms page (school, hotel or guest Wi-Fi).",
@@ -54,7 +54,7 @@ public static class NetworkClassifier
         // 4. Something on the network replaces certificates (inspecting proxy, content filter)
         if (o.InternetTls.IsCertificateProblem())
             return Make(NetworkVerdict.TlsInspection, VerdictCategory.NetworkRestriction,
-                "This network intercepts encrypted connections",
+                "This network appears to intercept encrypted connections",
                 "Even a well-known website presented a certificate that does not verify" + Cert(o.InternetCertificate) +
                 ". Networks with content filters or security inspection (common at schools and workplaces) do this. " + NoBypass,
                 ["Use a different network for mail, such as a mobile hotspot.",
@@ -68,7 +68,7 @@ public static class NetworkClassifier
                 : inc.Dns.Blocked() ? $"'{inc.Endpoint.Host}'" : $"'{outg.Endpoint.Host}'";
             return o.AccountHasConnectedBefore
                 ? Make(NetworkVerdict.ServerNameNotFound, VerdictCategory.NetworkRestriction,
-                    "This network cannot find your mail server",
+                    "This network appears unable to find your mail server",
                     $"Other internet names resolve, but {which} does not. This account has worked before, so the network's name service (DNS) is probably filtering it, or the provider's DNS is having problems.",
                     [otherNetwork, "If it fails on every network, check the server name with your provider."])
                 : Make(NetworkVerdict.ServerNameNotFound, VerdictCategory.ServerProblem,
@@ -90,15 +90,15 @@ public static class NetworkClassifier
         {
             if (refIncBlocked || refOutBlocked)
                 return Make(NetworkVerdict.NetworkBlocksMail, VerdictCategory.NetworkRestriction,
-                    "This network blocks email connections",
-                    $"Websites work, but the mail ports are closed: your incoming server (port {inc.Endpoint.Port}) and outgoing server (port {outg.Endpoint.Port}) " +
+                    "This network appears to block email connections",
+                    $"Websites work, but the mail ports appear closed: your incoming server (port {inc.Endpoint.Port}) and outgoing server (port {outg.Endpoint.Port}) " +
                     "cannot be reached, and neither can the standard mail ports of a large public mail provider. School, guest and some public Wi-Fi networks do this. " +
-                    "Your password and server settings are not the problem.",
+                    "That points to the network rather than your password or server settings, but it is inferred from the comparison, not proven.",
                     [otherNetwork, "Ask the network's administrator to allow IMAP (port 993) and SMTP submission (port 465 or 587).", vpnHint,
                      "Messages you send now wait in the Outbox and go out automatically when mail can be reached again."]);
             if (o.ReferenceIncomingPort == ProbeOutcome.Ok || o.ReferenceOutgoingPort == ProbeOutcome.Ok)
                 return Make(NetworkVerdict.ServerUnreachable, VerdictCategory.ServerProblem,
-                    "Your mail server is not responding",
+                    "Your mail server appears to be down",
                     $"This network reaches other mail servers, but '{inc.Endpoint.Host}' does not answer on port {inc.Endpoint.Port} and '{outg.Endpoint.Host}' does not answer on port {outg.Endpoint.Port}. " +
                     "The provider is probably having an outage, or the server settings are wrong.",
                     ["Check your provider's status page.", "HCG Mail keeps retrying and reconnects automatically.", "If it lasts, compare the server names and ports with your provider's instructions."]);
@@ -115,13 +115,13 @@ public static class NetworkClassifier
                 : [];
             if (refOutBlocked || working.Count > 0)
                 return Make(NetworkVerdict.NetworkBlocksSending, VerdictCategory.NetworkRestriction,
-                    "This network blocks sending email on your outgoing port",
+                    "This network appears to block sending on your outgoing port",
                     $"Receiving works, but the outgoing server '{outg.Endpoint.Host}' cannot be reached on port {outg.Endpoint.Port}" +
                     (refOutBlocked ? ", and the same port is closed for other mail providers too." : ", while another port of the same server works.") +
                     " Messages you send wait in the Outbox until sending works.",
                     [.. alt, otherNetwork, vpnHint]);
             return Make(NetworkVerdict.ServerUnreachable, VerdictCategory.ServerProblem,
-                "Your outgoing mail server is not responding",
+                "Your outgoing mail server appears to be down",
                 $"'{outg.Endpoint.Host}' does not answer on port {outg.Endpoint.Port}, although this network reaches other mail servers. Messages you send wait in the Outbox.",
                 ["Check the outgoing server and port with your provider.", "HCG Mail retries automatically."]);
         }
@@ -130,12 +130,12 @@ public static class NetworkClassifier
         {
             if (refIncBlocked)
                 return Make(NetworkVerdict.NetworkBlocksIncoming, VerdictCategory.NetworkRestriction,
-                    "This network blocks receiving email",
+                    "This network appears to block receiving email",
                     $"The incoming server '{inc.Endpoint.Host}' cannot be reached on port {inc.Endpoint.Port}, and the same port is closed for other mail providers too. " +
                     "Mail already on this device can still be read.",
                     [otherNetwork, "Ask the network's administrator to allow IMAP (port 993).", vpnHint]);
             return Make(NetworkVerdict.ServerUnreachable, VerdictCategory.ServerProblem,
-                "Your incoming mail server is not responding",
+                "Your incoming mail server appears to be down",
                 $"'{inc.Endpoint.Host}' does not answer on port {inc.Endpoint.Port}, although this network reaches other mail servers. Mail already on this device can still be read.",
                 ["Check your provider's status page.", "HCG Mail keeps retrying and reconnects automatically."]);
         }
@@ -144,7 +144,7 @@ public static class NetworkClassifier
         var tlsResults = new[] { inc, outg };
         if (tlsResults.Any(e => e.Tls == TlsOutcome.RevocationUnknown))
             return Make(NetworkVerdict.RevocationServiceBlocked, VerdictCategory.NetworkRestriction,
-                "This network blocks the certificate check",
+                "This network appears to block the certificate check",
                 "Your mail server's certificate is otherwise valid, but its certificate authority's revocation service could not be reached from this network, " +
                 "so HCG Mail cannot confirm that the certificate has not been revoked. Restricted networks often block these services. " + NoBypass,
                 ["Ask the network's administrator to allow the certificate authority's OCSP and CRL addresses (listed under Incoming/Outgoing below).", otherNetwork]);
@@ -168,7 +168,7 @@ public static class NetworkClassifier
                 ? new[] { $"Use {working[0].Label} for sending instead ({working[0].Source})." }
                 : [];
             return Make(NetworkVerdict.SecureHandshakeBlocked, VerdictCategory.NetworkRestriction,
-                "The secure connection is cut off on this network",
+                "The secure connection appears to be cut off on this network",
                 $"The {cut.Role} server accepts the connection, but the encrypted handshake never completes. Firewalls that inspect or filter traffic do this; " +
                 "a wrong security setting for the port can too. " + NoBypass,
                 [.. alt, otherNetwork, "Check that the security setting matches the port (SSL/TLS on 993/465, STARTTLS on 143/587)."]);
@@ -209,8 +209,22 @@ public static class NetworkClassifier
             []);
 
         NetworkDiagnosis Make(NetworkVerdict verdict, VerdictCategory category, string headline, string explanation, IReadOnlyList<string> actions) =>
-            new(verdict, category, headline, explanation, actions, working);
+            new(verdict, category, headline, explanation, actions, working, ConfidenceFor(verdict, o));
     }
+
+    /// <summary>
+    /// Directly observed failures are confirmed; causes inferred from comparisons (another provider's ports, a well-known
+    /// site's certificate, an intercepted web request) are only suspected; undecidable cases are inconclusive.
+    /// </summary>
+    public static DiagnosisConfidence ConfidenceFor(NetworkVerdict verdict, NetworkObservations o) => verdict switch
+    {
+        NetworkVerdict.Healthy or NetworkVerdict.NoNetwork or NetworkVerdict.NoInternet or NetworkVerdict.DnsFailure
+            or NetworkVerdict.ServerCertificateProblem or NetworkVerdict.ServerSettingsProblem or NetworkVerdict.CredentialsRejected
+            => DiagnosisConfidence.Confirmed,
+        NetworkVerdict.ServerNameNotFound => o.AccountHasConnectedBefore ? DiagnosisConfidence.Suspected : DiagnosisConfidence.Confirmed,
+        NetworkVerdict.Inconclusive => DiagnosisConfidence.Inconclusive,
+        _ => DiagnosisConfidence.Suspected,
+    };
 
     private static string At(string? address) => string.IsNullOrWhiteSpace(address) ? "" : $" ({address})";
 

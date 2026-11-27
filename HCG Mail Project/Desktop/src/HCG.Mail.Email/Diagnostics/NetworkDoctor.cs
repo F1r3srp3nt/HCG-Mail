@@ -10,30 +10,13 @@ using Microsoft.Extensions.Logging;
 
 namespace HCG.Mail.Email.Diagnostics;
 
-/// <summary>Where the Network Doctor compares against. Contacted only while the Network Doctor runs, never in the background.</summary>
+/// <summary>Time limits of the Network Doctor. Where it checks general connectivity comes from the selected <see cref="ConnectivityProvider"/>.</summary>
 public sealed record NetworkDoctorOptions
 {
-    /// <summary>Plain-HTTP check that answers 204 with an empty body; anything else means a Wi-Fi sign-in page (as Android and Chrome do).</summary>
-    public Uri CaptivePortalCheck { get; init; } = new("http://connectivitycheck.gstatic.com/generate_204");
-
-    /// <summary>HTTPS site used to test internet access and whether the network replaces certificates.</summary>
-    public Uri InternetCheck { get; init; } = new("https://www.gstatic.com/generate_204");
-
-    public string PublicDnsName { get; init; } = "www.gstatic.com";
-
-    /// <summary>A large public provider's mail ports: only a TCP connection is opened and closed, nothing is sent.</summary>
-    public string ReferenceIncomingHost { get; init; } = "imap.gmail.com";
-    public string ReferenceOutgoingHost { get; init; } = "smtp.gmail.com";
-
     public TimeSpan StepTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
     /// <summary>Servers deliberately answer a wrong password slowly (anti-brute-force), so sign-in gets more time.</summary>
     public TimeSpan SignInTimeout { get; init; } = TimeSpan.FromSeconds(45);
-
-    public string ContactedHostsText =>
-        $"While it runs, the Network Doctor contacts {CaptivePortalCheck.Host} and {InternetCheck.Host} (the same checks Android and Chrome use to detect " +
-        $"Wi-Fi sign-in pages) and briefly opens, without sending anything, connections to {ReferenceIncomingHost} and {ReferenceOutgoingHost} to see " +
-        "whether this network allows mail ports at all. Your password goes only to your own mail servers, over a verified encrypted connection.";
 }
 
 public enum NetworkCheckResult
@@ -52,7 +35,8 @@ public sealed record NetworkDoctorReport(
     TimeSpan Duration,
     NetworkObservations Observations,
     NetworkDiagnosis Diagnosis,
-    IReadOnlyList<NetworkCheckRow> Rows);
+    IReadOnlyList<NetworkCheckRow> Rows,
+    ConnectivityProvider Provider);
 
 /// <summary>
 /// The Network Doctor: measures, from the outside in, why mail does or does not work on the current network — device
@@ -68,9 +52,13 @@ public sealed class NetworkDoctor(
     IMailClientFactory clients,
     INetworkInterfaces interfaces,
     ILogger<NetworkDoctor> logger,
-    NetworkDoctorOptions? options = null)
+    NetworkDoctorOptions? options = null,
+    ConnectivityProviderSelection? providers = null)
 {
     public NetworkDoctorOptions Options { get; } = options ?? new NetworkDoctorOptions();
+
+    /// <summary>The connectivity-check provider the next run uses (the user's choice; Google when none is configured).</summary>
+    public ConnectivityProvider Provider => providers?.Current ?? ConnectivityProviders.Google;
 
     public async Task<NetworkDoctorReport> RunAsync(
         MailAccount account,
@@ -87,13 +75,16 @@ public sealed class NetworkDoctor(
         progress?.Report("Checking this device's network connection…");
         var nics = interfaces.GetActive();
 
-        progress?.Report("Checking internet access, Wi-Fi sign-in and name lookups…");
-        var dnsTask = Probe(() => dns.ResolveAsync(o.PublicDnsName, cancellationToken), cancellationToken);
-        var portalTask = http.GetAsync(o.CaptivePortalCheck, o.StepTimeout, cancellationToken);
-        var internetTask = http.GetAsync(o.InternetCheck, o.StepTimeout, cancellationToken);
-        var refInTask = TcpAsync(o.ReferenceIncomingHost, PortDefaults.ImapSslTls, cancellationToken);
-        var refOutPort = account.Smtp.Port is PortDefaults.SmtpSslTls or PortDefaults.SmtpStartTls ? account.Smtp.Port : PortDefaults.SmtpStartTls;
-        var refOutTask = TcpAsync(o.ReferenceOutgoingHost, refOutPort, cancellationToken);
+        var p = Provider;
+        var notTested = new HttpProbeResult(ProbeOutcome.NotTested, 0, null, "", TlsOutcome.NotTested, null);
+        if (p.ChecksConnectivity)
+            progress?.Report("Checking internet access, Wi-Fi sign-in and name lookups…");
+        var dnsTask = p.PublicDnsName is { } publicName ? Probe(() => dns.ResolveAsync(publicName, cancellationToken), cancellationToken) : Task.FromResult(ProbeOutcome.NotTested);
+        var portalTask = p.CaptivePortalCheck is { } portalUrl ? http.GetAsync(portalUrl, o.StepTimeout, cancellationToken) : Task.FromResult(notTested);
+        var internetTask = p.InternetCheck is { } internetUrl ? http.GetAsync(internetUrl, o.StepTimeout, cancellationToken) : Task.FromResult(notTested);
+        var refInTask = p.ReferenceIncomingHost is { } refIn ? TcpAsync(refIn, p.ReferenceIncomingPort, cancellationToken) : Task.FromResult(ProbeOutcome.NotTested);
+        var refOutPort = p.ReferenceOutgoingPortFor(account.Smtp.Port);
+        var refOutTask = p.ReferenceOutgoingHost is { } refOut ? TcpAsync(refOut, refOutPort, cancellationToken) : Task.FromResult(ProbeOutcome.NotTested);
 
         progress?.Report("Checking your incoming and outgoing servers…");
         var incomingTask = CheckImapAsync(account, password, cancellationToken);
@@ -102,7 +93,7 @@ public sealed class NetworkDoctor(
 
         var portal = portalTask.Result;
         var internet = internetTask.Result;
-        bool? captive = portal.Outcome == ProbeOutcome.Ok ? !(portal.Status == 204 && string.IsNullOrEmpty(portal.Body)) : null;
+        bool? captive = portal.Outcome == ProbeOutcome.Ok ? !p.IsExpectedCaptiveAnswer(portal.Status, portal.Body) : null;
         var incoming = incomingTask.Result;
         var outgoing = outgoingTask.Result;
 
@@ -123,7 +114,7 @@ public sealed class NetworkDoctor(
 
         var observations = new NetworkObservations
         {
-            HasActiveInterface = nics.Count > 0 || internet.Outcome == ProbeOutcome.Ok,
+            HasActiveInterface = nics.Count > 0 || internet.Outcome == ProbeOutcome.Ok || incomingTask.Result.Dns == ProbeOutcome.Ok,
             Interfaces = nics,
             PublicDns = dnsTask.Result,
             Internet = internet.Outcome == ProbeOutcome.Ok ? ProbeOutcome.Ok : internet.Outcome,
@@ -141,10 +132,10 @@ public sealed class NetworkDoctor(
             AccountHasConnectedBefore = accountHasConnectedBefore,
         };
         var diagnosis = NetworkClassifier.Classify(observations);
-        var rows = BuildRows(observations, o, refOutPort);
+        var rows = BuildRows(observations, p, refOutPort);
         logger.LogInformation("Network Doctor for account {AccountId}: {Verdict} ({Category}) in {Ms} ms",
             account.Id, diagnosis.Verdict, diagnosis.Category, clock.ElapsedMilliseconds);
-        return new NetworkDoctorReport(started, clock.Elapsed, observations, diagnosis, rows);
+        return new NetworkDoctorReport(started, clock.Elapsed, observations, diagnosis, rows, p);
     }
 
     // ---- account servers --------------------------------------------------------------------
@@ -313,8 +304,9 @@ public sealed class NetworkDoctor(
 
     // ---- rows for display -------------------------------------------------------------------
 
-    public static IReadOnlyList<NetworkCheckRow> BuildRows(NetworkObservations o, NetworkDoctorOptions options, int referenceOutgoingPort)
+    public static IReadOnlyList<NetworkCheckRow> BuildRows(NetworkObservations o, ConnectivityProvider p, int referenceOutgoingPort)
     {
+        const string off = "Not checked: connectivity checks are off (Settings › Privacy & security).";
         var rows = new List<NetworkCheckRow>();
         var vpns = o.Interfaces.Where(i => i.LooksLikeVpn).ToList();
         rows.Add(new("Network connection", o.HasActiveInterface ? NetworkCheckResult.Ok : NetworkCheckResult.Problem,
@@ -324,21 +316,25 @@ public sealed class NetworkDoctor(
             o.CaptivePortal switch { true => NetworkCheckResult.Problem, false => NetworkCheckResult.Ok, _ => NetworkCheckResult.NotTested },
             o.CaptivePortal switch
             {
-                true => "The network intercepted a web request" + (o.CaptivePortalAddress is { } a ? $" and redirected it to {a}" : "") + ". Sign in to the network in a browser.",
+                true => "The network answered a web request with something else" + (o.CaptivePortalAddress is { } a ? $" and redirected it to {a}" : "") + ". This usually means a sign-in page.",
                 false => "None: the network passes web traffic through unchanged.",
-                _ => $"Could not be checked ({options.CaptivePortalCheck.Host} did not answer).",
+                _ => p.CaptivePortalCheck is null ? off : $"Could not be checked ({p.CaptivePortalCheck.Host} did not answer).",
             }));
-        rows.Add(new("Name lookups (DNS)", Result(o.PublicDns), o.PublicDns == ProbeOutcome.Ok ? $"Public names resolve ({options.PublicDnsName})." : $"Looking up {options.PublicDnsName}: {NetworkClassifier.Describe(o.PublicDns)}."));
-        rows.Add(new("Internet access", Result(o.Internet), o.Internet == ProbeOutcome.Ok ? $"{options.InternetCheck.Host} reached over HTTPS." : $"{options.InternetCheck.Host}: {NetworkClassifier.Describe(o.Internet)}."));
+        rows.Add(new("Name lookups (DNS)", Result(o.PublicDns),
+            p.PublicDnsName is null ? off : o.PublicDns == ProbeOutcome.Ok ? $"Public names resolve ({p.PublicDnsName})." : $"Looking up {p.PublicDnsName}: {NetworkClassifier.Describe(o.PublicDns)}."));
+        rows.Add(new("Internet access", Result(o.Internet),
+            p.InternetCheck is null ? off : o.Internet == ProbeOutcome.Ok ? $"{p.InternetCheck.Host} reached over HTTPS." : $"{p.InternetCheck.Host}: {NetworkClassifier.Describe(o.Internet)}."));
         rows.Add(new("Certificate interception",
             o.InternetTls == TlsOutcome.Ok ? NetworkCheckResult.Ok : o.InternetTls.IsCertificateProblem() ? NetworkCheckResult.Problem : NetworkCheckResult.NotTested,
-            o.InternetTls == TlsOutcome.Ok ? "None: a well-known site's certificate verified normally."
-                : o.InternetTls.IsCertificateProblem() ? $"A well-known site's certificate did not verify ({NetworkClassifier.Describe(o.InternetTls)}{(o.InternetCertificate is { } c ? "; " + c : "")}). Something on this network replaces certificates."
+            p.InternetCheck is null ? off
+                : o.InternetTls == TlsOutcome.Ok ? "None seen: a well-known site's certificate verified normally."
+                : o.InternetTls.IsCertificateProblem() ? $"A well-known site's certificate did not verify ({NetworkClassifier.Describe(o.InternetTls)}{(o.InternetCertificate is { } c ? "; " + c : "")}). Something on this network may replace certificates, or this device's clock may be wrong."
                 : "Not determined."));
         rows.Add(new("Mail ports on this network", o.ReferenceIncomingPort.Blocked() || o.ReferenceOutgoingPort.Blocked() ? NetworkCheckResult.Problem
                 : o.ReferenceIncomingPort == ProbeOutcome.Ok && o.ReferenceOutgoingPort == ProbeOutcome.Ok ? NetworkCheckResult.Ok : NetworkCheckResult.NotTested,
-            $"Port 993 (incoming) at {options.ReferenceIncomingHost}: {NetworkClassifier.Describe(o.ReferenceIncomingPort)}; " +
-            $"port {referenceOutgoingPort} (sending) at {options.ReferenceOutgoingHost}: {NetworkClassifier.Describe(o.ReferenceOutgoingPort)}. Nothing was sent."));
+            !p.ComparesMailPorts ? off
+                : $"Port {p.ReferenceIncomingPort} (incoming) at {p.ReferenceIncomingHost}: {NetworkClassifier.Describe(o.ReferenceIncomingPort)}; " +
+                  $"port {referenceOutgoingPort} (sending) at {p.ReferenceOutgoingHost}: {NetworkClassifier.Describe(o.ReferenceOutgoingPort)}. Nothing was sent."));
         AddEndpoint(rows, "Incoming server (IMAP)", o.Incoming);
         AddEndpoint(rows, "Outgoing server (SMTP)", o.Outgoing);
         foreach (var alt in o.Alternatives)

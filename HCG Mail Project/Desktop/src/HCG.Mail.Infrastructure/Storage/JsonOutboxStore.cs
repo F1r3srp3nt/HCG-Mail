@@ -1,17 +1,22 @@
 using HCG.Mail.Core.Addresses;
 using HCG.Mail.Core.Compose;
 using HCG.Mail.Core.Mail;
+using HCG.Mail.Infrastructure.Security;
 using Microsoft.Extensions.Logging;
 
 namespace HCG.Mail.Infrastructure.Storage;
 
 /// <summary>
-/// The Outbox on disk: one private JSON file per waiting message or draft, written atomically (a crash never leaves half a
-/// message), with its attachments inside so the originals can be moved or deleted.
+/// The Outbox on disk: one private file per waiting message or draft, written atomically (a crash never leaves half a
+/// message), with its attachments inside so the originals can be moved or deleted. The message is encrypted with the
+/// account's own Outbox key (<see cref="AccountDataProtector"/>, kept only in the credential store); the envelope shows only
+/// the item id and the account it belongs to, and the encryption binds the message to both, so an item can never be read,
+/// or sent, as another account's.
 /// </summary>
-public sealed class JsonOutboxStore(AppPaths paths, ILogger<JsonOutboxStore> logger) : IOutboxStore
+public sealed class JsonOutboxStore(AppPaths paths, AccountDataProtector protector, ILogger<JsonOutboxStore> logger) : IOutboxStore
 {
-    private const int FileVersion = 1;
+    public const string Purpose = "outbox";
+    private const int FileVersion = 2;
     private readonly object _lock = new();
 
     public IReadOnlyList<OutboxItem> Load()
@@ -25,10 +30,21 @@ public sealed class JsonOutboxStore(AppPaths paths, ILogger<JsonOutboxStore> log
             {
                 try
                 {
-                    if (JsonFile.Read(file, MailStorageJsonContext.Default.OutboxFile, logger) is { } f)
-                        items.Add(ToItem(f));
+                    if (JsonFile.Read(file, MailStorageJsonContext.Default.OutboxEnvelope, logger) is not { } envelope)
+                        continue;
+                    var plain = protector.Unprotect(Purpose, envelope.AccountId, envelope.Id, Convert.FromBase64String(envelope.Payload));
+                    if (plain is null)
+                    {
+                        logger.LogWarning("An Outbox item of account {AccountId} cannot be decrypted (its key is gone); it is not sent", envelope.AccountId);
+                        continue;
+                    }
+                    var f = System.Text.Json.JsonSerializer.Deserialize(plain, MailStorageJsonContext.Default.OutboxFile);
+                    if (f is null || f.Id != envelope.Id || f.AccountId != envelope.AccountId)
+                        continue; // never trust an item whose inner identity differs from its envelope
+                    items.Add(ToItem(f));
                 }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException)
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException or System.Text.Json.JsonException
+                                               or Core.Security.CredentialVaultException)
                 {
                     logger.LogWarning("Could not read an Outbox item ({Error})", ex.GetType().Name);
                 }
@@ -39,9 +55,11 @@ public sealed class JsonOutboxStore(AppPaths paths, ILogger<JsonOutboxStore> log
 
     public void Put(OutboxItem item)
     {
-        var file = ToFile(item);
+        var path = PathFor(item.Id);
+        var inner = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(ToFile(item), MailStorageJsonContext.Default.OutboxFile);
+        var envelope = new OutboxEnvelope(FileVersion, item.Id, item.AccountId, Convert.ToBase64String(protector.Protect(Purpose, item.AccountId, item.Id, inner)));
         lock (_lock)
-            JsonFile.Write(PathFor(item.Id), file, MailStorageJsonContext.Default.OutboxFile);
+            JsonFile.Write(path, envelope, MailStorageJsonContext.Default.OutboxEnvelope);
     }
 
     public void Remove(string id)
@@ -53,6 +71,15 @@ public sealed class JsonOutboxStore(AppPaths paths, ILogger<JsonOutboxStore> log
                 File.Delete(path);
         }
     }
+
+    public void DeleteAccount(string accountId)
+    {
+        foreach (var item in Load().Where(i => i.AccountId == accountId))
+            Remove(item.Id);
+        protector.DeleteKey(Purpose, accountId);
+    }
+
+    internal sealed record OutboxEnvelope(int Version, string Id, string AccountId, string Payload);
 
     private string PathFor(string id)
     {

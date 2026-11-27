@@ -87,8 +87,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         SignInPresentation? signInPresentation = null,
         OutboxService? outbox = null,
         ConnectionRecoveryService? recovery = null,
-        IMailCache? mailCache = null)
+        IMailCache? mailCache = null,
+        HCG.Mail.Core.Network.ConnectivityProviderSelection? connectivityProviders = null)
     {
+        ConnectivityProviders = connectivityProviders?.Available ?? HCG.Mail.Core.Network.ConnectivityProviders.Available(null);
         _outbox = outbox;
         _recovery = recovery;
         _mailCache = mailCache;
@@ -216,6 +218,14 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             Accounts.Add(CreateAccountViewModel(account));
 
         await RetryPendingCredentialDeletionsAsync();
+        try
+        {
+            ApplyOfflinePolicy(); // retention, limits, and copies of accounts that no longer exist
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Could not apply the offline copy policy ({Error})", ex.GetType().Name);
+        }
         _outbox?.RecoverInterrupted();
         _recovery?.Start(ConnectAccountAsync);
 
@@ -939,8 +949,20 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         _notifications.Success("Outgoing server changed", $"{account.EmailAddress} now sends through {smtp.Host} port {smtp.Port}.");
     }
 
-    /// <summary>Deletes every account's offline copy of mail from this device (Settings).</summary>
-    public void ClearOfflineCopies() => _mailCache?.Clear();
+    /// <summary>Providers the user can choose for the Network Doctor's connectivity checks (Settings › Privacy &amp; security).</summary>
+    public IReadOnlyList<HCG.Mail.Core.Network.ConnectivityProvider> ConnectivityProviders { get; }
+
+    /// <summary>The offline copy store (Settings › Storage shows its size and limits).</summary>
+    public IMailCache? OfflineCache => _mailCache;
+
+    /// <summary>Deletes every account's offline copy and its key from this device (Settings).</summary>
+    public void ClearOfflineCopies() => _mailCache?.Clear(Accounts.Select(a => a.Account.Id).ToList());
+
+    /// <summary>Deletes one account's offline copy and its key.</summary>
+    public void DeleteOfflineCopy(AccountViewModel account) => _mailCache?.DeleteAccount(account.Account.Id);
+
+    /// <summary>Applies the retention period and storage limits now (after the user changed them, and at start-up).</summary>
+    public void ApplyOfflinePolicy() => _mailCache?.EnforcePolicy(Accounts.Select(a => a.Account.Id).ToList());
 
     // ---- connection state shown above the message list ------------------------------------------
 

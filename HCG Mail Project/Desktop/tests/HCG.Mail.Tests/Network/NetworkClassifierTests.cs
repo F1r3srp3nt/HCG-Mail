@@ -54,7 +54,9 @@ public sealed class NetworkClassifierTests
         var d = NetworkClassifier.Classify(o);
         Assert.Equal(NetworkVerdict.NetworkBlocksMail, d.Verdict);
         Assert.Equal(VerdictCategory.NetworkRestriction, d.Category);
-        Assert.Contains("password and server settings are not the problem", d.Explanation);
+        Assert.Contains("inferred from the comparison, not proven", d.Explanation);
+        Assert.Equal(DiagnosisConfidence.Suspected, d.Confidence); // a comparison, not proof
+        Assert.StartsWith("This network appears to", d.Headline);
         Assert.Contains(d.Actions, a => a.Contains("Outbox"));
         Assert.Contains(d.Actions, a => a.Contains("HCG VPN") && a.Contains("works without any VPN"));
     }
@@ -202,5 +204,27 @@ public sealed class NetworkClassifierTests
         var d = NetworkClassifier.Classify(o);
         Assert.Equal(NetworkVerdict.Inconclusive, d.Verdict);
         Assert.Contains("no sign-in on this port", d.Explanation);
+    }
+
+    [Theory]
+    [InlineData(NetworkVerdict.CredentialsRejected, DiagnosisConfidence.Confirmed)]
+    [InlineData(NetworkVerdict.ServerCertificateProblem, DiagnosisConfidence.Confirmed)]
+    [InlineData(NetworkVerdict.NoNetwork, DiagnosisConfidence.Confirmed)]
+    [InlineData(NetworkVerdict.NetworkBlocksMail, DiagnosisConfidence.Suspected)]
+    [InlineData(NetworkVerdict.CaptivePortal, DiagnosisConfidence.Suspected)]
+    [InlineData(NetworkVerdict.TlsInspection, DiagnosisConfidence.Suspected)]
+    [InlineData(NetworkVerdict.ServerUnreachable, DiagnosisConfidence.Suspected)]
+    [InlineData(NetworkVerdict.ApplicationProblem, DiagnosisConfidence.Suspected)]
+    [InlineData(NetworkVerdict.Inconclusive, DiagnosisConfidence.Inconclusive)]
+    public void Only_directly_observed_causes_are_confirmed(NetworkVerdict verdict, DiagnosisConfidence expected) =>
+        Assert.Equal(expected, NetworkClassifier.ConfidenceFor(verdict, Healthy()));
+
+    [Fact]
+    public void Suspected_findings_are_worded_as_such()
+    {
+        var d = NetworkClassifier.Classify(Healthy() with { CaptivePortal = true });
+        Assert.Equal(DiagnosisConfidence.Suspected, d.Confidence);
+        Assert.Contains("probably", d.Headline);
+        Assert.Contains("not proven", d.ConfidenceText);
     }
 }

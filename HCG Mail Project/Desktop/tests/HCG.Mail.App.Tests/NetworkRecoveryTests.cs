@@ -120,7 +120,9 @@ public sealed class NetworkRecoveryTests
         {
             s.AddSingleton<TimeProvider>(time);
             s.AddSingleton<INetworkMonitor>(network);
-            s.AddSingleton<IMailCache>(sp => new JsonMailCache(new AppPaths(dir), () => true, NullLogger<JsonMailCache>.Instance));
+            s.AddSingleton<IMailCache>(sp => new JsonMailCache(new AppPaths(dir), () => OfflineCachePolicy.Default,
+                new HCG.Mail.Infrastructure.Security.AccountDataProtector(new SessionCredentialVault(), NullLogger<HCG.Mail.Infrastructure.Security.AccountDataProtector>.Instance),
+                NullLogger<JsonMailCache>.Instance));
             s.AddSingleton<IMailSessionFactory>(sp => new OfflineCapableSessionFactory(new SharedMailboxFactory(mailbox, sw),
                 sp.GetRequiredService<IMailCache>(), network, sp.GetRequiredService<ILoggerFactory>()));
             more?.Invoke(s);
@@ -416,7 +418,9 @@ public sealed class NetworkRecoveryTests
         await health.Network!.RunCommand.ExecuteAsync(null);
         await UiHarness.Settle(500);
 
-        Assert.Equal("This network blocks email connections", health.Network.Headline);
+        Assert.Equal("This network appears to block email connections", health.Network.Headline);
+        Assert.Equal("Likely cause", health.Network.ConfidenceLabel);
+        Assert.True(health.Network.IsWarning); // not shown as a confirmed problem
         Assert.Equal("Network restriction", health.Network.CategoryLabel);
         Assert.Contains(health.Network.Rows, r => r.Title == "Mail ports on this network" && r.IsProblem);
         Assert.Contains(health.Network.Events, e => e.Description.Contains("Wi-Fi (wlan0)"));
@@ -644,5 +648,146 @@ public sealed class ComposeOfflineTests
         Assert.Contains("draft saved on this device", compose.StatusMessage);
         Assert.Empty(inner.Drafts);
         Assert.False(compose.IsDirty);
+    }
+}
+
+/// <summary>
+/// Recovery safety at the application level: a refused password is never tried again by itself, an uncertain send is never
+/// repeated by any recovery path, and queued mail always leaves through the account it was written from.
+/// </summary>
+public sealed class RecoverySafetyUiTests
+{
+    private static MailAccount Account(string id) => new()
+    {
+        Id = id,
+        DisplayName = id,
+        EmailAddress = id + "@example.no",
+        Username = id + "@example.no",
+        Imap = new ServerEndpoint("imap.example.no", 993, MailSecurityMode.SslTls),
+        Smtp = new ServerEndpoint("smtp.example.no", 465, MailSecurityMode.SslTls),
+    };
+
+    private sealed class CountingFactory(MailErrorKind? failWith) : IMailSessionFactory
+    {
+        public int Created { get; private set; }
+        public List<SwitchableSession> Sessions { get; } = [];
+        public MailErrorKind? FailWith { get; set; } = failWith;
+
+        public IMailSession Create(MailAccount account, string password)
+        {
+            Created++;
+            var s = new SwitchableSession(account) { FailWith = FailWith };
+            Sessions.Add(s);
+            return new OfflineCapableMailSession(s, new NoMailCache(), new ManualNetworkMonitor(), NullLogger.Instance);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task A_refused_password_is_never_retried_by_network_changes_wake_up_or_time()
+    {
+        var factory = new CountingFactory(MailErrorKind.Authentication);
+        var network = new ManualNetworkMonitor();
+        var time = new ManualTimeProvider();
+        using var recovery = new ConnectionRecoveryService(network, time, new AppSettingsService(new InMemoryAppSettingsStore()),
+            NullLogger<ConnectionRecoveryService>.Instance, post: a => a());
+        var vault = new SessionCredentialVault();
+        var account = new AccountViewModel(Account("auth"), factory, vault, NullLogger.Instance);
+        await vault.SetAsync(account.Account.CredentialKey, "wrong");
+        recovery.Start(a => a.ConnectAsync());
+        recovery.Track(account);
+
+        await account.ConnectAsync();
+        foreach (var kind in new[] { NetworkEventKind.Unavailable, NetworkEventKind.Available, NetworkEventKind.Changed, NetworkEventKind.Resumed })
+            network.Raise(kind);
+        time.Advance(TimeSpan.FromHours(6));
+        await Task.Delay(50);
+        Assert.Equal(1, factory.Created);                 // exactly the one sign-in the user started
+        Assert.Equal(1, factory.Sessions[0].Calls);
+    }
+
+    [AvaloniaFact]
+    public async Task A_refused_password_stops_the_outbox_after_one_attempt()
+    {
+        var factory = new CountingFactory(null);
+        var vault = new SessionCredentialVault();
+        var account = new AccountViewModel(Account("auth-outbox"), factory, vault, NullLogger.Instance);
+        await vault.SetAsync(account.Account.CredentialKey, "pw");
+        Assert.True(await account.ConnectAsync());
+        var outbox = new OutboxService(new InMemoryOutboxStore(), new RecordingNotifications(), NullLogger<OutboxService>.Instance);
+        for (var i = 0; i < 3; i++)
+            outbox.Enqueue(account.Account.Id, new OutgoingMessage { To = [new EmailAddress(null, "kari@example.no")], Subject = "m" + i, MessageId = $"m{i}@x" }, OutboxKind.Send, true);
+        factory.Sessions[0].FailWith = MailErrorKind.Authentication;
+        var calls = factory.Sessions[0].Calls;
+
+        await outbox.FlushAsync(account);
+        Assert.Equal(calls + 1, factory.Sessions[0].Calls); // not once per queued message
+    }
+
+    [AvaloniaFact]
+    public async Task An_uncertain_send_is_never_repeated_by_recovery_after_network_changes()
+    {
+        var factory = new CountingFactory(null);
+        var network = new ManualNetworkMonitor();
+        var time = new ManualTimeProvider();
+        var settings = new AppSettingsService(new InMemoryAppSettingsStore());
+        using var recovery = new ConnectionRecoveryService(network, time, settings, NullLogger<ConnectionRecoveryService>.Instance, post: a => a());
+        var vault = new SessionCredentialVault();
+        var account = new AccountViewModel(Account("ambiguous"), factory, vault, NullLogger.Instance);
+        await vault.SetAsync(account.Account.CredentialKey, "pw");
+        var outbox = new OutboxService(new InMemoryOutboxStore(), new RecordingNotifications(), NullLogger<OutboxService>.Instance);
+        recovery.Start(async a =>
+        {
+            if (await a.ConnectAsync())
+                await outbox.FlushAsync(a);
+        });
+        recovery.Track(account);
+        Assert.True(await account.ConnectAsync());
+
+        outbox.Enqueue(account.Account.Id, new OutgoingMessage { To = [new EmailAddress(null, "kari@example.no")], Subject = "Once", MessageId = "once@x" }, OutboxKind.Send, true);
+        factory.Sessions[^1].OutcomeUnknownOnSend = true;
+        await outbox.FlushAsync(account);
+        Assert.Equal(OutboxState.NeedsReview, Assert.Single(outbox.Items).State);
+
+        // The connection drops and comes back several times; every recovery path flushes the Outbox.
+        foreach (var s in factory.Sessions)
+            s.OutcomeUnknownOnSend = false;
+        factory.FailWith = null;
+        account.ReportError(new MailOperationException(MailErrorKind.Network, "lost"));
+        for (var i = 0; i < 3; i++)
+        {
+            network.Raise(NetworkEventKind.Changed);
+            time.Advance(TimeSpan.FromSeconds(3));
+            await Task.Delay(30);
+            account.ReportError(new MailOperationException(MailErrorKind.Network, "lost"));
+        }
+        Assert.Empty(factory.Sessions.SelectMany(s => s.Sent));
+        Assert.Equal(OutboxState.NeedsReview, Assert.Single(outbox.Items).State);
+    }
+
+    [AvaloniaFact]
+    public async Task Queued_mail_always_leaves_through_the_account_it_was_written_from()
+    {
+        var factoryA = new CountingFactory(null);
+        var factoryB = new CountingFactory(null);
+        var vault = new SessionCredentialVault();
+        var a = new AccountViewModel(Account("alice"), factoryA, vault, NullLogger.Instance);
+        var b = new AccountViewModel(Account("bob"), factoryB, vault, NullLogger.Instance);
+        await vault.SetAsync(a.Account.CredentialKey, "pw");
+        await vault.SetAsync(b.Account.CredentialKey, "pw");
+        Assert.True(await a.ConnectAsync());
+        Assert.True(await b.ConnectAsync());
+        var outbox = new OutboxService(new InMemoryOutboxStore(), new RecordingNotifications(), NullLogger<OutboxService>.Instance);
+        outbox.Enqueue("alice", new OutgoingMessage { Subject = "From Alice", MessageId = "a@x" }, OutboxKind.Send, true);
+        outbox.Enqueue("bob", new OutgoingMessage { Subject = "From Bob", MessageId = "b@x" }, OutboxKind.Send, true);
+
+        await outbox.FlushAsync(a);
+        Assert.Equal(["From Alice"], factoryA.Sessions.SelectMany(s => s.Sent).Select(m => m.Subject));
+        Assert.Empty(factoryB.Sessions.SelectMany(s => s.Sent));
+        Assert.Equal("bob", Assert.Single(outbox.Items).AccountId);
+
+        outbox.RemoveAccount("bob");
+        Assert.Empty(outbox.Items);
+        await outbox.FlushAsync(b);
+        Assert.Empty(factoryB.Sessions.SelectMany(s => s.Sent));
     }
 }

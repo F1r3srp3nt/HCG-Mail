@@ -167,14 +167,42 @@ public enum VerdictCategory
     Unknown,
 }
 
+/// <summary>How sure the verdict is. Uncertain conclusions are never presented as findings.</summary>
+public enum DiagnosisConfidence
+{
+    /// <summary>HCG Mail observed the failure and its cause directly (for example the server refused the password).</summary>
+    Confirmed,
+
+    /// <summary>The measurements point to this cause, but it is inferred (for example by comparing with another provider's ports).</summary>
+    Suspected,
+
+    /// <summary>The checks could not tell the possible causes apart.</summary>
+    Inconclusive,
+}
+
 public sealed record NetworkDiagnosis(
     NetworkVerdict Verdict,
     VerdictCategory Category,
     string Headline,
     string Explanation,
     IReadOnlyList<string> Actions,
-    IReadOnlyList<AlternativeEndpoint> WorkingAlternatives)
+    IReadOnlyList<AlternativeEndpoint> WorkingAlternatives,
+    DiagnosisConfidence Confidence = DiagnosisConfidence.Confirmed)
 {
+    public string ConfidenceLabel => Confidence switch
+    {
+        DiagnosisConfidence.Confirmed => "Confirmed",
+        DiagnosisConfidence.Suspected => "Likely cause",
+        _ => "Inconclusive",
+    };
+
+    public string ConfidenceText => Confidence switch
+    {
+        DiagnosisConfidence.Confirmed => "Confirmed: HCG Mail observed this directly.",
+        DiagnosisConfidence.Suspected => "Likely cause, not proven: the measurements below point to it, but it is inferred and could have another explanation.",
+        _ => "Inconclusive: the checks could not tell the possible causes apart. The measurements below show what is known.",
+    };
+
     public string CategoryLabel => Category switch
     {
         VerdictCategory.Healthy => "Working",

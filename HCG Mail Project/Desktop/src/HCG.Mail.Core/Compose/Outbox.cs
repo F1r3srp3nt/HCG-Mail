@@ -53,6 +53,9 @@ public interface IOutboxStore
     void Put(OutboxItem item);
 
     void Remove(string id);
+
+    /// <summary>Removes every item of the account and its Outbox key.</summary>
+    void DeleteAccount(string accountId);
 }
 
 public sealed class InMemoryOutboxStore : IOutboxStore
@@ -75,5 +78,12 @@ public sealed class InMemoryOutboxStore : IOutboxStore
     {
         lock (_items)
             _items.Remove(id);
+    }
+
+    public void DeleteAccount(string accountId)
+    {
+        lock (_items)
+            foreach (var id in _items.Values.Where(i => i.AccountId == accountId).Select(i => i.Id).ToList())
+                _items.Remove(id);
     }
 }

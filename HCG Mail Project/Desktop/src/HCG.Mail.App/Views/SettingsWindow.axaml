@@ -66,19 +66,12 @@
             </Border>
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
               <StackPanel Spacing="10">
-                <TextBlock Classes="h3" Text="Connection problems and offline use" />
+                <TextBlock Classes="h3" Text="Connection problems" />
                 <ToggleSwitch x:Name="ReconnectAutomaticallySwitch" IsChecked="{Binding ReconnectAutomatically}"
                               OnContent="Reconnect automatically after a connection problem" OffContent="Reconnect automatically after a connection problem" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
                            Text="After the network drops, changes or the computer wakes up, HCG Mail reconnects by itself (pausing 5 seconds, then longer, up to 5 minutes between attempts) and then sends what waits in the Outbox. A refused password is never retried automatically. This does not check for new mail on a timer." />
-                <ToggleSwitch x:Name="KeepOfflineCopiesSwitch" IsChecked="{Binding KeepOfflineCopies}"
-                              OnContent="Keep a copy of my mail on this computer for reading offline" OffContent="Keep a copy of my mail on this computer for reading offline" />
-                <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="The folder list, the newest messages of folders you open and the messages you read are kept in HCG Mail's private data folder (not attachments). Turning this off deletes them." />
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                  <Button Classes="subtle" Content="Delete offline copies" Command="{Binding DeleteOfflineCopiesCommand}" />
-                  <TextBlock Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding OfflineCopiesStatus}" />
-                </StackPanel>
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Mail you have read stays readable offline: see Storage › Offline copies." />
               </StackPanel>
             </Border>
           </StackPanel>
@@ -259,6 +252,15 @@
             <TextBlock Classes="h1" Text="Privacy &amp; security" />
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
               <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Network Doctor connectivity checks" />
+                <ComboBox x:Name="ConnectivityProviderChoice" MinWidth="320" ItemsSource="{Binding ConnectivityProviders}" SelectedItem="{Binding SelectedConnectivityProvider}" />
+                <TextBlock x:Name="ConnectivityProviderText" Classes="caption" TextWrapping="Wrap" Text="{Binding ConnectivityProviderText}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="These checks run only when you start the Network Doctor, never in the background, and never send account data. Automatic reconnection uses only this device's own network state." />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
                 <TextBlock Classes="h3" Text="Remote content" />
                 <ToggleSwitch x:Name="RemoteImagesToggle" IsChecked="{Binding LoadRemoteImagesAutomatically}" OnContent="Load remote images automatically" OffContent="Load remote images automatically" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
@@ -313,9 +315,41 @@
               </StackPanel>
             </Border>
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Offline copies" />
+                <ToggleSwitch x:Name="KeepOfflineCopiesSwitch" IsChecked="{Binding KeepOfflineCopies}"
+                              OnContent="Keep a copy of my mail on this device for reading offline" OffContent="Keep a copy of my mail on this device for reading offline" />
+                <TextBlock x:Name="OfflineProtection" Classes="caption" TextWrapping="Wrap" Text="{Binding OfflineProtectionText}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Kept: the folder list, the newest messages of folders you open and the messages you read (not attachments). Turning this off deletes the copies and their keys." />
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" Margin="0,4,0,0">
+                  <TextBlock Text="Keep copies for" VerticalAlignment="Center" Margin="0,0,12,6" />
+                  <ComboBox x:Name="OfflineRetention" Grid.Column="1" MinWidth="180" Margin="0,0,0,6" ItemsSource="{Binding RetentionOptions}" SelectedItem="{Binding SelectedRetention}" />
+                  <TextBlock Grid.Row="1" Text="Use at most" VerticalAlignment="Center" Margin="0,0,12,0" />
+                  <ComboBox x:Name="OfflineStorageLimit" Grid.Row="1" Grid.Column="1" MinWidth="180" ItemsSource="{Binding StorageLimitOptions}" SelectedItem="{Binding SelectedStorageLimit}" />
+                </Grid>
+                <ItemsControl x:Name="OfflineUsageList" ItemsSource="{Binding OfflineUsage}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:OfflineUsageRow">
+                      <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,3">
+                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Classes="caption" Text="{Binding SizeText}" VerticalAlignment="Center" Margin="12,0" />
+                        <Button Grid.Column="2" Classes="ghost" Content="Delete copy"
+                                Command="{Binding $parent[ItemsControl].((vm:SettingsViewModel)DataContext).DeleteOfflineCopyCommand}" CommandParameter="{Binding}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                  <Button x:Name="DeleteAllOfflineCopies" Classes="subtle" Content="Delete all offline copies" Command="{Binding DeleteOfflineCopiesCommand}" />
+                  <TextBlock Classes="caption" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding OfflineCopiesStatus}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
               <StackPanel Spacing="6">
                 <TextBlock Classes="h3" Text="On this device" />
-                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Messages stay on your mail server; HCG Mail does not store copies of them. This folder holds only settings, the account list (without passwords), the send history and a log that is kept for 7 days:" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Messages stay on your mail server. This folder holds settings, the account list (without passwords), the send history, a log kept for 7 days, the encrypted offline copies and the encrypted Outbox:" />
                 <SelectableTextBlock Text="{Binding DataDirectory}" TextWrapping="Wrap" />
               </StackPanel>
             </Border>

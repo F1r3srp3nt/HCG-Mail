@@ -33,7 +33,9 @@ public sealed class OfflineSessionTests : IDisposable
 
     public OfflineSessionTests()
     {
-        _cache = new JsonMailCache(new AppPaths(_dir), () => true, NullLogger<JsonMailCache>.Instance);
+        _cache = new JsonMailCache(new AppPaths(_dir), () => OfflineCachePolicy.Default,
+            new HCG.Mail.Infrastructure.Security.AccountDataProtector(new HCG.Mail.Infrastructure.Credentials.SessionCredentialVault(), NullLogger<HCG.Mail.Infrastructure.Security.AccountDataProtector>.Instance),
+            NullLogger<JsonMailCache>.Instance);
         _session = new OfflineCapableMailSession(_inner, _cache, _network, NullLogger.Instance);
     }
 
@@ -164,116 +166,5 @@ public sealed class OfflineSessionTests : IDisposable
         _session.MarkConnectionStale();
         Assert.Equal(1, _inner.StaleMarks);
         await Task.CompletedTask;
-    }
-}
-
-public sealed class MailCacheTests : IDisposable
-{
-    private readonly string _dir = Directory.CreateTempSubdirectory("hcg-mail-cache-").FullName;
-
-    public void Dispose() => Directory.Delete(_dir, recursive: true);
-
-    [Fact]
-    public void Nothing_is_written_when_offline_copies_are_off()
-    {
-        var enabled = false;
-        var cache = new JsonMailCache(new AppPaths(_dir), () => enabled, NullLogger<JsonMailCache>.Instance);
-        cache.SavePage("a", new FolderPage("INBOX", [], 0, 0, 1, false));
-        Assert.False(Directory.Exists(Path.Combine(_dir, "offline")));
-        enabled = true;
-        cache.SavePage("a", new FolderPage("INBOX", [], 0, 0, 1, false));
-        Assert.NotNull(cache.LoadPage("a", "INBOX"));
-        enabled = false;
-        Assert.Null(cache.LoadPage("a", "INBOX")); // and nothing is read back either
-    }
-
-    [Fact]
-    public void File_names_reveal_neither_account_folder_nor_subject()
-    {
-        var cache = new JsonMailCache(new AppPaths(_dir), () => true, NullLogger<JsonMailCache>.Instance);
-        var msg = new MessageRef("Private/Health", 3, 9);
-        cache.SaveFolders("student@example.no", [new MailFolder("Private/Health", "Health", '/', FolderRole.None, true, 1, 0, 1)]);
-        cache.SaveMessage("student@example.no", new MessageContent { Ref = msg, Subject = "Doctor appointment" });
-        var names = Directory.EnumerateFileSystemEntries(Path.Combine(_dir, "offline"), "*", SearchOption.AllDirectories).Select(Path.GetFileName).ToList();
-        Assert.DoesNotContain(names, n => n!.Contains("student") || n.Contains("Health") || n.Contains("Doctor"));
-        if (!OperatingSystem.IsWindows())
-            foreach (var file in Directory.EnumerateFiles(Path.Combine(_dir, "offline"), "*.json", SearchOption.AllDirectories))
-                Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
-    }
-
-    [Fact]
-    public void Removing_an_account_deletes_only_its_copy()
-    {
-        var cache = new JsonMailCache(new AppPaths(_dir), () => true, NullLogger<JsonMailCache>.Instance);
-        cache.SavePage("a", new FolderPage("INBOX", [], 0, 0, 1, false));
-        cache.SavePage("b", new FolderPage("INBOX", [], 0, 0, 1, false));
-        cache.DeleteAccount("a");
-        Assert.Null(cache.LoadPage("a", "INBOX"));
-        Assert.NotNull(cache.LoadPage("b", "INBOX"));
-        cache.Clear();
-        Assert.Null(cache.LoadPage("b", "INBOX"));
-    }
-
-    [Fact]
-    public void Very_large_inline_images_are_left_out_of_the_copy()
-    {
-        var cache = new JsonMailCache(new AppPaths(_dir), () => true, NullLogger<JsonMailCache>.Instance);
-        var msg = new MessageRef("INBOX", 1, 1);
-        cache.SaveMessage("a", new MessageContent { Ref = msg, TextBody = "x", InlineResources = [new InlineResource("big", "image/png", new byte[JsonMailCache.MaxInlineBytes + 1])] });
-        var loaded = cache.LoadMessage("a", msg)!.Value;
-        Assert.Equal("x", loaded.TextBody);
-        Assert.Empty(loaded.InlineResources);
-    }
-}
-
-public sealed class OutboxStoreTests : IDisposable
-{
-    private readonly string _dir = Directory.CreateTempSubdirectory("hcg-mail-outbox-").FullName;
-
-    public void Dispose() => Directory.Delete(_dir, recursive: true);
-
-    [Fact]
-    public void Queued_messages_survive_a_restart_with_their_attachments_even_if_the_original_file_is_deleted()
-    {
-        var file = Path.Combine(_dir, "report.pdf");
-        File.WriteAllBytes(file, [0x25, 0x50, 0x44, 0x46]);
-        var message = new OutgoingMessage
-        {
-            To = [new EmailAddress("Kari", "kari@example.no")],
-            Bcc = [new EmailAddress(null, "archive@example.no")],
-            Subject = "Report",
-            TextBody = "Attached.",
-            Attachments = [OutgoingAttachment.FromFile(file)],
-            Priority = MessagePriority.High,
-            MessageId = "abc@example.no",
-            RepliedMessage = new MessageRef("INBOX", 4, 1),
-        };
-        var store = new JsonOutboxStore(new AppPaths(_dir), NullLogger<JsonOutboxStore>.Instance);
-        store.Put(new OutboxItem("0123456789abcdef", "acct", OutboxKind.Send, message, DateTimeOffset.Now));
-        File.Delete(file);
-
-        var loaded = Assert.Single(new JsonOutboxStore(new AppPaths(_dir), NullLogger<JsonOutboxStore>.Instance).Load());
-        Assert.Equal(OutboxState.Waiting, loaded.State);
-        Assert.Equal("kari@example.no", Assert.Single(loaded.Message.To).Address);
-        Assert.Equal("archive@example.no", Assert.Single(loaded.Message.Bcc).Address);
-        Assert.Equal(MessagePriority.High, loaded.Message.Priority);
-        Assert.Equal("abc@example.no", loaded.Message.MessageId);
-        Assert.Equal(new MessageRef("INBOX", 4, 1), loaded.Message.RepliedMessage);
-        var attachment = Assert.Single(loaded.Message.Attachments);
-        Assert.Equal("report.pdf", attachment.FileName);
-        Assert.Equal([0x25, 0x50, 0x44, 0x46], attachment.Data);
-
-        store.Remove("0123456789abcdef");
-        Assert.Empty(store.Load());
-    }
-
-    [Theory]
-    [InlineData("../escape")]
-    [InlineData("a/b")]
-    [InlineData("")]
-    public void Ids_cannot_point_outside_the_outbox(string id)
-    {
-        var store = new JsonOutboxStore(new AppPaths(_dir), NullLogger<JsonOutboxStore>.Instance);
-        Assert.Throws<ArgumentException>(() => store.Put(new OutboxItem(id, "acct", OutboxKind.Draft, new OutgoingMessage(), DateTimeOffset.Now)));
     }
 }

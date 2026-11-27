@@ -144,12 +144,86 @@ public sealed class NetworkDoctorTests
     }
 
     [Fact]
-    public void Privacy_text_names_every_host_the_doctor_contacts()
+    public void Every_provider_names_the_hosts_it_contacts()
     {
-        var o = new NetworkDoctorOptions();
-        foreach (var host in new[] { o.CaptivePortalCheck.Host, o.InternetCheck.Host, o.ReferenceIncomingHost, o.ReferenceOutgoingHost })
-            Assert.Contains(host, o.ContactedHostsText);
+        foreach (var p in ConnectivityProviders.Available(new Uri("https://connectivity.hcg.example/")))
+            foreach (var host in p.ContactedHosts)
+                Assert.Contains(host, p.ContactedHostsText);
+        Assert.Empty(ConnectivityProviders.Off.ContactedHosts);
+        Assert.Contains("only your own mail servers", ConnectivityProviders.Off.ContactedHostsText);
     }
+
+    /// <summary>Records every host the Network Doctor contacts.</summary>
+    private sealed class Recorder : IDnsResolver, ITcpProbe, IHttpProbe
+    {
+        public List<string> Hosts { get; } = [];
+        public Task<IPAddress[]> ResolveAsync(string host, CancellationToken cancellationToken)
+        {
+            lock (Hosts) Hosts.Add(host);
+            return Task.FromResult(new[] { IPAddress.Parse("192.0.2.1") });
+        }
+        public Task ConnectAsync(string host, int port, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            lock (Hosts) Hosts.Add(host);
+            throw new SocketException((int)SocketError.TimedOut);
+        }
+        public Task<HttpProbeResult> GetAsync(Uri url, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            lock (Hosts) Hosts.Add(url.Host);
+            return Task.FromResult(new HttpProbeResult(ProbeOutcome.Ok, 204, null, "", TlsOutcome.Ok, null));
+        }
+    }
+
+    private static NetworkDoctor WithProvider(Recorder r, ConnectivityProvider provider) =>
+        new(r, r, r, new MailClientFactory { Timeout = TimeSpan.FromSeconds(3) }, new NoInterfaces(new NetworkInterfaceInfo("wlan0", "Wi-Fi", "Wi-Fi", true, false)),
+            NullLogger<NetworkDoctor>.Instance, new NetworkDoctorOptions { StepTimeout = TimeSpan.FromSeconds(2) }, new ConnectivityProviderSelection(() => provider));
+
+    [Fact]
+    public async Task With_connectivity_checks_off_only_the_accounts_own_servers_are_contacted()
+    {
+        var r = new Recorder();
+        var report = await WithProvider(r, ConnectivityProviders.Off).RunAsync(Account(), null, null, true);
+        Assert.All(r.Hosts, h => Assert.Contains(h, new[] { "imap.school-test.example", "smtp.school-test.example" }));
+        // Without a comparison the cause cannot be decided: inconclusive, not a confident finding.
+        Assert.Equal(NetworkVerdict.Inconclusive, report.Diagnosis.Verdict);
+        Assert.Equal(DiagnosisConfidence.Inconclusive, report.Diagnosis.Confidence);
+        Assert.Contains(report.Rows, row => row.Title == "Mail ports on this network" && row.Detail.Contains("connectivity checks are off"));
+    }
+
+    [Theory]
+    [InlineData("apple", "captive.apple.com", "imap.mail.me.com")]
+    [InlineData("microsoft", "www.msftconnecttest.com", "outlook.office365.com")]
+    [InlineData("google", "connectivitycheck.gstatic.com", "imap.gmail.com")]
+    public async Task Providers_are_interchangeable(string id, string captiveHost, string referenceHost)
+    {
+        var r = new Recorder();
+        var provider = ConnectivityProviders.Resolve(id, null);
+        var report = await WithProvider(r, provider).RunAsync(Account(), null, null, true);
+        Assert.Contains(captiveHost, r.Hosts);
+        Assert.Contains(referenceHost, r.Hosts);
+        Assert.DoesNotContain(r.Hosts, h => h.Contains("gstatic") && id != "google");
+        Assert.Same(provider, report.Provider);
+    }
+
+    [Fact]
+    public void An_HCG_endpoint_is_optional_and_offered_only_when_configured_over_https()
+    {
+        Assert.DoesNotContain(ConnectivityProviders.Available(null), p => p.Id == ConnectivityProviders.HcgId);
+        Assert.Null(ConnectivityProviders.Hcg(new Uri("http://insecure.hcg.example/")));
+        var hcg = ConnectivityProviders.Hcg(new Uri("https://connectivity.hcg.example/check/"))!;
+        Assert.Equal("https://connectivity.hcg.example/check/generate_204", hcg.InternetCheck!.ToString());
+        Assert.Equal("http://connectivity.hcg.example/check/generate_204", hcg.CaptivePortalCheck!.ToString());
+        Assert.False(hcg.IsThirdParty);
+        // A setting that names HCG in a build without the endpoint falls back to the default provider.
+        Assert.Equal(ConnectivityProviders.Google, ConnectivityProviders.Resolve("hcg", null));
+    }
+
+    [Theory]
+    [InlineData(200, "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>", false)]
+    [InlineData(200, "<html>Please sign in to School-WiFi</html>", true)]
+    [InlineData(302, "", true)]
+    public void Apples_check_recognises_its_own_answer(int status, string body, bool signInPage) =>
+        Assert.Equal(signInPage, !ConnectivityProviders.Apple.IsExpectedCaptiveAnswer(status, body));
 
     /// <summary>A TLS server with a self-signed certificate that records whether any application data ever arrives.</summary>
     private sealed class UntrustedTlsServer : IDisposable

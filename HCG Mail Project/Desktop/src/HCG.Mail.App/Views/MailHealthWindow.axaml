@@ -106,11 +106,15 @@
               <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
                 <Border Classes="badge" Width="132" VerticalAlignment="Top" Margin="0,2,14,0" IsVisible="{Binding HasDiagnosis}"
                         Classes.verified="{Binding IsHealthy}" Classes.warning="{Binding IsWarning}" Classes.failed="{Binding IsProblem}">
-                  <TextBlock x:Name="NetworkVerdictCategory" Text="{Binding CategoryLabel}" />
+                  <StackPanel>
+                    <TextBlock x:Name="NetworkVerdictCategory" Text="{Binding CategoryLabel}" />
+                    <TextBlock x:Name="NetworkConfidenceLabel" Text="{Binding ConfidenceLabel}" FontSize="10.5" FontWeight="Normal" />
+                  </StackPanel>
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="4">
                   <TextBlock x:Name="NetworkHeadline" Text="{Binding Headline}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding HasDiagnosis}" />
                   <TextBlock Text="Find out why mail does not work on this network" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" IsVisible="{Binding !HasDiagnosis}" />
+                  <TextBlock x:Name="NetworkConfidence" Classes="action" Text="{Binding ConfidenceText}" IsVisible="{Binding HasDiagnosis}" />
                   <TextBlock x:Name="NetworkExplanation" Classes="detail" Text="{Binding Explanation}" IsVisible="{Binding HasDiagnosis}" />
                   <TextBlock Classes="detail" IsVisible="{Binding !HasDiagnosis}"
                              Text="Checks the device's connection, Wi-Fi sign-in pages, name lookups, certificate interception, whether this network allows mail ports, and your incoming and outgoing servers — and says whether the network, your password, the server or HCG Mail is the cause." />

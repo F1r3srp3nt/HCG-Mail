@@ -93,9 +93,15 @@ public static class MobileServices
             services.AddSingleton<IAppSettingsStore, JsonAppSettingsStore>();
             services.AddSingleton<MailSessionFactory>();
             services.AddSingleton<INetworkMonitor, SystemNetworkMonitor>();
+            // Offline copies and the Outbox are encrypted per account; the keys live only in the credential store.
+            services.AddSingleton<HCG.Mail.Infrastructure.Security.AccountDataProtector>();
             services.AddSingleton<IMailCache>(sp => new JsonMailCache(sp.GetRequiredService<AppPaths>(),
-                () => sp.GetRequiredService<AppSettingsService>().Current.KeepOfflineCopies, sp.GetRequiredService<ILogger<JsonMailCache>>()));
-            services.AddSingleton<IOutboxStore, JsonOutboxStore>();
+                () => sp.GetRequiredService<AppSettingsService>().Current.GetOfflinePolicy(),
+                sp.GetRequiredService<HCG.Mail.Infrastructure.Security.AccountDataProtector>(), sp.GetRequiredService<ILogger<JsonMailCache>>()));
+            // Without a persistent credential store the keys would be lost at exit, so the Outbox then lives for this session.
+            services.AddSingleton<IOutboxStore>(sp => sp.GetRequiredService<ICredentialVault>().IsPersistent
+                ? ActivatorUtilities.CreateInstance<JsonOutboxStore>(sp)
+                : new InMemoryOutboxStore());
             // Every session keeps mail readable offline and fails fast while the server cannot be reached.
             services.AddSingleton<IMailSessionFactory>(sp => new OfflineCapableSessionFactory(sp.GetRequiredService<MailSessionFactory>(),
                 sp.GetRequiredService<IMailCache>(), sp.GetRequiredService<INetworkMonitor>(), sp.GetRequiredService<ILoggerFactory>()));
@@ -117,6 +123,14 @@ public static class MobileServices
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<INetworkInterfaces, SystemNetworkInterfaces>();
         services.AddSingleton<IHttpProbe, SystemHttpProbe>();
+        services.AddSingleton(sp =>
+        {
+            // An HCG-operated connectivity endpoint is optional: offered only when the build or environment names one.
+            var hcg = HcgConnectivityEndpoint.Resolve(typeof(MobileServices).Assembly);
+            var settings = sp.GetRequiredService<AppSettingsService>();
+            return new ConnectivityProviderSelection(() => ConnectivityProviders.Resolve(settings.Current.ConnectivityCheckProvider, hcg),
+                ConnectivityProviders.Available(hcg));
+        });
         services.AddSingleton<NetworkDoctor>();
         // Optional: a host that ships HCG VPN registers its own IHcgVpn. HCG Mail never requires it.
         services.AddSingleton<IHcgVpn, NoHcgVpn>();

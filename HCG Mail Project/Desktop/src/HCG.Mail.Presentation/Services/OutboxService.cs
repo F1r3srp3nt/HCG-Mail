@@ -90,6 +90,9 @@ public sealed class OutboxService
             {
                 if (!Items.Contains(item))
                     continue;
+                // Defence in depth: a message is only ever handed to the session of the account it was written from.
+                if (item.AccountId != session.Account.Id)
+                    continue;
                 // Skip a draft when the same message is waiting to be sent anyway.
                 if (item.Kind == OutboxKind.Draft && Items.Any(i => i.Kind == OutboxKind.Send && i.AccountId == accountId && i.Message.MessageId == item.Message.MessageId))
                 {
@@ -148,10 +151,12 @@ public sealed class OutboxService
         return handed;
     }
 
+    /// <summary>The account was removed: its waiting messages are discarded and its Outbox key deleted.</summary>
     public void RemoveAccount(string accountId)
     {
-        foreach (var item in Items.Where(i => i.AccountId == accountId).ToList())
-            Remove(item);
+        _store.DeleteAccount(accountId);
+        Reload();
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     private void Reload()
