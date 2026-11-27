@@ -56,7 +56,7 @@ Every file is listed with its SHA-256 in `SHA256SUMS.txt` and the release manife
 
 - **Not code-signed.**
   - Windows SmartScreen warns on first start (*More info › Run anyway*).
-  - macOS Gatekeeper blocks the first start (right-click › *Open*).
+  - macOS Gatekeeper blocks the first start (System Settings › Privacy & Security › *Open Anyway*).
   - Only do either if the checksum matches.
 - **Linux:** no secure password store integration yet. Passwords are kept only while HCG Mail runs. The ZIP needs an
   X11 or XWayland desktop.

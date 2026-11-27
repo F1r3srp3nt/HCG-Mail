@@ -23,12 +23,16 @@ ap.add_argument("--out", required=True)
 a = ap.parse_args()
 
 PLATFORM = {"osx": ("macos", "macOS"), "linux": ("linux", "Linux")}
-MIN_OS = {"osx-arm64": "macOS 11 Big Sur (Apple silicon)", "osx-x64": "macOS 10.15 Catalina (Intel)",
-          "linux-x64": "64-bit Linux with glibc 2.27+ (e.g. Ubuntu 18.04+), X11 or XWayland",
-          "linux-arm64": "64-bit ARM Linux with glibc 2.27+, X11 or XWayland"}
+# What is established, not assumed: the .NET 10 support matrix decides the oldest version; the tested version is in the
+# runtime evidence.
+MIN_OS = {"osx-arm64": "macOS versions supported by .NET 10, Apple silicon",
+          "osx-x64": "macOS versions supported by .NET 10, Intel",
+          "linux-x64": "64-bit Linux distributions supported by .NET 10, with X11 or XWayland",
+          "linux-arm64": "64-bit ARM Linux distributions supported by .NET 10, with X11 or XWayland"}
 LIMITATIONS = {
-    "macos": ["Not signed with an Apple Developer ID and not notarized: macOS Gatekeeper blocks the first start. Open it with "
-              "right-click › Open (or System Settings › Privacy & Security › Open Anyway) only if the SHA-256 matches.",
+    "macos": ["Not signed with an Apple Developer ID and not notarized: macOS Gatekeeper blocks the first start. Allow it in "
+              "System Settings › Privacy & Security › Open Anyway only if the SHA-256 matches.",
+              "The window needs a display at least 1040 points wide.",
               "Passwords are kept in the macOS Keychain.",
               "IMAP and SMTP only; Microsoft and Google sign-in are not part of the Public Beta."],
     "linux": ["Not code-signed (Linux executables are not signed); verify the SHA-256.",
@@ -76,6 +80,8 @@ for name in sorted(evidence):
     summary, install = runtime_of(rid)
     checks = summary["checks"] if summary else []
     install_state = "passed" if "INSTALL OK" in install else ("not-run" if not install else "failed")
+    if plat_key == "macos" and install_state == "passed" and "SEAL OK" not in install:
+        install_state = "failed"  # a broken bundle seal makes macOS call the downloaded app damaged
     launch = passed(checks, "the app started")
     restart = passed(checks, "Restart: the app started")
     cred = passed(checks, "Credential store")
@@ -84,7 +90,7 @@ for name in sorted(evidence):
     signature = summary["executable"]["codeSignature"] if summary else "not recorded"
     if plat_key == "macos":
         signing = {"status": "unsigned" if "Developer ID" not in signature else "signed",
-                   "evidence": f"codesign: {signature}. No Developer ID signature and no notarization (HCG Executable Maker applies none)."}
+                   "evidence": f"codesign: {signature}; bundle seal: {'verified (codesign --verify --deep --strict)' if 'SEAL OK' in install else 'NOT verified'}. Ad-hoc only: no Developer ID signature and no notarization."}
     else:
         signing = {"status": "unsigned", "evidence": "Linux executables are not code-signed."}
     os_caption = summary["os"]["caption"] if summary else "not run"

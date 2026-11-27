@@ -51,6 +51,34 @@ jobs:
           sed "s|@MAKER@|$PWD/maker|g" "hcg-mail/HCG Mail Project/Desktop/scripts/maker/package-desktop.cs.template" > "$pack/package-desktop.cs"
           dotnet run --no-cache "$pack/package-desktop.cs" -- "$PWD/hcg-mail/HCG Mail Project/Desktop" "$RUNNER_TEMP/out" \
             --version "$VERSION" --targets "${{ matrix.targets }}" --dist "$RUNNER_TEMP/dist" | tee "$RUNNER_TEMP/package.log"
+      - name: Seal the .app (ad-hoc) and rebuild the disk image (macOS)
+        # Executable Maker (pinned 595e989) assembles the bundle around an app host that only carries the .NET SDK's ad-hoc
+        # signature, so the bundle itself is not sealed: codesign --verify --deep fails and Gatekeeper reports "code has
+        # no resources but signature indicates they must be present" (macOS then calls a downloaded app damaged). Until
+        # that is fixed in Maker, every Mach-O file and then the bundle are signed ad-hoc here, verified strictly, and the
+        # DMG is rebuilt with Maker's layout (the app and an Applications link). Maker's own DMG checksums are recorded.
+        # Ad-hoc is not a Developer ID signature: Gatekeeper still treats the app as from an unidentified developer.
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/seal.log"; : > "$log"
+          for rid in osx-arm64 osx-x64; do
+            app="$RUNNER_TEMP/out/HCG Mail-$VERSION-$rid/HCG Mail.app"
+            dmg="$RUNNER_TEMP/dist/HCGMail-$VERSION-$rid.dmg"
+            { echo "== $rid"; echo "Maker's DMG: $(shasum -a 256 "$dmg")"; echo "Before: $(codesign --verify --deep --strict "$app" 2>&1 | tr '\n' ' ')"; } | tee -a "$log"
+            find "$app/Contents/MacOS" -type f | while read -r f; do
+              if file "$f" | grep -q 'Mach-O'; then codesign --force --sign - --timestamp=none "$f"; fi
+            done
+            codesign --force --sign - --timestamp=none "$app"
+            codesign --verify --deep --strict --verbose=2 "$app" 2>&1 | tee -a "$log"
+            stage="$RUNNER_TEMP/dmg-stage-$rid"; rm -rf "$stage"; mkdir -p "$stage"
+            ditto "$app" "$stage/HCG Mail.app"; ln -s /Applications "$stage/Applications"
+            rm -f "$dmg"
+            hdiutil create -volname "HCG Mail" -srcfolder "$stage" -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "$dmg" | tee -a "$log"
+            hdiutil verify "$dmg" 2>&1 | tail -1 | tee -a "$log"
+            echo "Sealed DMG: $(shasum -a 256 "$dmg")" | tee -a "$log"
+          done
       - name: Evidence — checksums, sizes, toolchain
         shell: bash
         run: |
@@ -82,6 +110,7 @@ jobs:
           path: |
             ${{ runner.temp }}/build-evidence-${{ matrix.os }}.json
             ${{ runner.temp }}/package.log
+            ${{ runner.temp }}/seal.log
           retention-days: 90
 
   runtime:
@@ -118,7 +147,7 @@ jobs:
           ditto "$RUNNER_TEMP/dmg/HCG Mail.app" "$RUNNER_TEMP/Applications/HCG Mail.app"
           hdiutil detach "$RUNNER_TEMP/dmg"
           app="$RUNNER_TEMP/Applications/HCG Mail.app"
-          { echo "Installed: $app"; plutil -p "$app/Contents/Info.plist"; echo; echo "Gatekeeper (spctl --assess):"; spctl --assess --type execute -vv "$app" 2>&1 || true; } | tee -a "$out/install.txt"
+          { echo "Installed: $app"; plutil -p "$app/Contents/Info.plist"; echo; echo "Code signature (codesign --verify --deep --strict):"; codesign --verify --deep --strict --verbose=2 "$app" 2>&1 && echo "SEAL OK" || echo "SEAL BROKEN"; echo; echo "Gatekeeper (spctl --assess):"; spctl --assess --type execute -vv "$app" 2>&1 || true; } | tee -a "$out/install.txt"
           echo "INSTALL OK" >> "$out/install.txt"
           bash "hcg-mail/HCG Mail Project/Desktop/scripts/unix-runtime-check.sh" "$app/Contents/MacOS/HCGMail" "$out"
       - name: Extract the portable ZIP and run (virtual display)

@@ -20,10 +20,18 @@ check() { # check <0|1> <description>
 echo "HCG Mail: $EXE"
 echo "  $(uname -a)"
 if [ "$OS" = Darwin ]; then
-  SIGNATURE="$(codesign -dv --verbose=2 "$(dirname "$(dirname "$EXE")")/.." 2>&1 | grep -E '^Signature|^Authority|^TeamIdentifier' | tr '\n' ' ')"
+  APP="$(cd "$(dirname "$EXE")/../.." && pwd)"
+  SIGNATURE="$(codesign -dv --verbose=2 "$APP" 2>&1 | grep -E '^Signature|^Authority|^TeamIdentifier' | tr '\n' ' ')"
   echo "  code signature: ${SIGNATURE:-none}"
 else
   SIGNATURE="not applicable (Linux executables are not code-signed)"
+fi
+
+# 0. macOS: the bundle's signature must seal the whole app (otherwise macOS calls a downloaded copy damaged)
+if [ "$OS" = Darwin ]; then
+  codesign --verify --deep --strict "$APP" > "$OUT/codesign-verify.txt" 2>&1; code=$?
+  sed 's/^/      /' "$OUT/codesign-verify.txt"
+  check $([ $code = 0 ] && echo 0 || echo 1) "Code signature seals the whole app bundle (codesign --verify --deep --strict, exit $code)"
 fi
 
 # 1. Credential store
