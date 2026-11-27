@@ -22,6 +22,7 @@ ap.add_argument("--dist", required=True)
 ap.add_argument("--signing", required=True)
 ap.add_argument("--verify", required=True)
 ap.add_argument("--schema")
+ap.add_argument("--tests", help="macos-tests.json from the workflow's tests job (regression suites on macOS, test mailbox)")
 ap.add_argument("--run-url", required=True)
 ap.add_argument("--out", required=True)
 ap.add_argument("--commit", default=os.environ.get("GITHUB_SHA", "not-recorded"))
@@ -61,6 +62,13 @@ for p in glob.glob(os.path.join(a.signing, "**", "signing-evidence-osx-*.json"),
         signing[f["fileName"]] = ev
 if not signing:
     sys.exit("No Developer ID signing evidence: refusing to write a release manifest")
+tests = json.load(open(a.tests)) if a.tests and os.path.exists(a.tests) else None
+suites = tests["suites"] if tests else {}
+suite_failed = sum(v["failed"] for v in suites.values())
+mailbox_state = tests["mailbox"]["state"] if tests else "not-run"
+tests_text = ("Regression suites on macOS " + tests["macos"] + ": " + ", ".join(f"{k.split('.')[0]} {v['passed']}/{v['total']} passed, {v['failed']} failed" for k, v in suites.items())
+              + ". Authenticated IMAP/SMTP, Keychain persistence and restart with the dedicated test mailbox: " + mailbox_state + ".") if tests else \
+             "Regression suites on macOS: not recorded. Authenticated IMAP/SMTP with the dedicated test mailbox: not run."
 verified = {}
 for p in glob.glob(os.path.join(a.verify, "**", "verification-*.json"), recursive=True):
     v = json.load(open(p))
@@ -97,7 +105,7 @@ for name in sorted(signing):
     validation = (f"Signed with {ev['signing']['application']}{' and ' + ev['signing']['installer'] if kind == 'pkg' else ''}, hardened runtime, "
                   f"notarized by Apple ({', '.join(s['submissionId'] + ' ' + s['status'] for s in signing_record['notarization'])}) and stapled. "
                   f"Download check (quarantine kept): Gatekeeper {gatekeeper}, install {install}, launch {launch}"
-                  + (f" on {', '.join(hosts)}." if hosts else " — not run yet."))
+                  + (f" on {', '.join(hosts)}." if hosts else " — not run yet.") + " " + tests_text)
     artifacts.append({
         "fileName": name, "format": kind, "version": ev["version"], "buildNumber": ev["buildNumber"], "platform": "macos", "architecture": arch,
         "sizeBytes": fe["sizeBytes"], "sha256": fe["sha256"], "sha512": fe["sha512"], "signing": signing_record, "minimumOs": MIN_OS[arch],
@@ -120,11 +128,15 @@ for name in sorted(signing):
             "script_free_lifecycle": {"state": "not-applicable", "detail": "Debian lifecycle level"},
             "device_installation": {"state": install, "detail": f"{kind.upper()} installed with the quarantine attribute kept" + (f" on {', '.join(hosts)}" if hosts else "")},
             "application_launch": {"state": launch, "detail": "started, captured on screen, quit and restarted" + (f" on {', '.join(hosts)}" if hosts else "")},
-            "runtime_verification": {"state": "partial" if launch == "passed" else launch, "detail": "credential store, TLS accept/refuse, start-up and restart; authenticated IMAP/SMTP not exercised here"},
+            "runtime_verification": {"state": ("failed" if launch == "failed" or mailbox_state == "failed" or suite_failed else
+                                               "passed" if launch == "passed" and mailbox_state == "passed" else
+                                               "partial" if launch == "passed" else launch),
+                                     "detail": ("Keychain round trip, TLS accept/refuse, start-up and restart on the installed download. " + tests_text)[:1000]},
         }},
         "device_evidence": [],
         "compatibility_status": f"Gatekeeper {gatekeeper}; launch verified on {', '.join(hosts)}" if hosts else "not verified on a Mac yet",
-        "runtime_compatibility": "partial" if launch == "passed" else ("failed" if launch == "failed" else "not-established"),
+        "runtime_compatibility": ("failed" if launch == "failed" or mailbox_state == "failed" else "passed" if launch == "passed" and mailbox_state == "passed"
+                                  else "partial" if launch == "passed" else "not-established"),
         "approvals": [],
         "distribution": {"channel": "candidate", "access": "public"},
         "publication": {"record_status": "protected", "in_index_builds": False},
@@ -150,7 +162,7 @@ for name in sorted(signing):
         "package": "com.hakmicapitalgroup.hcgmail", "sourceCommit": a.commit, "buildProvider": "github-actions" if a.run_id else "owner-mac",
         "toolchain": f"HCG Executable Maker engine; signed on macOS {ev['host']['macos']} ({ev['host']['machine']})",
         "validationReport": {"tool": "HCG Mail macos-release.yml (sign-and-notarize.sh, verify-distribution.sh, HCG Executable Maker Signing Doctor)",
-                             "passed": notarized and install == "passed" and launch == "passed", "summary": validation[:4000]},
+                             "passed": notarized and install == "passed" and launch == "passed" and not suite_failed and mailbox_state != "failed", "summary": validation[:4000]},
         "replaces": None,
     })
 
@@ -193,7 +205,7 @@ with open(os.path.join(a.out, "SHA256SUMS.txt"), "w") as s:
     for r in rows:
         s.write(f"{r[2]}  {r[0]}\n")
 with open(os.path.join(a.out, "SUMMARY.md"), "w") as s:
-    s.write(f"# HCG Mail 1.0 Public Beta — macOS\n\n{a.run_url}\n\nPassports: {validated}.\n\n")
+    s.write(f"# HCG Mail 1.0 Public Beta — macOS\n\n{a.run_url}\n\nSource {a.repository} {a.commit} ({a.branch}). Passports: {validated}.\n\n{tests_text}\n\n")
     s.write("| File | Size | SHA-256 | Signature | Gatekeeper (quarantined) | Install | Launch |\n|---|---|---|---|---|---|---|\n")
     for r in rows:
         s.write(f"| `{r[0]}` | {r[1]:,} | `{r[2]}` | {r[3]} | {r[4]} | {r[5]} | {r[6]} |\n")

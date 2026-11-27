@@ -127,15 +127,15 @@ You do **not** need these for HCG Store:
      --identity "Developer ID Application: <Name> (<Team ID>)" \
      --installer-identity "Developer ID Installer: <Name> (<Team ID>)" \
      --notary-profile hcg-notary \
-     --zip-name "HCG Mail.app.zip" --pkg-name "HCG Mail-1.0.0-beta.1-osx-arm64.pkg"
+     --zip-name "HCG-Mail-1.0.0-beta.1-macos-arm64.zip" --pkg-name "HCG-Mail-1.0.0-beta.1-macos-arm64.pkg"
    ```
-   It stops at the first problem and says what it was. It writes `dist/HCG Mail.app.zip`,
-   `dist/HCG Mail-1.0.0-beta.1-osx-arm64.pkg`, `dist/signing-evidence-osx-arm64.json`, `dist/SHA256SUMS-osx-arm64.txt`
+   It stops at the first problem and says what it was. It writes `dist/HCG-Mail-1.0.0-beta.1-macos-arm64.zip`,
+   `dist/HCG-Mail-1.0.0-beta.1-macos-arm64.pkg`, `dist/signing-evidence-osx-arm64.json`, `dist/SHA256SUMS-osx-arm64.txt`
    and `dist/logs/`.
 5. Run the download check on your Mac for both files. Each must report "Download check passed".
    ```bash
-   "$S/verify-distribution.sh" "dist/HCG Mail.app.zip" "verify/zip" --expect developer-id
-   "$S/verify-distribution.sh" "dist/HCG Mail-1.0.0-beta.1-osx-arm64.pkg" "verify/pkg" --expect developer-id --install
+   "$S/verify-distribution.sh" "dist/HCG-Mail-1.0.0-beta.1-macos-arm64.zip" "verify/zip" --expect developer-id
+   "$S/verify-distribution.sh" "dist/HCG-Mail-1.0.0-beta.1-macos-arm64.pkg" "verify/pkg" --expect developer-id --install
    ```
    - `--install` installs the package into `/Applications` (administrator password), as a customer would.
    - The checks use a separate data folder, so your own accounts are not touched.
@@ -168,7 +168,7 @@ This path puts encrypted copies of the two private keys in GitHub. Path A avoids
 3. Run **macOS release (Developer ID)** with Actions › Run workflow on the `macos/1.0.0-beta.1` branch, then approve the `macos-signing` step.
 4. Each run uses a temporary keychain that is deleted at the end of the job. Nothing is ever printed.
 5. The run produces:
-   - `hcg-mail-macos-1.0.0-beta.1`: `HCG Mail.app.zip` and `HCG Mail-1.0.0-beta.1-osx-arm64.pkg`;
+   - `hcg-mail-macos-1.0.0-beta.1`: `HCG-Mail-1.0.0-beta.1-macos-arm64.zip` and `HCG-Mail-1.0.0-beta.1-macos-arm64.pkg`;
    - `hcg-mail-macos-verify-*`: the download checks;
    - `hcg-mail-macos-release-manifest`: the manifest, `SHA256SUMS.txt`, the passports and `store-release-draft.json`.
 

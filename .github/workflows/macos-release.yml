@@ -1,19 +1,21 @@
 # HCG Mail for macOS (Apple silicon), public beta: Developer ID signing, notarization, stapling, and the two HCG Store
-# downloads "HCG Mail.app.zip" and "HCG Mail-<version>-osx-arm64.pkg".
-# Publishes nothing. Stages:
-#   package           HCG Executable Maker's engine (pinned) builds the .app for Apple silicon and Intel; the layout is
-#                     audited (code only in Contents/MacOS) and the unsigned app is kept as the signing input.
-#   hardened-runtime  On real Macs of each architecture: the release signing commands with an ad-hoc identity (no
-#                     certificate), the same hardened runtime and entitlements; Maker's Signing Doctor; then each test
-#                     ZIP and PKG are installed and HCG Mail started and checked under the hardened runtime. These test
+# downloads HCG-Mail-<version>-macos-arm64.zip and HCG-Mail-<version>-macos-arm64.pkg. Publishes nothing. Stages:
+#   readiness         (Linux, seconds) which owner credentials exist: Apple signing (environment "macos-signing") and the
+#                     dedicated test mailbox. Missing ones are named in the run summary; dependent stages then skip.
+#   package           HCG Executable Maker's engine (pinned) builds the .app; layout audit (code only in Contents/MacOS);
+#                     the unsigned app is kept as the signing input, with a GitHub build-provenance attestation.
+#   hardened-runtime  On a real Apple silicon Mac: the release signing commands with an ad-hoc identity (no certificate),
+#                     the same hardened runtime and entitlements; Maker's Signing Doctor; the test ZIP and PKG installed
+#                     and HCG Mail started under the hardened runtime; screenshots of the running Release app. These test
 #                     files are never release artifacts.
-#   developer-id      Only when the owner has configured the Apple signing secrets (environment "macos-signing",
-#                     docs/MACOS_SIGNING.md): Developer ID signing, notarization and stapling. Otherwise it reports
-#                     "not configured" and nothing is signed.
+#   tests             The regression suites natively on macOS (rendering included) and, when the test mailbox is
+#                     configured, authenticated IMAP/SMTP, Keychain persistence and restart with it.
+#   developer-id      Only with the owner's Apple credentials: Developer ID signing, notarization, stapling; provenance
+#                     attestation of the two downloads.
 #   verify-signed     Each signed file downloaded as a customer would (quarantine kept): Gatekeeper must answer
-#                     "Notarized Developer ID"; installed and started on Apple silicon and Intel.
-#   evidence          Release manifest, SHA256SUMS and Release Passports from that evidence.
-# The same scripts sign on the owner's Mac without CI: scripts/macos/sign-and-notarize.sh.
+#                     "Notarized Developer ID"; installed and started on Apple silicon.
+#   evidence          Release manifest, SHA256SUMS, Release Passports and the HCG Store private draft.
+# The same scripts sign on the owner's Mac without CI: scripts/macos/sign-and-notarize.sh (docs/MACOS_SIGNING.md).
 name: macOS release (Developer ID)
 
 on:
@@ -28,7 +30,8 @@ permissions:
 env:
   VERSION: 1.0.0-beta.1
   BUILD_NUMBER: 4          # CFBundleVersion; build 3 was the earlier unsigned macOS DMG of 1.0.0-beta.1
-  ZIP_NAME: HCG Mail.app.zip
+  ZIP_NAME: HCG-Mail-1.0.0-beta.1-macos-arm64.zip
+  PKG_NAME: HCG-Mail-1.0.0-beta.1-macos-arm64.pkg
   MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f          # packaging engine (unchanged since 1.0.0-beta.1)
   MAKER_DOCTOR_COMMIT: 431c8b3b3fcd9ca95af27658c81398aee877bc17   # Signing Doctor (--mac-signing-doctor), read only
   HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
@@ -36,10 +39,52 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 1
 
 jobs:
+  readiness:
+    name: Owner credentials present? (Apple signing, test mailbox)
+    runs-on: ubuntu-24.04
+    environment: macos-signing
+    outputs:
+      signing: ${{ steps.check.outputs.signing }}
+      mailbox: ${{ steps.check.outputs.mailbox }}
+    steps:
+      - id: check
+        shell: bash
+        env:
+          MACOS_DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          MACOS_DEVELOPER_ID_APPLICATION_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
+          MACOS_DEVELOPER_ID_INSTALLER_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_INSTALLER_P12_BASE64 }}
+          MACOS_DEVELOPER_ID_INSTALLER_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_INSTALLER_P12_PASSWORD }}
+          APPLE_NOTARY_API_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_API_KEY_P8_BASE64 }}
+          APPLE_NOTARY_API_KEY_ID: ${{ secrets.APPLE_NOTARY_API_KEY_ID }}
+          APPLE_NOTARY_API_ISSUER_ID: ${{ secrets.APPLE_NOTARY_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          HCG_TEST_MAILBOX_ADDRESS: ${{ secrets.HCG_TEST_MAILBOX_ADDRESS }}
+          HCG_TEST_MAILBOX_PASSWORD: ${{ secrets.HCG_TEST_MAILBOX_PASSWORD }}
+          HCG_TEST_MAILBOX_IMAP_HOST: ${{ secrets.HCG_TEST_MAILBOX_IMAP_HOST }}
+          HCG_TEST_MAILBOX_SMTP_HOST: ${{ secrets.HCG_TEST_MAILBOX_SMTP_HOST }}
+        run: |
+          report() { # report <output> <label> <names…>
+            local out="$1" label="$2"; shift 2; local missing=""
+            for v in "$@"; do [ -n "${!v}" ] || missing="$missing $v"; done
+            if [ -z "$missing" ]; then echo "$out=true" >> "$GITHUB_OUTPUT"; echo "- $label: **configured**" >> "$GITHUB_STEP_SUMMARY"
+            else echo "$out=false" >> "$GITHUB_OUTPUT"; echo "- $label: **not configured** — missing:$missing" >> "$GITHUB_STEP_SUMMARY"
+                 echo "::notice::$label not configured (missing:$missing). See HCG Mail Project/Desktop/docs/MACOS_SIGNING.md."; fi
+          }
+          echo "### Owner credentials (names only; no value is read or printed)" >> "$GITHUB_STEP_SUMMARY"
+          report signing "Apple Developer ID signing and notarization" MACOS_DEVELOPER_ID_APPLICATION_P12_BASE64 MACOS_DEVELOPER_ID_APPLICATION_P12_PASSWORD \
+            MACOS_DEVELOPER_ID_INSTALLER_P12_BASE64 MACOS_DEVELOPER_ID_INSTALLER_P12_PASSWORD APPLE_NOTARY_API_KEY_P8_BASE64 APPLE_NOTARY_API_KEY_ID \
+            APPLE_NOTARY_API_ISSUER_ID APPLE_TEAM_ID
+          report mailbox "Dedicated test mailbox (IMAP/SMTP)" HCG_TEST_MAILBOX_ADDRESS HCG_TEST_MAILBOX_PASSWORD HCG_TEST_MAILBOX_IMAP_HOST HCG_TEST_MAILBOX_SMTP_HOST
+          cat "$GITHUB_STEP_SUMMARY"
+
   package:
     name: Build the .app with HCG Executable Maker and audit its layout
     runs-on: macos-15
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v5
         with: { path: hcg-mail }
@@ -60,25 +105,30 @@ jobs:
         run: |
           set -euo pipefail
           in="$RUNNER_TEMP/signing-input"; mkdir -p "$in"
-          for rid in osx-arm64; do
-            app="$RUNNER_TEMP/out/HCG Mail-$VERSION-$rid/HCG Mail.app"
-            # The build number goes into CFBundleVersion (Maker writes the version there); signing follows, so the seal covers it.
-            plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$app/Contents/Info.plist"
-            {
-              echo "== $rid: $app"
-              plutil -p "$app/Contents/Info.plist"
-              echo "Contents/MacOS:"
-              find "$app/Contents/MacOS" -type f -print0 | xargs -0 file | sed "s|$app/||"
-              echo "Signatures as built (Maker leaves only the .NET SDK's ad-hoc signature on the app host):"
-              find "$app/Contents/MacOS" -type f -print0 | while IFS= read -r -d '' f; do echo "  ${f##*/}: $(codesign -dv "$f" 2>&1 | grep -E '^(Signature|Authority)=' | head -1 || echo 'not signed')"; done
-              echo "Bundle: $(codesign --verify --deep --strict "$app" 2>&1 | tr '\n' ' ')"
-            } | tee -a "$in/bundle-audit.txt"
-            nonmacho=""
-            while IFS= read -r -d '' f; do file -b "$f" | grep -q '^Mach-O' || nonmacho="$nonmacho ${f##*/}"; done < <(find "$app/Contents/MacOS" -type f -print0)
-            [ -z "$nonmacho" ] || { echo "::error::$rid: not code in Contents/MacOS:$nonmacho"; exit 1; }
-            ditto -c -k --keepParent "$app" "$in/HCGMail-$VERSION-$rid-unsigned-app.zip"
-          done
+          rid=osx-arm64
+          app="$RUNNER_TEMP/out/HCG Mail-$VERSION-$rid/HCG Mail.app"
+          # The build number goes into CFBundleVersion (Maker writes the version there); signing follows, so the seal covers it.
+          plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$app/Contents/Info.plist"
+          {
+            echo "== $rid: $app"
+            echo "Source: ${{ github.repository }} ${{ github.sha }} (${{ github.ref_name }}), run ${{ github.run_id }}; Maker engine $MAKER_COMMIT; $(dotnet --version 2>/dev/null | sed 's/^/.NET SDK /')"
+            plutil -p "$app/Contents/Info.plist"
+            echo "Contents/MacOS:"
+            find "$app/Contents/MacOS" -type f -print0 | xargs -0 file | sed "s|$app/||"
+            echo "Signatures as built (Maker leaves only the .NET SDK's ad-hoc signature on the app host):"
+            find "$app/Contents/MacOS" -type f -print0 | while IFS= read -r -d '' f; do echo "  ${f##*/}: $(codesign -dv "$f" 2>&1 | grep -E '^(Signature|Authority)=' | head -1 || echo 'not signed')"; done
+            echo "Bundle: $(codesign --verify --deep --strict "$app" 2>&1 | tr '\n' ' ')"
+          } | tee -a "$in/bundle-audit.txt"
+          nonmacho=""
+          while IFS= read -r -d '' f; do file -b "$f" | grep -q '^Mach-O' || nonmacho="$nonmacho ${f##*/}"; done < <(find "$app/Contents/MacOS" -type f -print0)
+          [ -z "$nonmacho" ] || { echo "::error::$rid: not code in Contents/MacOS:$nonmacho"; exit 1; }
+          ditto -c -k --keepParent "$app" "$in/HCGMail-$VERSION-$rid-unsigned-app.zip"
           cd "$in" && shasum -a 256 *.zip | tee SHA256SUMS-signing-input.txt
+      - name: Build provenance of the signing input (GitHub attestation)
+        uses: actions/attest-build-provenance@v2
+        continue-on-error: true
+        with:
+          subject-path: ${{ runner.temp }}/signing-input/*.zip
       - uses: actions/upload-artifact@v4
         with:
           name: hcg-mail-macos-signing-input-${{ env.VERSION }}
@@ -88,15 +138,10 @@ jobs:
           retention-days: 90
 
   hardened-runtime:
-    name: Hardened runtime on real ${{ matrix.rid }} (ad-hoc test signing; not for distribution)
+    name: Hardened runtime on real Apple silicon (ad-hoc test signing; not for distribution), screenshots
     needs: package
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-15
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { rid: osx-arm64, arch: arm64, runner: macos-15, doctor: true }
     steps:
       - uses: actions/checkout@v5
         with: { path: hcg-mail, sparse-checkout: "HCG Mail Project/Desktop/scripts\nHCG Mail Project/Desktop/packaging" }
@@ -107,22 +152,19 @@ jobs:
         run: |
           set -euo pipefail
           s="$PWD/hcg-mail/HCG Mail Project/Desktop/scripts/macos"
-          mkdir -p "$RUNNER_TEMP/app" && ditto -x -k "input/signing-input/HCGMail-$VERSION-${{ matrix.rid }}-unsigned-app.zip" "$RUNNER_TEMP/app"
+          mkdir -p "$RUNNER_TEMP/app" && ditto -x -k "input/signing-input/HCGMail-$VERSION-osx-arm64-unsigned-app.zip" "$RUNNER_TEMP/app"
           bash "$s/sign-and-notarize.sh" --test --identity - --app "$RUNNER_TEMP/app/HCG Mail.app" --version "$VERSION" \
-            --arch ${{ matrix.arch }} --build-number "$BUILD_NUMBER" --out "$RUNNER_TEMP/test"
+            --arch arm64 --build-number "$BUILD_NUMBER" --out "$RUNNER_TEMP/test"
       - uses: actions/setup-dotnet@v5
-        if: matrix.doctor
         with: { dotnet-version: '10.0.x' }
       - uses: actions/checkout@v5
-        if: matrix.doctor
         with: { repository: F1r3srp3nt/HCG-Executable-Maker, ref: '${{ env.MAKER_DOCTOR_COMMIT }}', path: maker }
       - name: HCG Executable Maker Signing Doctor (read only)
-        if: matrix.doctor
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p "$RUNNER_TEMP/doctor" && ditto -x -k "$RUNNER_TEMP/test/HCGMail-$VERSION-${{ matrix.rid }}-adhoc-TEST-not-for-distribution.zip" "$RUNNER_TEMP/doctor"
-          dotnet run --project maker/src/HCG.ExecutableMaker.App -c Release -- --mac-signing-doctor "$RUNNER_TEMP/doctor/HCG Mail.app" | tee "$RUNNER_TEMP/test/logs/signing-doctor-${{ matrix.rid }}.txt"
+          mkdir -p "$RUNNER_TEMP/doctor" && ditto -x -k "$RUNNER_TEMP/test/HCGMail-$VERSION-osx-arm64-adhoc-TEST-not-for-distribution.zip" "$RUNNER_TEMP/doctor"
+          dotnet run --project maker/src/HCG.ExecutableMaker.App -c Release -- --mac-signing-doctor "$RUNNER_TEMP/doctor/HCG Mail.app" | tee "$RUNNER_TEMP/test/logs/signing-doctor-osx-arm64.txt"
       - name: Install each test file as a customer would and run HCG Mail under the hardened runtime
         shell: bash
         run: |
@@ -132,21 +174,84 @@ jobs:
             sudo rm -rf "/Applications/HCG Mail.app"
           done
           exit $rc
+      - name: Screenshots of the running Release app (HCG Dark and HCG Light; no account, no personal data)
+        shell: bash
+        run: |
+          bash "$PWD/hcg-mail/HCG Mail Project/Desktop/scripts/macos/capture-screenshots.sh" "$RUNNER_TEMP/doctor/HCG Mail.app" "$RUNNER_TEMP/screenshots"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: hcg-mail-macos-hardened-runtime-${{ matrix.rid }}-TEST-not-for-distribution
+          name: hcg-mail-macos-screenshots-${{ env.VERSION }}
+          path: ${{ runner.temp }}/screenshots
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-macos-hardened-runtime-osx-arm64-TEST-not-for-distribution
           path: ${{ runner.temp }}/test
           retention-days: 14
 
+  tests:
+    name: Regression suites on native macOS; authenticated IMAP/SMTP with the test mailbox when configured
+    needs: readiness
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: HCG Mail Project/Desktop
+    env:
+      HCG_TEST_MAILBOX_ADDRESS: ${{ secrets.HCG_TEST_MAILBOX_ADDRESS }}
+      HCG_TEST_MAILBOX_USERNAME: ${{ secrets.HCG_TEST_MAILBOX_USERNAME }}
+      HCG_TEST_MAILBOX_PASSWORD: ${{ secrets.HCG_TEST_MAILBOX_PASSWORD }}
+      HCG_TEST_MAILBOX_IMAP_HOST: ${{ secrets.HCG_TEST_MAILBOX_IMAP_HOST }}
+      HCG_TEST_MAILBOX_IMAP_PORT: ${{ secrets.HCG_TEST_MAILBOX_IMAP_PORT }}
+      HCG_TEST_MAILBOX_IMAP_SECURITY: ${{ secrets.HCG_TEST_MAILBOX_IMAP_SECURITY }}
+      HCG_TEST_MAILBOX_SMTP_HOST: ${{ secrets.HCG_TEST_MAILBOX_SMTP_HOST }}
+      HCG_TEST_MAILBOX_SMTP_PORT: ${{ secrets.HCG_TEST_MAILBOX_SMTP_PORT }}
+      HCG_TEST_MAILBOX_SMTP_SECURITY: ${{ secrets.HCG_TEST_MAILBOX_SMTP_SECURITY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with: { dotnet-version: '10.0.x' }
+      - name: dotnet test (Release) on macOS — includes the real macOS Keychain round trip and the rendering suites
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/tests"; mkdir -p "$out"
+          a=0; b=0; c=0
+          dotnet test tests/HCG.Mail.Tests/HCG.Mail.Tests.csproj -c Release --logger "trx;LogFileName=engine.trx" --results-directory "$out" || a=$?
+          dotnet test tests/HCG.Mail.App.Tests/HCG.Mail.App.Tests.csproj -c Release --logger "trx;LogFileName=app.trx" --results-directory "$out" || b=$?
+          python3 - "$out" "${{ needs.readiness.outputs.mailbox }}" <<'PY' || c=$?
+          import glob, json, platform, sys, xml.etree.ElementTree as ET
+          ns = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+          suites, mailbox = {}, []
+          for trx in sorted(glob.glob(sys.argv[1] + "/*.trx")):
+              root = ET.parse(trx).getroot(); c = root.find(".//t:Counters", ns)
+              suites[trx.rsplit("/", 1)[1]] = {k: int(c.get(k)) for k in ("total", "executed", "passed", "failed")}
+              for r in root.iter("{%s}UnitTestResult" % ns["t"]):
+                  if "DedicatedMailbox" in r.get("testName", ""): mailbox.append({"name": r.get("testName").rsplit(".", 1)[-1], "outcome": r.get("outcome")})
+          configured = sys.argv[2] == "true"
+          state = "not-run" if not configured else ("passed" if mailbox and all(m["outcome"] == "Passed" for m in mailbox) else "failed")
+          json.dump({"macos": platform.mac_ver()[0], "machine": platform.machine(), "suites": suites,
+                     "mailbox": {"configured": configured, "state": state, "tests": mailbox}}, open(sys.argv[1] + "/macos-tests.json", "w"), indent=2)
+          print(open(sys.argv[1] + "/macos-tests.json").read())
+          sys.exit(1 if state == "failed" else 0)
+          PY
+          exit $(( a | b | c ))
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: hcg-mail-macos-tests, path: '${{ runner.temp }}/tests', retention-days: 90 }
+
   developer-id:
     name: Developer ID signing, notarization and stapling
-    needs: hardened-runtime
+    needs: [readiness, hardened-runtime]
+    if: needs.readiness.outputs.signing == 'true'
     runs-on: macos-15
     timeout-minutes: 120
     environment: macos-signing
-    outputs:
-      configured: ${{ steps.config.outputs.configured }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     env:
       APP_P12: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12_BASE64 }}
       APP_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
@@ -157,27 +262,11 @@ jobs:
       NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_API_ISSUER_ID }}
       TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
     steps:
-      - name: Signing configured?
-        id: config
-        shell: bash
-        run: |
-          missing=""
-          for v in APP_P12 APP_P12_PASSWORD PKG_P12 PKG_P12_PASSWORD NOTARY_KEY NOTARY_KEY_ID NOTARY_ISSUER TEAM_ID; do [ -n "${!v}" ] || missing="$missing $v"; done
-          if [ -n "$missing" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Developer ID signing is not configured (missing:$missing). Nothing was signed or notarized. See HCG Mail Project/Desktop/docs/MACOS_SIGNING.md."
-            echo "Developer ID signing: **not configured** (missing:$missing). Nothing was signed or notarized." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
       - uses: actions/checkout@v5
-        if: steps.config.outputs.configured == 'true'
         with: { path: hcg-mail, sparse-checkout: "HCG Mail Project/Desktop/scripts\nHCG Mail Project/Desktop/packaging" }
       - uses: actions/download-artifact@v4
-        if: steps.config.outputs.configured == 'true'
         with: { name: 'hcg-mail-macos-signing-input-${{ env.VERSION }}', path: input }
       - name: Temporary keychain with the two Developer ID identities (deleted at the end of the job)
-        if: steps.config.outputs.configured == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -200,44 +289,41 @@ jobs:
           [ -n "$pkg_sha" ] || { echo "::error::No Developer ID Installer identity of team $TEAM_ID in MACOS_DEVELOPER_ID_INSTALLER_P12_BASE64"; exit 1; }
           printf '%s' "$NOTARY_KEY" | base64 --decode > "$RUNNER_TEMP/AuthKey_$NOTARY_KEY_ID.p8"
           { echo "KEYCHAIN=$kc"; echo "APP_SHA=$app_sha"; echo "PKG_SHA=$pkg_sha"; } >> "$GITHUB_ENV"
-      - name: Sign, notarize and staple (Apple silicon and Intel)
-        if: steps.config.outputs.configured == 'true'
+      - name: Sign, notarize and staple
         shell: bash
         run: |
           set -euo pipefail
           s="$PWD/hcg-mail/HCG Mail Project/Desktop/scripts/macos"
-          for arch in arm64; do
-            mkdir -p "$RUNNER_TEMP/app-$arch" && ditto -x -k "input/signing-input/HCGMail-$VERSION-osx-$arch-unsigned-app.zip" "$RUNNER_TEMP/app-$arch"
-            bash "$s/sign-and-notarize.sh" --app "$RUNNER_TEMP/app-$arch/HCG Mail.app" --version "$VERSION" --arch $arch --build-number "$BUILD_NUMBER" \
-              --out "$RUNNER_TEMP/dist" --keychain "$KEYCHAIN" --identity "$APP_SHA" --installer-identity "$PKG_SHA" \
-              --notary-key "$RUNNER_TEMP/AuthKey_$NOTARY_KEY_ID.p8" --notary-key-id "$NOTARY_KEY_ID" --notary-issuer "$NOTARY_ISSUER" \
-              --zip-name "$ZIP_NAME" --pkg-name "HCG Mail-$VERSION-osx-$arch.pkg"
-          done
+          mkdir -p "$RUNNER_TEMP/app-arm64" && ditto -x -k "input/signing-input/HCGMail-$VERSION-osx-arm64-unsigned-app.zip" "$RUNNER_TEMP/app-arm64"
+          bash "$s/sign-and-notarize.sh" --app "$RUNNER_TEMP/app-arm64/HCG Mail.app" --version "$VERSION" --arch arm64 --build-number "$BUILD_NUMBER" \
+            --out "$RUNNER_TEMP/dist" --keychain "$KEYCHAIN" --identity "$APP_SHA" --installer-identity "$PKG_SHA" \
+            --notary-key "$RUNNER_TEMP/AuthKey_$NOTARY_KEY_ID.p8" --notary-key-id "$NOTARY_KEY_ID" --notary-issuer "$NOTARY_ISSUER" \
+            --zip-name "$ZIP_NAME" --pkg-name "$PKG_NAME"
           mkdir -p "$RUNNER_TEMP/evidence" && mv "$RUNNER_TEMP"/dist/signing-evidence-*.json "$RUNNER_TEMP"/dist/SHA256SUMS-*.txt "$RUNNER_TEMP/dist/logs" "$RUNNER_TEMP/evidence/"
       - name: Remove the keychain and the API key
-        if: always() && steps.config.outputs.configured == 'true'
+        if: always()
         shell: bash
         run: |
           [ -n "${KEYCHAIN:-}" ] && security delete-keychain "$KEYCHAIN" || true
           rm -f "$RUNNER_TEMP"/AuthKey_*.p8 "$RUNNER_TEMP"/*.p12
+      - name: Build provenance of the two downloads (GitHub attestation)
+        uses: actions/attest-build-provenance@v2
+        continue-on-error: true
+        with:
+          subject-path: |
+            ${{ runner.temp }}/dist/${{ env.ZIP_NAME }}
+            ${{ runner.temp }}/dist/${{ env.PKG_NAME }}
       - uses: actions/upload-artifact@v4
-        if: steps.config.outputs.configured == 'true'
         with: { name: 'hcg-mail-macos-${{ env.VERSION }}', path: '${{ runner.temp }}/dist', retention-days: 90 }
       - uses: actions/upload-artifact@v4
-        if: always() && steps.config.outputs.configured == 'true'
+        if: always()
         with: { name: hcg-mail-macos-signing-evidence, path: '${{ runner.temp }}/evidence', retention-days: 90 }
 
   verify-signed:
-    name: Download check on real ${{ matrix.rid }} (quarantine kept, Gatekeeper, install, launch)
+    name: Download check on real Apple silicon (quarantine kept, Gatekeeper, install, launch)
     needs: developer-id
-    if: needs.developer-id.outputs.configured == 'true'
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-15
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { rid: osx-arm64, runner: macos-15 }
     steps:
       - uses: actions/checkout@v5
         with: { path: hcg-mail, sparse-checkout: "HCG Mail Project/Desktop/scripts" }
@@ -247,19 +333,19 @@ jobs:
         shell: bash
         run: |
           s="$PWD/hcg-mail/HCG Mail Project/Desktop/scripts/macos"; rc=0
-          for f in "dist/$ZIP_NAME" "dist/HCG Mail-$VERSION-${{ matrix.rid }}.pkg"; do
+          for f in "dist/$ZIP_NAME" "dist/$PKG_NAME"; do
             bash "$s/verify-distribution.sh" "$f" "$RUNNER_TEMP/verify/$(basename "$f")" --expect developer-id --install || rc=1
             sudo rm -rf "/Applications/HCG Mail.app"
           done
           exit $rc
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: 'hcg-mail-macos-verify-${{ matrix.rid }}', path: '${{ runner.temp }}/verify', retention-days: 90 }
+        with: { name: hcg-mail-macos-verify-osx-arm64, path: '${{ runner.temp }}/verify', retention-days: 90 }
 
   evidence:
-    name: Release manifest and Release Passports (from the evidence; nothing is sent)
-    needs: [developer-id, verify-signed]
-    if: always() && needs.developer-id.outputs.configured == 'true'
+    name: Release manifest, Release Passports and HCG Store draft (from the evidence; nothing is sent)
+    needs: [developer-id, verify-signed, tests]
+    if: always() && needs.developer-id.result == 'success'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -273,11 +359,14 @@ jobs:
       - uses: actions/download-artifact@v4
         continue-on-error: true
         with: { pattern: 'hcg-mail-macos-verify-*', path: verify }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { name: hcg-mail-macos-tests, path: tests }
       - name: Generate and validate
         run: |
           pip install --quiet jsonschema
           python3 -I "hcg-mail/HCG Mail Project/Desktop/scripts/macos/macos-evidence.py" --dist dist --signing signing --verify verify \
-            --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
+            --tests tests/macos-tests.json --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out manifest | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         if: always()

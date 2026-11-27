@@ -6,8 +6,8 @@ Developer ID and should not be distributed.
 
 ## Downloads
 
-- `HCG Mail-1.0.0-beta.1-osx-arm64.pkg`: the installer. It puts HCG Mail in `/Applications` and runs no scripts.
-- `HCG Mail.app.zip`: the app itself. Open the ZIP and drag HCG Mail to Applications.
+- `HCG-Mail-1.0.0-beta.1-macos-arm64.pkg`: the installer. It puts HCG Mail in `/Applications` and runs no scripts.
+- `HCG-Mail-1.0.0-beta.1-macos-arm64.zip`: the app itself. Open the ZIP and drag HCG Mail to Applications.
 
 Both are signed with HCG's Developer ID (the installer with its Developer ID Installer certificate) and notarized by
 Apple, with the notarization ticket stapled. macOS opens HCG Mail after its usual one-time question about an app
