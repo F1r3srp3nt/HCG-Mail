@@ -152,3 +152,4 @@ $os = Get-CimInstance Win32_OperatingSystem
 $failed = @($checks | Where-Object { -not $_.passed }).Count
 if ($failed -gt 0) { Write-Host "Upgrade check: $failed check(s) FAILED"; exit 1 }
 Write-Host "Upgrade check: all checks passed ($OldVersion → $NewVersion)"
+exit 0

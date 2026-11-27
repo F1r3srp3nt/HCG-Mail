@@ -81,7 +81,11 @@ jobs:
             stage="$RUNNER_TEMP/dmg-stage-$rid"; rm -rf "$stage"; mkdir -p "$stage"
             ditto "$app" "$stage/HCG Mail.app"; ln -s /Applications "$stage/Applications"
             rm -f "$dmg"
-            hdiutil create -volname "HCG Mail" -srcfolder "$stage" -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "$dmg" | tee -a "$log"
+            # hdiutil on hosted runners intermittently fails with "Resource busy": retry a few times.
+            for i in 1 2 3 4; do
+              hdiutil create -volname "HCG Mail" -srcfolder "$stage" -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "$dmg" 2>&1 | tee -a "$log" && [ -s "$dmg" ] && break
+              [ "$i" = 4 ] && exit 1; echo "hdiutil create failed (attempt $i), retrying" | tee -a "$log"; sleep $((i * 10))
+            done
             hdiutil verify "$dmg" 2>&1 | tail -1 | tee -a "$log"
             echo "Sealed DMG: $(shasum -a 256 "$dmg")" | tee -a "$log"
           done

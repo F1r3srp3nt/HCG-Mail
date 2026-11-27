@@ -198,3 +198,5 @@ $bad = @($offered | Where-Object { -not ($_.rendered -and $_.closed -and $_.wind
 if ($offered.Count -lt 2) { Write-Host "Only $($offered.Count) scaling(s) offered by this display: not enough to test scaling"; exit 1 }
 if ($bad.Count -gt 0) { Write-Host "FAILED at: $(($bad | ForEach-Object { "$($_.scale) %" }) -join ', ')"; exit 1 }
 Write-Host "Display scaling: HCG Mail rendered and closed at $(($offered | ForEach-Object { "$($_.scale) %" }) -join ', ')"
+# Explicit success: callers read $LASTEXITCODE, which a script without native commands leaves unset.
+exit 0

@@ -40,6 +40,9 @@ case "${1:-start}" in
 esac
 
 command -v dovecot >/dev/null || { echo "Install dovecot-imapd dovecot-lmtpd postfix first"; exit 1; }
+# Installing the packages on a systemd host (CI runners) starts the distribution's own Dovecot on ports 143/993:
+# stop it so the test server can listen there.
+if command -v systemctl >/dev/null && systemctl is-active --quiet dovecot 2>/dev/null; then systemctl stop dovecot; fi
 stop
 mkdir -p "$ROOT"/{pki,mail,crl}
 cd "$ROOT/pki"
@@ -196,7 +199,8 @@ postconf -M "submission/inet=submission inet n - y - - smtpd"
 postconf -P "submission/inet/smtpd_tls_security_level=encrypt" "submission/inet/smtpd_sasl_auth_enable=yes" \
   "submission/inet/smtpd_client_restrictions=permit_sasl_authenticated,reject"
 
-dovecot -c "$ROOT/dovecot.conf" </dev/null >/dev/null 2>&1
+dovecot -c "$ROOT/dovecot.conf" </dev/null >"$ROOT/dovecot-start.log" 2>&1 || {
+  echo "Dovecot did not start:"; cat "$ROOT/dovecot-start.log"; tail -20 "$ROOT/dovecot.log" 2>/dev/null; exit 1; }
 postfix start </dev/null >/dev/null 2>&1 || postfix reload </dev/null >/dev/null 2>&1
 sleep 1
 echo "Test server ready: IMAP $HOST:993 (SSL/TLS) / 143 (STARTTLS), SMTP $HOST:465 (SSL/TLS) / 587 (STARTTLS)"
