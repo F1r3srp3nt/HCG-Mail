@@ -43,7 +43,14 @@ check $([ $code = 0 ] && echo 0 || echo 1) "Credential store round trip ($STORE,
 # 2. TLS certificate validation
 tls() { # tls <host:port> <expect-valid 1|0> <what>
   "$EXE" --diagnose-tls "$1" > /dev/null 2>&1; local c=$?
-  local f="$DATA/tls-diagnosis-${1%%:*}-${1##*:}.txt"; [ -f "$f" ] && sed 's/^/      /' "$f"
+  local f="$DATA/tls-diagnosis-${1%%:*}-${1##*:}.txt"
+  # The probes reach public hosts: a network timeout says nothing about certificate validation, so it is tried once
+  # more (the verdict below stays strict: a refusal counts only when the certificate check refused it).
+  if [ -f "$f" ] && grep -q 'FAILED after .* Timeout' "$f"; then
+    echo "      (network timeout reaching $1; trying once more)"; sleep 5
+    "$EXE" --diagnose-tls "$1" > /dev/null 2>&1; c=$?
+  fi
+  [ -f "$f" ] && sed 's/^/      /' "$f"
   if [ "$2" = 1 ]; then check $([ $c = 0 ] && echo 0 || echo 1) "TLS accepted: $1 ($3, exit $c)"
   # A refusal counts only when the certificate or TLS check refused it, not when the host could not be reached.
   else check $([ $c != 0 ] && [ -f "$f" ] && grep -Eq 'FAILED after .* (Certificate|Tls|RevocationUnavailable)' "$f" && echo 0 || echo 1) "TLS rejected: $1 ($3, exit $c)"; fi

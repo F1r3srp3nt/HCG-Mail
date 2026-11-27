@@ -98,6 +98,7 @@ if [ -n "$APP" ] && [ -d "$APP" ]; then
     # Finder shows once for every downloaded app; Gatekeeper's verdict on that same quarantined copy is checked above.
     bash "$here/../unix-runtime-check.sh" "$APP/Contents/MacOS/HCGMail" "$OUT/runtime" > "$OUT/runtime.txt" 2>&1; rc=$?
     tail -25 "$OUT/runtime.txt"
+    grep '^FAIL' "$OUT/runtime.txt" | sed 's/^/      failed: /' || true
     check $rc "Launch and runtime checks (unix-runtime-check.sh)" "$(tail -1 "$OUT/runtime.txt")"
   fi
 fi
