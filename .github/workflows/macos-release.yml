@@ -69,8 +69,9 @@ jobs:
               find "$app/Contents/MacOS" -type f -print0 | while IFS= read -r -d '' f; do echo "  ${f##*/}: $(codesign -dv "$f" 2>&1 | grep -E '^(Signature|Authority)=' | head -1 || echo 'not signed')"; done
               echo "Bundle: $(codesign --verify --deep --strict "$app" 2>&1 | tr '\n' ' ')"
             } | tee -a "$in/bundle-audit.txt"
-            nonmacho="$(find "$app/Contents/MacOS" -type f -print0 | xargs -0 file | grep -vc ': *Mach-O' || true)"
-            [ "$nonmacho" = 0 ] || { echo "::error::$rid: $nonmacho non-code file(s) in Contents/MacOS"; exit 1; }
+            nonmacho=""
+            while IFS= read -r -d '' f; do file -b "$f" | grep -q '^Mach-O' || nonmacho="$nonmacho ${f##*/}"; done < <(find "$app/Contents/MacOS" -type f -print0)
+            [ -z "$nonmacho" ] || { echo "::error::$rid: not code in Contents/MacOS:$nonmacho"; exit 1; }
             ditto -c -k --keepParent "$app" "$in/HCGMail-$VERSION-$rid-unsigned-app.zip"
           done
           cd "$in" && shasum -a 256 *.zip | tee SHA256SUMS-signing-input.txt
