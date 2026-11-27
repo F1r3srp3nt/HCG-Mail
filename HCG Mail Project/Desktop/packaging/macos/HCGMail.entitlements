@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements of HCG Mail for macOS (Developer ID, outside the Mac App Store). Only what the app needs,
+  each with its evidence (docs/MACOS_SIGNING.md):
+    com.apple.security.cs.allow-jit   The .NET runtime (CoreCLR) compiles the app's code just in time into MAP_JIT memory.
+                                      Without it the hardened runtime stops HCG Mail at start-up.
+  Not needed, so not granted:
+    allow-unsigned-executable-memory, disable-library-validation (every library in the app is signed by the same team),
+    allow-dyld-environment-variables, get-task-allow (debugging; the notary service rejects it), App Sandbox (Developer ID
+    apps need not be sandboxed; HCG Mail's Keychain items and data folder stay where earlier builds put them).
+  Network access, the login Keychain and Avalonia's graphics need no entitlement outside the App Sandbox.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>
