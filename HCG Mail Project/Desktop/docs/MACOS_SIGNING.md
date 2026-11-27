@@ -109,33 +109,56 @@ You do **not** need these for HCG Store:
 
 ## Signing a release
 
-### A. On your MacBook: the keys stay on it
+The macOS release workflow starts **only by hand** (Actions › macOS release (Developer ID) › Run workflow). Its
+`signing` input chooses where signing happens:
 
-1. From the macOS release workflow run, download `hcg-mail-macos-signing-input-1.0.0-beta.1`. It holds the unsigned `.app` for each architecture, which is not for distribution.
+- **`local-vault`** (default): CI builds and qualifies the app (layout audit, hardened runtime, install and launch with
+  test signing, the regression suites on macOS) and publishes the unsigned signing input. It never asks for Apple
+  credentials. You sign on your Mac as in A.
+- **`ci-secrets`**: CI signs with the `macos-signing` environment's secrets (B). Use it only once they are configured.
+
+### A. On your MacBook with Executable Maker's Signing Vault: the keys stay on it
+
+0. **Certificates, once.** In HCG Executable Maker, open Signing & Security › **Apple Signing**:
+   - **Import .p12…** for your *Developer ID Application* and *Developer ID Installer* identities (certificate and
+     private key into the login keychain; the password is checked before anything is written and never stored).
+   - In **Project Signing**, choose HCG Mail, platform macOS, mode Manual, route **macOS Developer ID**, your Team ID, the
+     Developer ID Application certificate and the Developer ID Installer certificate. HCG Mail needs no provisioning
+     profile (its only entitlement, `com.apple.security.cs.allow-jit`, is a hardened-runtime key). Save, then
+     **Check signing**: every check must pass. Revocation is shown as *Not verified* there; Apple checks it at notarization.
+   - The Signing Vault's account backup stores public metadata only, and its encrypted private-key vault is not available
+     yet: your private keys exist only in this Mac's keychain. Keep your own backup of the `.p12` files.
+   - Notarization is a separate boundary (App Store Connect API key): create the notary profile once with
+     `xcrun notarytool store-credentials hcg-notary --key AuthKey_<KEYID>.p8 --key-id <KEYID> --issuer <ISSUER UUID>`.
+   - Check: `"HCG Mail Project/Desktop/scripts/macos/sign-and-notarize.sh" --check-setup --notary-profile hcg-notary` lists both identities from the
+     keychain and confirms the notary profile works. The script uses the identities the Signing Vault imported; HCG Mail
+     never sees the keys.
+
+1. From the macOS release workflow run, download `hcg-mail-macos-signing-input-1.0.0-beta.2`. It holds the unsigned `.app` for each architecture, which is not for distribution.
 2. Check the input files against `SHA256SUMS-signing-input.txt`:
    ```bash
    shasum -a 256 -c SHA256SUMS-signing-input.txt
    ```
 3. Unpack the app:
    ```bash
-   ditto -x -k HCGMail-1.0.0-beta.1-osx-arm64-unsigned-app.zip in-arm64
+   ditto -x -k HCGMail-1.0.0-beta.2-osx-arm64-unsigned-app.zip in-arm64
    ```
 4. Sign, notarize and build the two downloads:
    ```bash
    S="HCG Mail Project/Desktop/scripts/macos"
-   "$S/sign-and-notarize.sh" --app "in-arm64/HCG Mail.app" --version 1.0.0-beta.1 --build-number 4 --arch arm64 --out dist \
+   "$S/sign-and-notarize.sh" --app "in-arm64/HCG Mail.app" --version 1.0.0-beta.2 --build-number 5 --arch arm64 --out dist \
      --identity "Developer ID Application: <Name> (<Team ID>)" \
      --installer-identity "Developer ID Installer: <Name> (<Team ID>)" \
      --notary-profile hcg-notary \
-     --zip-name "HCG-Mail-1.0.0-beta.1-macos-arm64.zip" --pkg-name "HCG-Mail-1.0.0-beta.1-macos-arm64.pkg"
+     --zip-name "HCG-Mail-1.0.0-beta.2-macos-arm64.zip" --pkg-name "HCG-Mail-1.0.0-beta.2-macos-arm64.pkg"
    ```
-   It stops at the first problem and says what it was. It writes `dist/HCG-Mail-1.0.0-beta.1-macos-arm64.zip`,
-   `dist/HCG-Mail-1.0.0-beta.1-macos-arm64.pkg`, `dist/signing-evidence-osx-arm64.json`, `dist/SHA256SUMS-osx-arm64.txt`
+   It stops at the first problem and says what it was. It writes `dist/HCG-Mail-1.0.0-beta.2-macos-arm64.zip`,
+   `dist/HCG-Mail-1.0.0-beta.2-macos-arm64.pkg`, `dist/signing-evidence-osx-arm64.json`, `dist/SHA256SUMS-osx-arm64.txt`
    and `dist/logs/`.
 5. Run the download check on your Mac for both files. Each must report "Download check passed".
    ```bash
-   "$S/verify-distribution.sh" "dist/HCG-Mail-1.0.0-beta.1-macos-arm64.zip" "verify/zip" --expect developer-id
-   "$S/verify-distribution.sh" "dist/HCG-Mail-1.0.0-beta.1-macos-arm64.pkg" "verify/pkg" --expect developer-id --install
+   "$S/verify-distribution.sh" "dist/HCG-Mail-1.0.0-beta.2-macos-arm64.zip" "verify/zip" --expect developer-id
+   "$S/verify-distribution.sh" "dist/HCG-Mail-1.0.0-beta.2-macos-arm64.pkg" "verify/pkg" --expect developer-id --install
    ```
    - `--install` installs the package into `/Applications` (administrator password), as a customer would.
    - The checks use a separate data folder, so your own accounts are not touched.
@@ -165,10 +188,10 @@ This path puts encrypted copies of the two private keys in GitHub. Path A avoids
    | `APPLE_NOTARY_API_ISSUER_ID` | the Issuer ID |
 
    Also add the **variable** `APPLE_TEAM_ID` (your Team ID).
-3. Run **macOS release (Developer ID)** with Actions › Run workflow on the `macos/1.0.0-beta.1` branch, then approve the `macos-signing` step.
+3. Run **macOS release (Developer ID)** with Actions › Run workflow with `signing: ci-secrets` (on `main`, or `release/1.0.0-beta.2` before it merges), then approve the `macos-signing` step.
 4. Each run uses a temporary keychain that is deleted at the end of the job. Nothing is ever printed.
 5. The run produces:
-   - `hcg-mail-macos-1.0.0-beta.1`: `HCG-Mail-1.0.0-beta.1-macos-arm64.zip` and `HCG-Mail-1.0.0-beta.1-macos-arm64.pkg`;
+   - `hcg-mail-macos-1.0.0-beta.2`: `HCG-Mail-1.0.0-beta.2-macos-arm64.zip` and `HCG-Mail-1.0.0-beta.2-macos-arm64.pkg`;
    - `hcg-mail-macos-verify-*`: the download checks;
    - `hcg-mail-macos-release-manifest`: the manifest, `SHA256SUMS.txt`, the passports and `store-release-draft.json`.
 

@@ -33,13 +33,36 @@ error). Each verdict has a plain explanation and concrete actions.
 *Copy report* produces a support report without passwords, tokens or message content; e-mail addresses keep only their
 domain (`LogRedactor`).
 
-### What the Network Doctor contacts
+### Confirmed, likely or inconclusive
 
-Only while it runs: `connectivitycheck.gstatic.com` and `www.gstatic.com` (the same checks Android and Chrome use for
-Wi-Fi sign-in pages), and a TCP connection, opened and closed without sending anything, to `imap.gmail.com` and
-`smtp.gmail.com` to see whether the network allows mail ports at all. The user's password goes only to the user's own mail
-servers, over a verified encrypted connection. The hosts are listed in the window (`NetworkDoctorOptions.ContactedHostsText`)
-and can be replaced in `NetworkDoctorOptions`.
+Every verdict carries a confidence (`DiagnosisConfidence`), shown next to it:
+
+- **Confirmed**: observed directly. Examples: the server refused the password; the certificate failed verification for a
+  stated reason; there is no network interface; name lookups failed.
+- **Likely cause**: inferred and worded as such ("appears to…", "probably…"). Examples: the network blocks mail ports
+  (inferred from another provider's ports), a Wi-Fi sign-in page, certificate interception, a server outage, or a defect
+  in HCG Mail. These are shown as warnings, never as confirmed problems.
+- **Inconclusive**: the checks cannot tell the causes apart, for example when connectivity checks are off.
+
+### Connectivity check providers
+
+The general checks (Wi-Fi sign-in page, internet access, certificate interception, mail-port comparison) come from an
+interchangeable `ConnectivityProvider`. Choose it in Settings › Privacy & security:
+
+| Provider | Contacts | Mail-port comparison |
+| --- | --- | --- |
+| Google (default) | connectivitycheck.gstatic.com, www.gstatic.com | imap.gmail.com 993, smtp.gmail.com 465/587 |
+| Apple | captive.apple.com, www.apple.com | imap.mail.me.com 993, smtp.mail.me.com 587 |
+| Microsoft | www.msftconnecttest.com, www.microsoft.com | outlook.office365.com 993, smtp.office365.com 587 |
+| HCG | the configured endpoint (only when a build or `HCG_CONNECTIVITY_CHECK_URL` names an HTTPS endpoint) | none |
+| Off | nothing: only your own mail servers | none (verdicts that would need it are inconclusive) |
+
+The providers are contacted only while the Network Doctor runs. Automatic reconnection never uses them: it relies only
+on the device's own network state. HCG infrastructure is optional.
+
+**Future HCG endpoint contract.** `GET {base}/generate_204` answers `204` with an empty body, over HTTP (sign-in page
+check) and HTTPS (internet and certificate check). The endpoint is set with the MSBuild property
+`HcgConnectivityCheckUrl` (assembly metadata) or the environment variable `HCG_CONNECTIVITY_CHECK_URL`. HTTPS only.
 
 ### Provider-approved alternative SMTP
 
@@ -79,23 +102,42 @@ command the user asked for: networks that drop idle connections silently no long
 
 ## Offline mailbox access
 
-Every session is wrapped in `OfflineCapableMailSession`. Successful reads are copied to the device (`JsonMailCache`): the
-folder list, the newest page of each opened folder and the messages that were opened (not attachments; inline images of very
-large messages are left out; at most 400 messages per account).
+Every session is wrapped in `OfflineCapableMailSession`. Successful reads are copied to the device (`JsonMailCache`):
+- the folder list;
+- the newest page of each opened folder;
+- the messages that were opened.
 
-When the server cannot be reached, the session goes offline: the folder and messages on screen stay, the message list shows
-*Offline — showing mail saved on this device (from 14:02)* with the reason and the next reconnection, and reads are answered
-at once from the copy. Changes (flags, delete, move), attachment downloads and opening server drafts fail immediately with a
-clear message. Only a successful connection brings the session back online.
+Not stored: attachments, and inline images of very large messages.
 
-The copy lives in HCG Mail's private data folder (`offline/`, files readable only by the user on macOS and Linux, file names
-are hashes so folder names and subjects do not appear in the file system). It is deleted when the account is removed, when
-*Keep a copy of my mail on this computer for reading offline* is turned off, or with *Delete offline copies* in Settings.
+When the server cannot be reached, the session goes offline:
+- The folder and messages on screen stay. The banner shows *Offline — showing mail saved on this device (from 14:02)*, the reason and the next reconnection attempt.
+- Reads are answered at once from the copy.
+- Changes (flags, delete, move), attachment downloads and opening server drafts fail immediately with a clear message.
+- Only a successful connection brings the session back online.
+
+### Protection at rest
+
+- **Encrypted.** Every file is encrypted with AES-256-GCM (`AccountDataProtector`).
+- **One key per account and purpose** (offline copy, Outbox), a random 256-bit key. It is created on first use and kept only in the operating system's credential store: Windows Credential Manager, or the macOS/iOS Keychain. It is never written to a file and never stored next to the data.
+- **Isolated per account.** Each account has its own folder and key. The associated data binds every file to its account, purpose and slot, so a file copied into another account's folder, or to another place, does not decrypt; it is deleted when found.
+- **Crypto-shredding.** Removing an account, turning offline copies off, or *Delete offline copies* deletes the files **and the keys**. A copy taken before deletion can no longer be decrypted.
+- **Without a persistent credential store** (Linux), keys exist only while HCG Mail runs. Copies are then unreadable after it closes and are deleted, and the Outbox is kept in memory for the session.
+- **Local only.** Nothing here is ever sent anywhere: HCG Mail never synchronizes offline copies or the Outbox to HCG infrastructure or anyone else. The cache has no network dependency (tested).
+
+### Controls (Settings › Storage › Offline copies)
+
+- On or off: off deletes the copies and keys.
+- Retention: 7, 30 (default), 90 days or 1 year.
+- Storage limit per account: 50 MB to 1 GB (default 250 MB). The oldest messages go first; the folder list goes last.
+- Space used per account, with *Delete copy* per account, and *Delete all offline copies*.
+- Retention, limits and copies of removed accounts are applied at every start and whenever a setting changes.
 
 ## Outbox: persistent outgoing mail and drafts
 
 A message goes to the Outbox only when it certainly did not reach the server: the account is offline, or the connection
-failed before the server received it. Drafts saved while offline are kept on the device and copied to the Drafts folder on
+failed before the server received it. Outbox items are encrypted per account like offline copies (with a separate key, so
+deleting offline copies never touches unsent mail), and a message is only ever handed to the session of the account it
+was written from. Drafts saved while offline are kept on the device and copied to the Drafts folder on
 reconnection. The Outbox is stored on disk (`outbox/`, one file per item, written atomically, attachments included so the
 original files can be moved).
 
@@ -110,12 +152,29 @@ When the account reconnects, waiting items are handed to the server one at a tim
 
 Outbox items are listed in Mail Health › Network Doctor with *Send again* and *Discard*.
 
+## Recovery safety (verified by tests)
+
+| Guarantee | Tests |
+| --- | --- |
+| A refused password is never retried by network changes, wake-up, time or the Outbox | `RecoverySafetyUiTests.A_refused_password_*`, `NetworkRecoveryTests.A_refused_password_*` |
+| Certificate or TLS failures never fall back to an unencrypted connection, and never send the password or a message, however often recovery retries | `RecoverySafetyTests.Repeated_recovery_attempts_*`, `A_server_that_offers_no_STARTTLS_*` (real TLS and SMTP servers, in process) |
+| An ambiguous SMTP outcome is never sent again automatically by any recovery path | `RecoverySafetyUiTests.An_uncertain_send_*`, `OutboxServiceTests.An_uncertain_send_*`, crash recovery |
+| Network transitions recover safely | `NetworkRecoveryTests`, `RestrictedNetworkE2ETests` (real Dovecot/Postfix) |
+| Pending messages stay with their account | `RecoverySafetyUiTests.Queued_mail_always_leaves_*`, `OfflineSecurityTests.An_outbox_item_relabelled_*` |
+
 ## Optional HCG VPN
 
 `IHcgVpn` is the connection point for the future HCG VPN service. This build registers `NoHcgVpn` (not installed). A host
 application that ships HCG VPN registers its own implementation; HCG Mail then shows its state in the Network Doctor and
 mentions it as one option when a network blocks mail. HCG Mail never installs, starts or downloads a VPN, never passes it
 credentials or message content, and works exactly the same without it.
+
+**Integration contract (`HCG.Mail.Core.Network.IHcgVpn`).**
+- `State`: one of `NotInstalled`, `Disconnected`, `Connecting`, `Connected`.
+- `DisplayName`.
+- `StateChanged`.
+
+Read-only: HCG Mail does not control the VPN. A VPN connecting or disconnecting is a network change like any other. Accounts that failed for network reasons reconnect, and certificate validation stays the same with or without it.
 
 ## Tests
 

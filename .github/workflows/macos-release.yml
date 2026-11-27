@@ -18,20 +18,27 @@
 # The same scripts sign on the owner's Mac without CI: scripts/macos/sign-and-notarize.sh (docs/MACOS_SIGNING.md).
 name: macOS release (Developer ID)
 
+# Started by hand only. Missing Apple credentials are never requested again and again by pushes: with signing "local-vault"
+# (the default) CI builds and qualifies the app and leaves Developer ID signing to the owner's Mac, where the certificates
+# are managed by HCG Executable Maker's Signing Vault (docs/MACOS_SIGNING.md); "ci-secrets" signs here with the
+# "macos-signing" environment's secrets, once the owner has configured them.
 on:
-  push:
-    branches: ['macos/**']
-    paths-ignore: ['**/*.md', '**/docs/**']
   workflow_dispatch:
+    inputs:
+      signing:
+        description: Where Developer ID signing happens
+        type: choice
+        options: [local-vault, ci-secrets]
+        default: local-vault
 
 permissions:
   contents: read
 
 env:
-  VERSION: 1.0.0-beta.1
-  BUILD_NUMBER: 4          # CFBundleVersion; build 3 was the earlier unsigned macOS DMG of 1.0.0-beta.1
-  ZIP_NAME: HCG-Mail-1.0.0-beta.1-macos-arm64.zip
-  PKG_NAME: HCG-Mail-1.0.0-beta.1-macos-arm64.pkg
+  VERSION: 1.0.0-beta.2
+  BUILD_NUMBER: 5          # CFBundleVersion; 1.0.0-beta.1 used builds 3 (unsigned DMG) and 4
+  ZIP_NAME: HCG-Mail-1.0.0-beta.2-macos-arm64.zip
+  PKG_NAME: HCG-Mail-1.0.0-beta.2-macos-arm64.pkg
   MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f          # packaging engine (unchanged since 1.0.0-beta.1)
   MAKER_DOCTOR_COMMIT: 431c8b3b3fcd9ca95af27658c81398aee877bc17   # Signing Doctor (--mac-signing-doctor), read only
   HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
@@ -41,6 +48,7 @@ env:
 jobs:
   readiness:
     name: Owner credentials present? (Apple signing, test mailbox)
+    if: inputs.signing == 'ci-secrets'
     runs-on: ubuntu-24.04
     environment: macos-signing
     outputs:
@@ -194,6 +202,7 @@ jobs:
   tests:
     name: Regression suites on native macOS; authenticated IMAP/SMTP with the test mailbox when configured
     needs: readiness
+    if: always() && needs.readiness.result != 'failure'
     runs-on: macos-15
     timeout-minutes: 40
     defaults:
@@ -373,12 +382,12 @@ jobs:
         with: { name: hcg-mail-macos-release-manifest, path: manifest, retention-days: 90 }
 
   release-gate:
-    name: Release gate (fails unless every signing and verification stage ran and passed)
+    name: Release gate (Developer ID stages must run and pass; with local signing, reports pre-signing qualification only)
     needs: [readiness, package, hardened-runtime, tests, developer-id, verify-signed, evidence]
     if: always()
     runs-on: ubuntu-24.04
     steps:
-      - name: Every stage must have run and succeeded; a skipped stage is a failure
+      - name: Every required stage must have run and succeeded; a skipped stage is a failure
         shell: bash
         run: |
           fail=0
@@ -386,13 +395,20 @@ jobs:
             if [ "$2" = success ]; then echo "PASS  $1: $2"; echo "- $1: **$2**" >> "$GITHUB_STEP_SUMMARY"
             else echo "FAIL  $1: $2"; echo "- $1: **$2** — not qualified" >> "$GITHUB_STEP_SUMMARY"; fail=1; fi
           }
-          echo "### macOS release gate" >> "$GITHUB_STEP_SUMMARY"
-          check "Owner credentials: Apple signing" "$([ '${{ needs.readiness.outputs.signing }}' = true ] && echo success || echo missing)"
+          echo "### macOS release gate (${{ inputs.signing }})" >> "$GITHUB_STEP_SUMMARY"
           check "Build and layout audit" "${{ needs.package.result }}"
           check "Hardened runtime, install and launch (test signing)" "${{ needs.hardened-runtime.result }}"
           check "Regression suites on macOS" "${{ needs.tests.result }}"
-          check "Developer ID signing, notarization, stapling" "${{ needs.developer-id.result }}"
-          check "Download check: Gatekeeper, install, launch" "${{ needs.verify-signed.result }}"
-          check "Release manifest, passports, Store draft" "${{ needs.evidence.result }}"
-          echo "- Test mailbox (IMAP/SMTP): ${{ needs.readiness.outputs.mailbox == 'true' && 'configured' || 'NOT configured — authenticated IMAP/SMTP not run' }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ inputs.signing }}" = ci-secrets ]; then
+            check "Owner credentials: Apple signing" "$([ '${{ needs.readiness.outputs.signing }}' = true ] && echo success || echo missing)"
+            check "Developer ID signing, notarization, stapling" "${{ needs.developer-id.result }}"
+            check "Download check: Gatekeeper, install, launch" "${{ needs.verify-signed.result }}"
+            check "Release manifest, passports, Store draft" "${{ needs.evidence.result }}"
+            echo "- Test mailbox (IMAP/SMTP): ${{ needs.readiness.outputs.mailbox == 'true' && 'configured' || 'NOT configured — authenticated IMAP/SMTP not run' }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "- **Not a release yet.** Developer ID signing, notarization, stapling and the download check happen on the owner's Mac"
+              echo "  with the certificates in HCG Executable Maker's Signing Vault (docs/MACOS_SIGNING.md). Apple credentials were not requested."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
           exit $fail

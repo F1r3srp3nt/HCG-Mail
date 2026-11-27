@@ -71,6 +71,14 @@ display = {}
 for path in glob.glob(os.path.join(a.display, "*", "display-scaling.json")) if a.display else []:
     d = json.load(open(path, encoding="utf-8-sig"))
     display[os.path.basename(os.path.dirname(path))] = d
+def _untested_scales():
+    found = set()
+    for d in (display or {}).values():
+        for sc in d["scales"]:
+            if not sc["available"]:
+                found.add(sc["scale"])
+    return [str(x) for x in sorted(found)]
+
 def display_text():
     if not display:
         return "Display scaling: FAILED (no result)." if display_missing else "Display scaling: not run."
@@ -206,6 +214,8 @@ for f in ev["files"]:
             "(public testing prerelease); access 'public' is the intended access after the owner's publication approval, the Store draft "
             "is private; publication.record_status 'protected' means not published.",
             f"Evidence: {a.run_url}",
+            *([f"Known limitation: display scaling {', '.join(_untested_scales())} % not tested (the test display did not offer it)."] if _untested_scales() else []),
+            "Offline copies and the Outbox are encrypted per account with keys kept only in Windows Credential Manager; they are never uploaded.",
         ],
     }
     files.append(passport)
@@ -216,15 +226,18 @@ import jsonschema
 schema = json.load(open(a.schema, encoding="utf-8"))
 for p in files: jsonschema.validate(p, schema)
 
+untested_scales = _untested_scales()
 notes = [
     f"HCG Mail {version} for Windows: public testing prerelease, free during testing (temporary; not a permanent free price).",
     "IMAP/SMTP email for your own mailbox. Passwords in Windows Credential Manager; TLS with certificate validation only.",
     "New: the official HCG logo with a transparent background in both themes, one HCG Mail wordmark (no overlapping title "
     "text), a cleaner welcome screen, and account setup focused on IMAP and SMTP.",
+    "New: Network Doctor in Mail Health for school and other restricted Wi-Fi; automatic reconnection; mail you have read "
+    "stays readable offline (encrypted on this PC); messages written offline wait in the Outbox and are sent when the connection returns.",
     "Installing over 1.0.0-beta.1 keeps your accounts, settings and saved passwords.",
     "Installer (per-user, no administrator rights) or portable ZIP, for x64 and ARM64. Self-contained: no .NET installation needed.",
     "Not code-signed: Windows SmartScreen warns. Compare the SHA-256 checksum before running.",
-]
+] + ([f"Known limitation: display scaling {', '.join(untested_scales)} % has not been tested (the test display did not offer it)."] if untested_scales else [])
 release = {
     "productId": "hcg-mail", "editionId": "windows-desktop", "version": version, "build": build_no, "channel": "beta",
     "releaseNotes": notes,

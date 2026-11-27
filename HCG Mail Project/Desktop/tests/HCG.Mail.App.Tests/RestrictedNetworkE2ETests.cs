@@ -263,7 +263,7 @@ public sealed class RestrictedNetworkE2ETests
     }
 
     private static NetworkDoctor Doctor(bool referencesBlocked) =>
-        new(new SystemDnsResolver(), new ReferencePorts(referencesBlocked), new WebWorks(), new MailClientFactory { Timeout = TimeSpan.FromSeconds(6) },
+        new(new SystemDnsResolver(), new ReferencePorts(referencesBlocked), new WebWorks(), new MailClientFactory { Timeout = TimeSpan.FromSeconds(30) },
             new SystemNetworkInterfaces(), NullLogger<NetworkDoctor>.Instance, new NetworkDoctorOptions { StepTimeout = TimeSpan.FromSeconds(4), SignInTimeout = TimeSpan.FromSeconds(60) });
 
     [LocalMailServerFact]
@@ -284,6 +284,7 @@ public sealed class RestrictedNetworkE2ETests
         Assert.True(wrong.Diagnosis.Category == VerdictCategory.Credentials,
             $"{wrong.Diagnosis.Verdict}: incoming {wrong.Observations.Incoming.Auth} ({wrong.Observations.Incoming.Detail}); outgoing {wrong.Observations.Outgoing.Auth} ({wrong.Observations.Outgoing.Detail})");
 
+        // (Dovecot slows down repeated wrong passwords from one address; the client allows for that, as HCG Mail does.)
         // A filtering firewall: connections are accepted but the secure handshake never completes.
         imapRelay.BlackHole();
         smtpRelay.BlackHole();
