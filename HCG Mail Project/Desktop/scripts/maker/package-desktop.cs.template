@@ -45,7 +45,7 @@ var projects = new ProjectService(new ProjectImporter(paths, TimeProvider.System
     new ProjectInspectionService([new DotNetProjectInspector(TimeProvider.System)], TimeProvider.System),
     new SqliteProjectRepository(db), new SqliteSettingsStore(db), toolchains, paths, TimeProvider.System, NullLogger<ProjectService>.Instance);
 var builds = new BuildService(new LocalProcessBuildWorker(runner), toolchains, new SqliteBuildRepository(db),
-    new PackagingRegistry([new PortableFolderPackager(), new PortableZipPackager(), new InnoSetupPackager(runner)]),
+    new PackagingRegistry([new PortableFolderPackager(), new PortableZipPackager(), new MacAppBundlePackager(), new DmgPackager(runner)]),
     paths, TimeProvider.System);
 
 var report = await toolchains.GetAsync();
