@@ -18,9 +18,10 @@
 # Output (artifacts/ is ignored by git):
 #   artifacts/ios/ipa/HCGMail.iOS.ipa               the signed app — upload this one with Transporter
 #   artifacts/ios/ipa/HCGMail.iOS.ipa.sha256        its SHA-256 checksum (shasum -a 256 -c to re-check before upload)
-#   artifacts/ios/archive/HCG Mail <version> (<build>).xcarchive   copy of the archive; the original is listed in
-#                                                    Xcode › Window › Organizer › Archives
+#   artifacts/ios/archive/HCGMail.iOS.xcarchive     the archive, written there directly by .NET (ArchiveDir); double-click
+#                                                    it to add it to Xcode › Window › Organizer › Archives
 #   artifacts/ios/verification.txt                  the checks below, for the release record
+# The paths are fixed (no date-stamped folder in ~/Library), so other tools can rely on them. Each run replaces them.
 source "$(dirname "$0")/_common.sh"
 require_macos
 
@@ -49,33 +50,26 @@ rm -rf "$OUT"
 # 2. Build, sign and archive.
 extra=(-p:ApplicationVersion="$BUILD_NUMBER")
 [[ -n "${HCG_IOS_MARKETING_VERSION:-}" ]] && extra+=(-p:ApplicationDisplayVersion="$HCG_IOS_MARKETING_VERSION")
-marker="$(mktemp -t hcg-archive-start)"
+ARCHIVE="$ARCHIVE_OUT/HCGMail.iOS.xcarchive"
+IPA="$OUT/HCGMail.iOS.ipa"
+# The .NET iOS SDK's ArchiveDir is the .xcarchive directory itself (not a folder to put archives in). It must not
+# hold an older archive: the Archive task copies into it without emptying it.
+rm -rf "$ARCHIVE"; mkdir -p "$ARCHIVE_OUT"
 # Mailbox sign-in values (HCG_MICROSOFT_CLIENT_ID etc.) reach the build through oauth-clients.props.
 require_build_xcode
 echo "Building with Xcode $BUILD_XCODE_VERSION ($BUILD_XCODE_APP)" | tee -a "$REPORT"
 ios_dotnet publish "$APP_PROJECT" -c Release -f "$TFM" -r ios-arm64 \
-  -p:ArchiveOnBuild=true \
+  -p:ArchiveOnBuild=true -p:ArchiveDir="$ARCHIVE" \
   -p:CodesignKey="$HCG_IOS_SIGNING_IDENTITY" \
   -p:CodesignProvision="$HCG_IOS_PROVISIONING_PROFILE" \
-  -p:BuildIpa=true \
+  -p:BuildIpa=true -p:IpaPackagePath="$IPA" \
   -o "$OUT" "${extra[@]}"
 
-IPA="$(find "$OUT" -maxdepth 1 -name '*.ipa' | head -1)"
-[[ -f "$IPA" ]] || { echo "error: no .ipa produced in $OUT" >&2; exit 1; }
-
-# 3. The .xcarchive: .NET writes it where Xcode's Organizer looks (~/Library/Developer/Xcode/Archives/<date>/).
-ARCHIVE="$(find "$HOME/Library/Developer/Xcode/Archives" -maxdepth 2 -name '*.xcarchive' -newer "$marker" -type d 2>/dev/null \
-           | while read -r a; do [[ -d "$a/Products/Applications/HCGMail.iOS.app" ]] && echo "$a"; done | tail -1)"
-rm -f "$marker"
-if [[ -n "$ARCHIVE" ]]; then
-  version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ARCHIVE/Products/Applications/HCGMail.iOS.app/Info.plist")"
-  mkdir -p "$ARCHIVE_OUT"
-  ARCHIVE_COPY="$ARCHIVE_OUT/HCG Mail $version ($BUILD_NUMBER).xcarchive"
-  rm -rf "$ARCHIVE_COPY"
-  ditto "$ARCHIVE" "$ARCHIVE_COPY"
-else
-  echo "warning: no new .xcarchive found in ~/Library/Developer/Xcode/Archives; the .ipa is complete without it." >&2
-fi
+# 3. Both products at their fixed paths.
+[[ -f "$IPA" ]] || { echo "error: no .ipa at $IPA" >&2; exit 1; }
+[[ -f "$ARCHIVE/Info.plist" && -d "$ARCHIVE/Products/Applications/HCGMail.iOS.app" ]] \
+  || { echo "error: no complete .xcarchive at $ARCHIVE (Info.plist and Products/Applications/HCGMail.iOS.app)" >&2; exit 1; }
+ARCHIVE_COPY="$ARCHIVE"
 
 # 4. Verify what will be uploaded: the .ipa, and the app inside the archive.
 echo | tee -a "$REPORT"
@@ -99,7 +93,7 @@ set -e
 echo
 echo "Signed IPA:   $IPA"
 echo "SHA-256:      $IPA.sha256"
-[[ -n "${ARCHIVE:-}" ]] && echo "Archive:      $ARCHIVE_COPY" && echo "              (also in Xcode › Window › Organizer › Archives: $ARCHIVE)"
+echo "Archive:      $ARCHIVE  (double-click to add it to Xcode › Window › Organizer)"
 echo "Checks:       $REPORT"
 if [[ $ipa_ok -ne 0 || $archive_ok -ne 0 ]]; then
   echo "error: the build did not pass every check — do not upload it. See $REPORT." >&2
