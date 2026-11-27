@@ -371,3 +371,28 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: hcg-mail-macos-release-manifest, path: manifest, retention-days: 90 }
+
+  release-gate:
+    name: Release gate (fails unless every signing and verification stage ran and passed)
+    needs: [readiness, package, hardened-runtime, tests, developer-id, verify-signed, evidence]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Every stage must have run and succeeded; a skipped stage is a failure
+        shell: bash
+        run: |
+          fail=0
+          check() { # check <stage> <result>
+            if [ "$2" = success ]; then echo "PASS  $1: $2"; echo "- $1: **$2**" >> "$GITHUB_STEP_SUMMARY"
+            else echo "FAIL  $1: $2"; echo "- $1: **$2** — not qualified" >> "$GITHUB_STEP_SUMMARY"; fail=1; fi
+          }
+          echo "### macOS release gate" >> "$GITHUB_STEP_SUMMARY"
+          check "Owner credentials: Apple signing" "$([ '${{ needs.readiness.outputs.signing }}' = true ] && echo success || echo missing)"
+          check "Build and layout audit" "${{ needs.package.result }}"
+          check "Hardened runtime, install and launch (test signing)" "${{ needs.hardened-runtime.result }}"
+          check "Regression suites on macOS" "${{ needs.tests.result }}"
+          check "Developer ID signing, notarization, stapling" "${{ needs.developer-id.result }}"
+          check "Download check: Gatekeeper, install, launch" "${{ needs.verify-signed.result }}"
+          check "Release manifest, passports, Store draft" "${{ needs.evidence.result }}"
+          echo "- Test mailbox (IMAP/SMTP): ${{ needs.readiness.outputs.mailbox == 'true' && 'configured' || 'NOT configured — authenticated IMAP/SMTP not run' }}" >> "$GITHUB_STEP_SUMMARY"
+          exit $fail
