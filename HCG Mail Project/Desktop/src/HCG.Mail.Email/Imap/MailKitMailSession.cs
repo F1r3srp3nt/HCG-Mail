@@ -631,7 +631,9 @@ public sealed class MailKitMailSession : IMailSession
             if (!smtp.Capabilities.HasFlag(SmtpCapabilities.Authentication))
                 throw new MailOperationException(MailErrorKind.Authentication, "The outgoing server does not offer authentication. Check the outgoing server name and port.");
             await smtp.AuthenticateAsync(new NetworkCredential(Account.Username, _password)).ConfigureAwait(false);
-            transactionStarted = true;
+            // From here the server may receive the message. With the tracking client it is narrowed to "a recipient was
+            // accepted" (before that no message data can have been sent); other clients count everything after AUTH.
+            transactionStarted = smtp is not Smtp.TransactionTrackingSmtpClient;
             var reply = await smtp.SendAsync(mime).ConfigureAwait(false);
             // MailKit returns only after a 250 reply to the end of the message data.
             record = record with { State = DeliveryState.Accepted, SmtpStatusCode = 250, ServerReply = Truncate(reply) };
@@ -653,9 +655,14 @@ public sealed class MailKitMailSession : IMailSession
         }
         catch (Exception ex)
         {
+            if (smtp is Smtp.TransactionTrackingSmtpClient tracking && tracking.RecipientAccepted)
+                transactionStarted = true;
             var translated = MailErrorTranslator.Translate(ex, MailProtocol.Smtp, endpoint, recorder);
-            Record(ClassifyFailure(record, ex, transactionStarted) with { ErrorMessage = translated.UserMessage });
+            var classified = ClassifyFailure(record, ex, transactionStarted) with { ErrorMessage = translated.UserMessage };
+            Record(classified);
             _logger.LogWarning("SMTP send failed for account {AccountId}: {Kind} ({Error})", Account.Id, translated.Kind, ex.GetType().Name);
+            if (classified.State == DeliveryState.Submitted)
+                throw new MailOperationException(translated.Kind, translated.UserMessage, ex) { OutcomeUnknown = true }; // never resend silently
             throw translated;
         }
     }

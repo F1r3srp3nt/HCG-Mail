@@ -44,7 +44,10 @@ public sealed class DeliveryRecordViewModel(DeliveryRecord record)
     public string Reply => record.ServerReply is null ? "No reply text" : $"{record.SmtpStatusCode} {record.ServerReply}".Trim();
     public string Details => $"{record.RecipientCount} recipient(s) · priority {record.Priority.ToString().ToLowerInvariant()} · via {record.SmtpServer}" +
                              (record.MessageId is null ? "" : $" · Message-ID <{record.MessageId}>");
-    public string Explanation => record.ErrorMessage ?? record.Explanation;
+    // An unknown outcome must say so ("may or may not have been accepted"), not just repeat the connection error.
+    public string Explanation => record.State == HCG.Mail.Core.Delivery.DeliveryState.Submitted && record.ErrorMessage is { } error
+        ? record.Explanation + " (" + error + ")"
+        : record.ErrorMessage ?? record.Explanation;
 }
 
 /// <summary>

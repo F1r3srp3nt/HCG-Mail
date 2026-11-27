@@ -146,6 +146,14 @@ public sealed partial class ComposeViewModel : ObservableObject
                 "Send anyway"))
             return;
 
+        // The previous attempt may have reached the server: sending again could deliver the message twice.
+        if (PossiblyAlreadySent
+            && !await _dialogs.ConfirmAsync("This message may already have been sent",
+                "The connection was lost while the outgoing server was receiving it, so it is not known whether it was sent. " +
+                "Check your Sent folder, or ask a recipient, before sending it again. Sending again may deliver it twice.",
+                "Send again", destructive: true))
+            return;
+
         var account = SelectedFrom;
         var session = account.Session!;
         IsBusy = true;
@@ -164,15 +172,29 @@ public sealed partial class ComposeViewModel : ObservableObject
             _savedSnapshot = Snapshot();
             CloseRequested?.Invoke(this, EventArgs.Empty);
         }
+        catch (MailOperationException ex) when (ex.OutcomeUnknown)
+        {
+            PossiblyAlreadySent = true;
+            SetStatus("Sending result unknown: " + ex.UserMessage + " The message may already have been sent. Check your Sent folder before sending again.", error: true);
+        }
         catch (MailOperationException ex)
         {
             SetStatus("Not sent: " + ex.UserMessage, error: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // An attachment that was moved, deleted or locked after it was added: nothing was sent.
+            SetStatus("Not sent: an attachment could not be read (" + ex.Message + "). Remove it or attach it again.", error: true);
         }
         finally
         {
             IsBusy = false;
         }
     }
+
+    /// <summary>The last send attempt lost its connection after the server started receiving the message.</summary>
+    [ObservableProperty]
+    private bool _possiblyAlreadySent;
 
     [RelayCommand(CanExecute = nameof(CanUseServer))]
     private async Task SaveDraftAsync() => await SaveDraftCoreAsync();
@@ -233,6 +255,24 @@ public sealed partial class ComposeViewModel : ObservableObject
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// Saves unsaved changes as the server draft without being asked (the window calls this every minute), so a crash, a
+    /// lost laptop battery or a closed lid does not lose the message. Quiet: it only runs when the account is connected,
+    /// nothing else is in progress and every address is valid (a draft would leave invalid ones out).
+    /// </summary>
+    public async Task<bool> AutosaveAsync()
+    {
+        if (!IsDirty || IsBusy || SelectedFrom.Session is null)
+            return false;
+        BuildMessage(out var invalid);
+        if (invalid.Count > 0)
+            return false;
+        if (!await SaveDraftCoreAsync())
+            return false;
+        SetStatus($"Draft saved automatically at {DateTime.Now.ToString("HH:mm", CultureInfo.CurrentCulture)}.", error: false);
+        return true;
     }
 
     private async Task<bool> SaveDraftCoreAsync()
