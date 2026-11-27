@@ -57,6 +57,8 @@ public sealed partial class SettingsViewModel : ObservableObject
         _saveCopyToSentFolder = s.SaveCopyToSentFolder;
         _confirmBeforeOpeningLinks = s.ConfirmBeforeOpeningLinks;
         _connectOnStartup = s.ConnectOnStartup;
+        _signatureAccount = main.SelectedAccount ?? main.Accounts.FirstOrDefault();
+        _signatureText = _signatureAccount is null ? "" : s.SignatureFor(_signatureAccount.Account.Id) ?? "";
         _askWhereToSaveAttachments = s.AskWhereToSaveAttachments;
         _downloadDirectory = s.DownloadDirectory ?? AppPaths.DefaultDownloadDirectory();
         _selectedRefresh = RefreshOptions.FirstOrDefault(o => o.Minutes == s.AutomaticRefreshMinutes) ?? RefreshOptions[0];
@@ -85,6 +87,33 @@ public sealed partial class SettingsViewModel : ObservableObject
     ];
 
     public ObservableCollection<AccountViewModel> Accounts => _main.Accounts;
+    public bool HasAccounts => Accounts.Count > 0;
+
+    // ---- Signatures -----------------------------------------------------------------------------
+
+    [ObservableProperty] private AccountViewModel? _signatureAccount;
+    [ObservableProperty] private string _signatureText = "";
+    [ObservableProperty] private string _signatureStatus = "";
+
+    partial void OnSignatureAccountChanged(AccountViewModel? value)
+    {
+        SignatureText = value is null ? "" : _settings.Current.SignatureFor(value.Account.Id) ?? "";
+        SignatureStatus = "";
+    }
+
+    partial void OnSignatureTextChanged(string value) => SignatureStatus = "";
+
+    [RelayCommand]
+    private void SaveSignature()
+    {
+        if (SignatureAccount is not { } account)
+            return;
+        _settings.Update(s => s.WithSignature(account.Account.Id, SignatureText));
+        SignatureStatus = string.IsNullOrWhiteSpace(SignatureText) ? "Signature removed." : "Signature saved.";
+    }
+
+    [RelayCommand]
+    private void OpenMailHealth() => _main.OpenMailHealthCommand.Execute(null);
 
     public string Version { get; } =
         typeof(SettingsViewModel).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";

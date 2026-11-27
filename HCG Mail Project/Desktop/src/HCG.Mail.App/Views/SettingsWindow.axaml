@@ -46,6 +46,28 @@
     <TabControl Background="{DynamicResource Hcg.Bg.Sidebar}">
 
       <!-- Appearance -->
+      <TabItem Header="General">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <TextBlock Classes="h1" Text="General" />
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="h3" Text="Checking for new messages" />
+                <ComboBox x:Name="RefreshChoice" ItemsSource="{Binding RefreshOptions}" SelectedItem="{Binding SelectedRefresh}" MinWidth="320" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Manually (the default): HCG Mail checks for new mail only when you click Refresh (F5), open a folder or start the app, and never contacts the server in the background. Automatic: the open folder is also checked at the chosen interval while HCG Mail is running." />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Startup" />
+                <ToggleSwitch IsChecked="{Binding ConnectOnStartup}" OnContent="Connect to my accounts when HCG Mail starts" OffContent="Connect to my accounts when HCG Mail starts" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
       <TabItem Header="Appearance">
         <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
           <StackPanel Classes="page">
@@ -144,24 +166,83 @@
       </TabItem>
 
       <!-- Mail -->
-      <TabItem Header="Mail">
+      <TabItem Header="Reading">
         <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
           <StackPanel Classes="page">
-            <TextBlock Classes="h1" Text="Mail" />
-            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
-              <StackPanel Spacing="8">
-                <TextBlock Classes="h3" Text="Checking for new messages" />
-                <ComboBox x:Name="RefreshChoice" ItemsSource="{Binding RefreshOptions}" SelectedItem="{Binding SelectedRefresh}" MinWidth="320" />
-                <TextBlock Classes="caption" TextWrapping="Wrap"
-                           Text="Manually (the default): HCG Mail checks for new mail only when you click Refresh (F5), open a folder or start the app, and never contacts the server in the background. Automatic: the open folder is also checked at the chosen interval while HCG Mail is running." />
-              </StackPanel>
-            </Border>
+            <TextBlock Classes="h1" Text="Reading" />
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
               <StackPanel Spacing="10">
                 <TextBlock Classes="h3" Text="Message display" />
                 <ComboBox x:Name="ViewModeChoice" ItemsSource="{Binding ViewModeOptions}" SelectedItem="{Binding SelectedViewMode}" MinWidth="320" />
                 <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding SelectedViewMode.Description}" />
                 <TextBlock Classes="caption" TextWrapping="Wrap" Text="You can switch any message between Original, Readable and Plain text above its text. Colours are never inverted." />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Read status" />
+                <ToggleSwitch IsChecked="{Binding MarkAsReadWhenOpened}" OnContent="Mark messages as read when opened" OffContent="Mark messages as read when opened" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Composing">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <TextBlock Classes="h1" Text="Composing" />
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Sent messages" />
+                <ToggleSwitch IsChecked="{Binding SaveCopyToSentFolder}" OnContent="Save a copy of sent messages in the Sent folder" OffContent="Save a copy of sent messages in the Sent folder" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="HCG Mail checks first whether the server already saved the message, so no duplicates are created." />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="h3" Text="Drafts" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="While you write, unsaved changes are saved to your Drafts folder on the server every minute (when the account is connected). Closing a message or HCG Mail with unsaved changes always asks first." />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Signatures">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <TextBlock Classes="h1" Text="Signatures" />
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Each account can have its own plain-text signature. It is added below a “-- ” line to new messages, and above the quoted text in replies and forwards." />
+                <TextBlock Classes="caption" Text="No accounts yet." IsVisible="{Binding !HasAccounts}" />
+                <ComboBox x:Name="SignatureAccountChoice" ItemsSource="{Binding Accounts}" SelectedItem="{Binding SignatureAccount}" MinWidth="320" IsVisible="{Binding HasAccounts}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AccountViewModel">
+                      <TextBlock Text="{Binding AddressLine}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBox x:Name="SignatureText" Text="{Binding SignatureText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="120" MaxLength="2000"
+                         PlaceholderText="For example your name, title and phone number" IsVisible="{Binding HasAccounts}" />
+                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding HasAccounts}">
+                  <Button x:Name="SaveSignatureButton" Classes="primary" Content="Save signature" Command="{Binding SaveSignatureCommand}" />
+                  <TextBlock Classes="caption" VerticalAlignment="Center" Text="{Binding SignatureStatus}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Privacy &amp; security">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <TextBlock Classes="h1" Text="Privacy &amp; security" />
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="h3" Text="Remote content" />
                 <ToggleSwitch x:Name="RemoteImagesToggle" IsChecked="{Binding LoadRemoteImagesAutomatically}" OnContent="Load remote images automatically" OffContent="Load remote images automatically" />
                 <TextBlock Classes="caption" TextWrapping="Wrap"
                            Text="Off (recommended): remote images are blocked until you choose Load remote images in a message. Loading them contacts the sender's servers, which learn that and when you opened the message and see your IP address. Images included in the message itself are always shown. Remote fonts, stylesheets and backgrounds are never loaded." />
@@ -169,21 +250,39 @@
             </Border>
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
               <StackPanel Spacing="10">
-                <TextBlock Classes="h3" Text="Reading and sending" />
-                <ToggleSwitch IsChecked="{Binding MarkAsReadWhenOpened}" OnContent="Mark messages as read when opened" OffContent="Mark messages as read when opened" />
-                <ToggleSwitch IsChecked="{Binding SaveCopyToSentFolder}" OnContent="Save a copy of sent messages in the Sent folder" OffContent="Save a copy of sent messages in the Sent folder" />
-                <TextBlock Classes="caption" TextWrapping="Wrap" Text="HCG Mail checks first whether the server already saved the message, so no duplicates are created." />
+                <TextBlock Classes="h3" Text="Links" />
+                <ToggleSwitch IsChecked="{Binding ConfirmBeforeOpeningLinks}" OnContent="Show the real destination and ask before opening links" OffContent="Show the real destination and ask before opening links" />
+              </StackPanel>
+            </Border>
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="6">
+                <TextBlock Classes="h3" Text="Passwords and your mail" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding CredentialStorage, StringFormat='Passwords are stored in {0}, never in a file.'}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Connections are always encrypted and the server's certificate is always checked. Messages run no scripts, forms or active content. HCG Mail has no telemetry and never sends your messages to HCG, AI services or anyone other than your own mail servers." />
               </StackPanel>
             </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
 
-      <!-- Downloads & startup -->
-      <TabItem Header="Downloads &amp; startup">
+      <TabItem Header="Mail Health">
         <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
           <StackPanel Classes="page">
-            <TextBlock Classes="h1" Text="Downloads &amp; startup" />
+            <TextBlock Classes="h1" Text="Mail Health" />
+            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
+              <StackPanel Spacing="10">
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Mail Health shows, for the selected account, whether sign-in, encryption, folders, synchronization and sending actually work, and checks your domain's sending setup (SPF, DKIM, DMARC). Nothing is changed and no email is sent." />
+                <Button x:Name="OpenMailHealthButton" Classes="subtle" Content="Open Mail Health" Command="{Binding OpenMailHealthCommand}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Storage">
+        <ScrollViewer Background="{DynamicResource Hcg.Bg.Reader}">
+          <StackPanel Classes="page">
+            <TextBlock Classes="h1" Text="Storage" />
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
               <StackPanel Spacing="10">
                 <TextBlock Classes="h3" Text="Attachment download location" />
@@ -197,15 +296,10 @@
               </StackPanel>
             </Border>
             <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
-              <StackPanel Spacing="10">
-                <TextBlock Classes="h3" Text="Startup" />
-                <ToggleSwitch IsChecked="{Binding ConnectOnStartup}" OnContent="Connect to my accounts when HCG Mail starts" OffContent="Connect to my accounts when HCG Mail starts" />
-              </StackPanel>
-            </Border>
-            <Border Classes="card option" BoxShadow="{DynamicResource Hcg.Shadow.None}">
-              <StackPanel Spacing="10">
-                <TextBlock Classes="h3" Text="Links" />
-                <ToggleSwitch IsChecked="{Binding ConfirmBeforeOpeningLinks}" OnContent="Show the real destination and ask before opening links" OffContent="Show the real destination and ask before opening links" />
+              <StackPanel Spacing="6">
+                <TextBlock Classes="h3" Text="On this device" />
+                <TextBlock Classes="caption" TextWrapping="Wrap" Text="Messages stay on your mail server; HCG Mail does not store copies of them. This folder holds only settings, the account list (without passwords), the send history and a log that is kept for 7 days:" />
+                <SelectableTextBlock Text="{Binding DataDirectory}" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
           </StackPanel>

@@ -80,7 +80,8 @@ public sealed partial class ComposeViewModel : ObservableObject
         _bcc = RecipientParser.Format(initial.Bcc);
         _showCcBcc = initial.Cc.Count > 0 || initial.Bcc.Count > 0;
         _subject = initial.Subject;
-        _body = initial.TextBody;
+        _signature = settings.Current.SignatureFor(from.Account.Id);
+        _body = SignatureBlock.Insert(initial.TextBody, _signature, initial.Kind);
         _selectedPriority = PriorityOptions.First(o => o.Value == initial.Priority);
         foreach (var attachment in initial.Attachments)
             Attachments.Add(new ComposeAttachmentViewModel(attachment));
@@ -88,6 +89,16 @@ public sealed partial class ComposeViewModel : ObservableObject
         // "Unchanged" means as opened: closing a new message, reply or forward that the user has not edited does not
         // ask about saving a draft (it used to, because new messages started with an empty baseline).
         _savedSnapshot = Snapshot();
+    }
+
+    private string? _signature;
+
+    partial void OnSelectedFromChanged(AccountViewModel value)
+    {
+        // Another sending account: its signature replaces the previous one, unless the user changed that text.
+        var next = _settings.Current.SignatureFor(value.Account.Id);
+        Body = SignatureBlock.Replace(Body, _signature, next);
+        _signature = next;
     }
 
     public static IReadOnlyList<PriorityOption> PriorityOptions { get; } =

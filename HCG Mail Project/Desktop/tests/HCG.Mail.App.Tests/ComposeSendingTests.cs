@@ -120,4 +120,19 @@ public class ComposeSendingTests
         Assert.False(await compose.AutosaveAsync()); // would drop the invalid address: wait for the user
         await session.Received(1).SaveDraftAsync(Arg.Any<OutgoingMessage>(), Arg.Any<CancellationToken>());
     }
+
+    [AvaloniaFact]
+    public async Task A_new_message_starts_with_the_accounts_signature_and_is_not_treated_as_edited()
+    {
+        var (ui, _, _, dialogs) = await CreateAsync();
+        await using var _ = ui;
+        var settings = ui.Services.GetRequiredService<AppSettingsService>();
+        var account = ui.ViewModel.Accounts[0];
+        settings.Update(s => s.WithSignature(account.Account.Id, "Ola Nordmann"));
+
+        var compose = new ComposeViewModel(ui.ViewModel.Accounts, account, new OutgoingMessage(), settings, dialogs, Substitute.For<INotificationService>());
+
+        Assert.EndsWith("-- \nOla Nordmann", compose.Body);
+        Assert.False(compose.IsDirty); // closing an untouched new message does not ask to save a draft
+    }
 }

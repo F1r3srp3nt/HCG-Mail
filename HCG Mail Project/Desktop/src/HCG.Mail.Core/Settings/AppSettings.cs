@@ -50,6 +50,17 @@ public sealed record AppSettings
     /// </summary>
     public IReadOnlyList<string> PendingCredentialDeletions { get; init; } = [];
 
+    /// <summary>Per-account plain-text signatures, inserted into new messages, replies and forwards from that account.</summary>
+    public IReadOnlyList<AccountSignature> Signatures { get; init; } = [];
+
+    public string? SignatureFor(string accountId) => Signatures.FirstOrDefault(s => s.AccountId == accountId)?.Text;
+
+    public AppSettings WithSignature(string accountId, string? text) => this with
+    {
+        Signatures = [.. Signatures.Where(s => s.AccountId != accountId),
+            .. string.IsNullOrWhiteSpace(text) ? Array.Empty<AccountSignature>() : [new AccountSignature(accountId, text.Replace("\r\n", "\n").TrimEnd())]],
+    };
+
     // Returns the same instance when nothing changes, so value equality of AppSettings (used to skip
     // needless saves) is not broken by a fresh list allocation.
     private static IReadOnlyList<string> NormalizeKeys(IReadOnlyList<string>? keys)
@@ -70,6 +81,8 @@ public sealed record AppSettings
         PendingCredentialDeletions = NormalizeKeys(PendingCredentialDeletions),
     };
 }
+
+public sealed record AccountSignature(string AccountId, string Text);
 
 public interface IAppSettingsStore
 {
