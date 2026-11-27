@@ -6,18 +6,18 @@ name: iOS
 on:
   pull_request:
     paths:
-      - 'iOS App Store Submission/**'
-      - 'iOS Executable/**'
-      - 'Windows-executable-Application/src/**'
-      - 'Windows-executable-Application/tests/**'
-      - 'Windows-executable-Application/Directory.*'
+      - 'HCG Mail Project/iOS/**'
+      - 'HCG Mail Project/docs/packaging/ios-*'
+      - 'HCG Mail Project/Desktop/src/**'
+      - 'HCG Mail Project/Desktop/tests/**'
+      - 'HCG Mail Project/Desktop/Directory.*'
       - 'hcg-apps.json'
       - '.github/workflows/ios.yml'
   push:
     branches: [main]
     paths:
-      - 'iOS App Store Submission/**'
-      - 'Windows-executable-Application/src/**'
+      - 'HCG Mail Project/iOS/**'
+      - 'HCG Mail Project/Desktop/src/**'
       - '.github/workflows/ios.yml'
   workflow_dispatch:
 
@@ -43,24 +43,24 @@ jobs:
         with:
           dotnet-version: '10.0.1xx'
       - name: Exactly one iOS application in the repository (hcg-apps.json and a project scan agree)
-        run: python3 -I "iOS App Store Submission/scripts/verify-app-selection.py"
+        run: python3 -I "HCG Mail Project/iOS/scripts/verify-app-selection.py"
       - name: App Store Connect text (Apple's limits, no placeholders, nothing this build does not offer)
-        run: python3 -I "iOS App Store Submission/scripts/check-store-metadata.py"
+        run: python3 -I "HCG Mail Project/iOS/scripts/check-store-metadata.py"
       - name: Build diagnostics (HCG001 for a lone iOS folder, HCG002 for the iOS app on Linux)
         run: |
           set +e
-          dotnet build "iOS App Store Submission/src/HCG.Mail.iOS/HCG.Mail.iOS.csproj" > "$RUNNER_TEMP/ios-on-linux.log" 2>&1
+          dotnet build "HCG Mail Project/iOS/src/HCG.Mail.iOS/HCG.Mail.iOS.csproj" > "$RUNNER_TEMP/ios-on-linux.log" 2>&1
           grep -q "error HCG002" "$RUNNER_TEMP/ios-on-linux.log" || { cat "$RUNNER_TEMP/ios-on-linux.log"; exit 1; }
-          lone="$RUNNER_TEMP/lone"; mkdir -p "$lone"; cp -r "iOS App Store Submission" "$lone/"
-          dotnet build "$lone/iOS App Store Submission/src/HCG.Mail.Mobile/HCG.Mail.Mobile.csproj" > "$RUNNER_TEMP/lone.log" 2>&1
+          lone="$RUNNER_TEMP/lone"; mkdir -p "$lone"; cp -r "HCG Mail Project/iOS" "$lone/"
+          dotnet build "$lone/iOS/src/HCG.Mail.Mobile/HCG.Mail.Mobile.csproj" > "$RUNNER_TEMP/lone.log" 2>&1
           grep -q "error HCG001" "$RUNNER_TEMP/lone.log" || { cat "$RUNNER_TEMP/lone.log"; exit 1; }
-          dotnet build "$lone/iOS App Store Submission/src/HCG.Mail.Mobile/HCG.Mail.Mobile.csproj" -p:HcgSharedRoot="$PWD/Windows-executable-Application" || exit 1
+          dotnet build "$lone/iOS/src/HCG.Mail.Mobile/HCG.Mail.Mobile.csproj" -p:HcgSharedRoot="$PWD/HCG Mail Project/Desktop" || exit 1
           echo "HCG001/HCG002 reported as expected; HcgSharedRoot override builds."
       - name: Desktop and shared tests (the iOS app reuses this code)
-        working-directory: Windows-executable-Application
+        working-directory: HCG Mail Project/Desktop
         run: dotnet test HCG.Mail.sln -c Release
       - name: Mobile UI tests (iPhone and iPad layouts, flows, rendering — headless)
-        working-directory: iOS App Store Submission
+        working-directory: HCG Mail Project/iOS
         env:
           HCG_MAIL_SCREENSHOT_DIR: ${{ github.workspace }}/artifacts/headless-screenshots
         run: dotnet test tests/HCG.Mail.Mobile.Tests -c Release
@@ -84,7 +84,7 @@ jobs:
       run:
         # bash -eo pipefail: a failing script must fail the step even when piped into tee.
         shell: bash
-        working-directory: iOS App Store Submission
+        working-directory: HCG Mail Project/iOS
     steps:
       - uses: actions/checkout@v4
       - name: Select the Xcode version pinned in toolchain.props
@@ -113,7 +113,7 @@ jobs:
         timeout-minutes: 20
         run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail" -sdk iphonesimulator -configuration Debug build
       - name: Check the simulator app (bundle ID, versions, icon, launch screen, privacy manifest)
-        run: python3 -I scripts/verify-ios-build.py app ../artifacts/ios/simulator/Debug/HCGMail.iOS.app --kind simulator
+        run: python3 -I scripts/verify-ios-build.py app ../../artifacts/ios/simulator/Debug/HCGMail.iOS.app --kind simulator
       - name: Xcode scheme "HCG Mail Simulator" builds, installs and starts the app
         timeout-minutes: 35
         run: |
@@ -122,7 +122,7 @@ jobs:
           echo "xcodebuild returned after $((SECONDS - start)) s"
           # The scheme returns after the build and starts the app in the background; wait for its verdict. A cold
           # simulator boot on a hosted runner has taken up to ~20 minutes, so the limit is wall-clock time.
-          log=../artifacts/ios/simulator/launch.log
+          log=../../artifacts/ios/simulator/launch.log
           while (( SECONDS - start < 1800 )); do grep -q 'HCG-LAUNCH:' "$log" 2>/dev/null && break; sleep 5; done
           echo "launch finished after $((SECONDS - start)) s:"
           cat "$log"
@@ -134,7 +134,7 @@ jobs:
         env:
           HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
         run: |
-          mkdir -p ../artifacts/ios-screenshots
+          mkdir -p ../../artifacts/ios-screenshots
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" scripts/run-simulator.sh --exclusive --self-test
       # Preview mode: sample mailbox, no network. Each device is its own step, and run-simulator.sh limits and logs
       # every stage (boot, install, launch, ready, screenshot), so a stall names its stage well before the step limit.
@@ -149,14 +149,14 @@ jobs:
           # competes with the capture on a loaded runner.
           osascript -e 'quit app "Simulator"' 2>/dev/null || killall Simulator 2>/dev/null || true
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" \
-            scripts/run-simulator.sh --exclusive --preview --screen inbox --screenshot ../artifacts/ios-screenshots/iphone.png
+            scripts/run-simulator.sh --exclusive --preview --screen inbox --screenshot ../../artifacts/ios-screenshots/iphone.png
       - name: Screenshot in preview mode on iPad (the app reports the inbox is open)
         timeout-minutes: 40
         env:
           HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
         run: |
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" \
-            scripts/run-simulator.sh --ipad --exclusive --preview --screen inbox --screenshot ../artifacts/ios-screenshots/ipad.png
+            scripts/run-simulator.sh --ipad --exclusive --preview --screen inbox --screenshot ../../artifacts/ios-screenshots/ipad.png
       - name: The builds left the checkout clean
         run: test -z "$(git status --porcelain)" || { git status --porcelain; exit 1; }
       - name: Shut down the simulators (leave nothing running for the runner's clean-up)
@@ -186,7 +186,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: iOS App Store Submission
+        working-directory: HCG Mail Project/iOS
     steps:
       - uses: actions/checkout@v4
       - name: Select the Xcode version pinned in toolchain.props
@@ -234,7 +234,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: iOS App Store Submission
+        working-directory: HCG Mail Project/iOS
     steps:
       - uses: actions/checkout@v4
       - name: Select the Xcode version pinned in toolchain.props
@@ -257,12 +257,12 @@ jobs:
         run: xcodebuild -project HCGMail.xcodeproj -scheme "HCG Mail" -sdk iphoneos -configuration Release build
       - name: Check the Release device app (bundle ID, versions, SDK, icon, launch screen, privacy manifest)
         run: |
-          mkdir -p ../artifacts/ios-release-check
-          app=../artifacts/ios/device/Release/HCGMail.iOS.app
-          python3 -I scripts/verify-ios-build.py app "$app" --kind device | tee ../artifacts/ios-release-check/verification.txt
-          plutil -convert xml1 -o ../artifacts/ios-release-check/Info.plist "$app/Info.plist"
-          cp "$app/PrivacyInfo.xcprivacy" ../artifacts/ios-release-check/
-          xcrun --sdk iphoneos assetutil --info "$app/Assets.car" > ../artifacts/ios-release-check/assets.json
+          mkdir -p ../../artifacts/ios-release-check
+          app=../../artifacts/ios/device/Release/HCGMail.iOS.app
+          python3 -I scripts/verify-ios-build.py app "$app" --kind device | tee ../../artifacts/ios-release-check/verification.txt
+          plutil -convert xml1 -o ../../artifacts/ios-release-check/Info.plist "$app/Info.plist"
+          cp "$app/PrivacyInfo.xcprivacy" ../../artifacts/ios-release-check/
+          xcrun --sdk iphoneos assetutil --info "$app/Assets.car" > ../../artifacts/ios-release-check/assets.json
       - name: Product › Archive from the scheme stops and points to scripts/export-ipa.sh
         run: |
           set +e
@@ -295,7 +295,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: iOS App Store Submission
+        working-directory: HCG Mail Project/iOS
     steps:
       - uses: actions/checkout@v4
       - name: Select the Xcode version pinned in toolchain.props
@@ -316,7 +316,7 @@ jobs:
           HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
         run: |
           export HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")"
-          out=../artifacts/app-store-screenshots; mkdir -p "$out"
+          out=../../artifacts/app-store-screenshots; mkdir -p "$out"
           # The 6.9" iPhone changes name with each simulator generation (iOS 27.2 has the iPhone 18 Pro Max); the size
           # check below still decides whether App Store Connect accepts the screenshots.
           iphone="$(xcrun simctl list devices available -j | python3 -I -c 'import json, re, sys

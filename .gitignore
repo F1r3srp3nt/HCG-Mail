@@ -42,3 +42,12 @@ __pycache__/
 
 # HCG Mail Unleashed CI output (.github/workflows/unleashed.yml)
 unleashed-out/
+
+# HCG Mail Distribution/: local drop folders for executables. Only the README.md files are tracked; every file or folder
+# copied into an OS/architecture folder (installers, ZIPs, .app bundles, portable folders) stays out of Git.
+/HCG Mail Distribution/**
+!/HCG Mail Distribution/README.md
+!/HCG Mail Distribution/*/
+!/HCG Mail Distribution/*/README.md
+!/HCG Mail Distribution/*/*/
+!/HCG Mail Distribution/*/*/README.md

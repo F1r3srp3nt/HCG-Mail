@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: Windows-executable-Application
+        working-directory: HCG Mail Project/Desktop
     steps:
       - uses: actions/checkout@v5
 
