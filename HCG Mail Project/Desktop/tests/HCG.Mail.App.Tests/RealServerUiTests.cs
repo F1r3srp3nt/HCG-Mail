@@ -56,7 +56,15 @@ public class RealServerUiTests
     }
 
     /// <summary>Runs an async test body on the headless UI thread, pumping the dispatcher until it completes.</summary>
-    private static Task OnUiThread(Func<Task> test) =>
+    /// <remarks>
+    /// The session completes the dispatched task on its own thread and runs continuations inline, so returning that
+    /// task to xUnit would let xUnit start the next test on the session thread; an [AvaloniaFact] there blocks that
+    /// thread waiting for itself and the run hangs. The result is relayed through a TaskCompletionSource that runs its
+    /// continuations on the thread pool, so the session thread always returns to its queue first.
+    /// </remarks>
+    private static Task OnUiThread(Func<Task> test)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         HeadlessUnitTestSession.GetOrStartForAssembly(Assembly.GetExecutingAssembly()).Dispatch(() =>
         {
             var task = test();
@@ -70,7 +78,17 @@ public class RealServerUiTests
                 Thread.Sleep(5);
             }
             task.GetAwaiter().GetResult();
-        }, CancellationToken.None);
+        }, CancellationToken.None).ContinueWith(dispatched =>
+        {
+            if (dispatched.IsFaulted)
+                completion.SetException(dispatched.Exception!.InnerExceptions);
+            else if (dispatched.IsCanceled)
+                completion.SetCanceled();
+            else
+                completion.SetResult();
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return completion.Task;
+    }
 
     private static async Task<string> AppendHtmlMessageAsync()
     {

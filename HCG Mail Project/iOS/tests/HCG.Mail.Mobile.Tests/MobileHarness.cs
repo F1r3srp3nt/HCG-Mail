@@ -81,7 +81,17 @@ public sealed class MobileHarness : IAsyncDisposable
     /// Runs an async test body on the headless UI thread for tests that cannot use [AvaloniaFact] (which is sealed,
     /// so it cannot carry the opt-in condition of the end-to-end tests).
     /// </summary>
-    public static Task OnUiThread(Func<Task> test, int timeoutMinutes = 4) =>
+    /// <remarks>
+    /// The task <see cref="HeadlessUnitTestSession.Dispatch(Action, CancellationToken)"/> returns is completed on the
+    /// session's own thread by a TaskCompletionSource that runs continuations inline. Returned to xUnit as it is,
+    /// xUnit's continuation (finish this test, start the next) would run on the session thread; when the next test is
+    /// an [AvaloniaFact], its <c>AvaloniaTestCase.Run</c> blocks that thread waiting for work queued to that same
+    /// thread, and the run hangs forever. The result is therefore relayed through a TaskCompletionSource that runs its
+    /// continuations on the thread pool, so the session thread always returns to its queue first.
+    /// </remarks>
+    public static Task OnUiThread(Func<Task> test, int timeoutMinutes = 4)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         HeadlessUnitTestSession.GetOrStartForAssembly(typeof(MobileHarness).Assembly).Dispatch(() =>
         {
             var task = test();
@@ -95,7 +105,17 @@ public sealed class MobileHarness : IAsyncDisposable
                 Thread.Sleep(5);
             }
             task.GetAwaiter().GetResult();
-        }, CancellationToken.None);
+        }, CancellationToken.None).ContinueWith(dispatched =>
+        {
+            if (dispatched.IsFaulted)
+                completion.SetException(dispatched.Exception!.InnerExceptions);
+            else if (dispatched.IsCanceled)
+                completion.SetCanceled();
+            else
+                completion.SetResult();
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        return completion.Task;
+    }
 
     /// <summary>Waits until a condition holds (async loads, debounced selection) or fails after a timeout.</summary>
     public static async Task WaitUntil(Func<bool> condition, string what, int timeoutMs = 5000, Func<string>? detail = null)
