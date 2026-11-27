@@ -21,7 +21,7 @@ public class OnboardingTests
     public void A_gmail_address_suggests_googles_servers_and_explains_app_passwords()
     {
         var setup = Setup();
-        setup.EmailAddress = "kari.nordmann@gmail.com";
+        setup.EmailAddress = "someone@gmail.com";
 
         Assert.Equal(ProviderPresets.Gmail, setup.SelectedPreset);
         Assert.Equal("imap.gmail.com", setup.ImapHost);
@@ -38,7 +38,7 @@ public class OnboardingTests
     {
         var setup = Setup();
         setup.ImapHost = "mail.mycompany.no";
-        setup.EmailAddress = "kari@gmail.com";
+        setup.EmailAddress = "someone@gmail.com";
         Assert.Equal("mail.mycompany.no", setup.ImapHost);
         Assert.NotEqual(ProviderPresets.Gmail, setup.SelectedPreset);
     }
@@ -56,9 +56,9 @@ public class OnboardingTests
     }
 
     [Theory]
-    [InlineData("ola@outlook.com", "Microsoft sign-in")]
-    [InlineData("ola@hotmail.no", "Microsoft sign-in")]
-    [InlineData("ola@proton.me", "Proton Mail Bridge")]
+    [InlineData("someone@outlook.com", "Microsoft sign-in")]
+    [InlineData("someone@hotmail.no", "Microsoft sign-in")]
+    [InlineData("someone@proton.me", "Proton Mail Bridge")]
     public void Addresses_that_cannot_use_a_password_here_say_why(string address, string expected)
     {
         var setup = Setup();
@@ -102,14 +102,16 @@ public class OnboardingTests
     {
         await using var ui = await UiHarness.StartAsync();
         var setup = Setup();
-        setup.EmailAddress = "kari.nordmann@gmail.com";
-        setup.DisplayName = "Kari Nordmann";
+        // Public screenshot: no real-looking address (any @gmail.com address may belong to someone). The preset is chosen
+        // from the list instead.
+        setup.SelectedPreset = ProviderPresets.Gmail;
+        setup.DisplayName = "Your name";
         setup.Description = "Personal";
         var window = new AccountSetupWindow { DataContext = setup, Width = 1100, Height = 900 };
         window.Show();
         await UiHarness.Settle(200);
         UiHarness.Capture(window, "onboarding-gmail");
-        setup.EmailAddress = "kari@outlook.com";
+        setup.EmailAddress = "someone@outlook.com";
         await UiHarness.Settle(100);
         UiHarness.Capture(window, "onboarding-outlook-notice");
         window.Close();
