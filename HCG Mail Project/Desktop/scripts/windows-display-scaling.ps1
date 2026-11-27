@@ -19,10 +19,8 @@ param(
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force $Out | Out-Null
 
-Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @'
+Add-Type -TypeDefinition @'
 using System;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 
 public static class HcgDisplay
@@ -123,27 +121,28 @@ public static class HcgDisplay
 
     // The app's window
     [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
-    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT r);
-    [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT r);
+    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
-    /// <summary>Captures the window (PW_RENDERFULLCONTENT); returns "WxH" and whether it has rendered content.</summary>
-    public static string Capture(IntPtr hwnd, string path, out bool content)
-    {
-        RECT r; GetWindowRect(hwnd, out r);
-        int w = r.Right - r.Left, h = r.Bottom - r.Top; content = false;
-        if (w <= 0 || h <= 0) return "0x0";
-        using (var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb))
-        {
-            using (var g = Graphics.FromImage(bmp)) { var hdc = g.GetHdc(); PrintWindow(hwnd, hdc, 2); g.ReleaseHdc(hdc); }
-            bmp.Save(path, ImageFormat.Png);
-            var seen = new System.Collections.Generic.HashSet<int>();
-            for (int y = 0; y < h; y += Math.Max(1, h / 40)) for (int x = 0; x < w; x += Math.Max(1, w / 40)) seen.Add(bmp.GetPixel(x, y).ToArgb());
-            content = seen.Count > 20;
-        }
-        return w + "x" + h;
-    }
 }
 '@
+
+# The app's own window, rendered by Windows even when something else covers the screen (PW_RENDERFULLCONTENT), as in
+# windows-runtime-check.ps1. Returns "WxH" and whether the window has rendered content (not one flat colour).
+Add-Type -AssemblyName System.Drawing
+function WindowShot([System.IntPtr] $hwnd, [string] $path) {
+  $r = New-Object HcgDisplay+RECT
+  if (-not [HcgDisplay]::GetWindowRect($hwnd, [ref]$r)) { return @{ size = '0x0'; content = $false } }
+  $w = $r.Right - $r.Left; $h = $r.Bottom - $r.Top
+  if ($w -le 0 -or $h -le 0) { return @{ size = '0x0'; content = $false } }
+  $bmp = New-Object System.Drawing.Bitmap $w, $h
+  $g = [System.Drawing.Graphics]::FromImage($bmp); $hdc = $g.GetHdc()
+  $ok = [HcgDisplay]::PrintWindow($hwnd, $hdc, 2)
+  $g.ReleaseHdc($hdc); $g.Dispose()
+  $colors = @{}; for ($x = 0; $x -lt $w; $x += [Math]::Max(1, [int]($w / 40))) { for ($y = 0; $y -lt $h; $y += [Math]::Max(1, [int]($h / 40))) { $colors[$bmp.GetPixel($x, $y).ToArgb()] = 1 } }
+  $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+  return @{ size = "${w}x${h}"; content = ($ok -and $colors.Count -ge 8) }
+}
 
 $results = @()
 $originalRes = [HcgDisplay]::Resolution()
@@ -174,9 +173,8 @@ foreach ($scale in 100, 125, 150, 175, 200) {
     $entry.windowDpi = [int][HcgDisplay]::GetDpiForWindow($p.MainWindowHandle)
     $entry.windowScale = [math]::Round($entry.windowDpi / 96 * 100)
     $shot = Join-Path $Out "window-$scale.png"
-    $rendered = $false
-    $entry.window = [HcgDisplay]::Capture($p.MainWindowHandle, $shot, [ref] $rendered)
-    $entry.rendered = $rendered; $entry.screenshot = (Split-Path $shot -Leaf)
+    $cap = WindowShot $p.MainWindowHandle $shot
+    $entry.window = $cap.size; $entry.rendered = $cap.content; $entry.screenshot = (Split-Path $shot -Leaf)
     $null = $p.CloseMainWindow()
     $entry.closed = $p.WaitForExit(20000)
   }

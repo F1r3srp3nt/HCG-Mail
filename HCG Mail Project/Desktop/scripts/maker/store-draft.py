@@ -73,7 +73,7 @@ for path in glob.glob(os.path.join(a.display, "*", "display-scaling.json")) if a
     display[os.path.basename(os.path.dirname(path))] = d
 def display_text():
     if not display:
-        return "Display scaling: not run."
+        return "Display scaling: FAILED (no result)." if display_missing else "Display scaling: not run."
     parts = []
     for theme, d in sorted(display.items()):
         name = {"HcgFuture": "HCG Dark", "HcgClassic": "HCG Light"}.get(theme, theme)
@@ -86,14 +86,17 @@ def display_text():
                 cells.append(f"{sc['scale']} % {'passed' if ok else 'FAILED'}")
         parts.append(f"{name}: " + ", ".join(cells))
     return "Display scaling on " + next(iter(display.values()))["windows"] + " — " + "; ".join(parts) + "."
+# A check the workflow asked for (its folder was passed) but that left no result is a failure, not "not run".
+display_missing = bool(a.display) and not display
 display_ok = bool(display) and all(sc["rendered"] and sc["closed"] and sc["windowScale"] == sc["scale"]
                                    for d in display.values() for sc in d["scales"] if sc["available"])
 
 upgrade = json.load(open(os.path.join(a.upgrade, "upgrade.json"), encoding="utf-8-sig")) if a.upgrade and os.path.exists(os.path.join(a.upgrade, "upgrade.json")) else None
-upgrade_state = "not-run" if not upgrade else ("passed" if upgrade["failures"] == 0 else "failed")
+upgrade_state = ("failed" if a.upgrade else "not-run") if not upgrade else ("passed" if upgrade["failures"] == 0 else "failed")
 def upgrade_text():
     if not upgrade:
-        return "Upgrade from the published earlier version: not run."
+        return ("Upgrade from the published earlier version: FAILED (no result)." if a.upgrade else
+                "Upgrade from the published earlier version: not run.")
     return (f"Upgrade {upgrade['from']} → {upgrade['to']} on {upgrade['windows']} with existing user data and a saved password: {upgrade_state}, "
             f"{sum(c['passed'] for c in upgrade['checks'])}/{len(upgrade['checks'])} checks (registration, program version, data and password kept, "
             "starts with the account, uninstall keeps user data).")
@@ -102,10 +105,10 @@ e2e = {"total": 0, "passed": 0, "failed": 0}
 for trx in glob.glob(os.path.join(a.e2e, "**", "*.trx"), recursive=True) if a.e2e else []:
     c = ET.parse(trx).getroot().find(".//t:Counters", ns)
     e2e["total"] += int(c.get("total")); e2e["passed"] += int(c.get("passed")); e2e["failed"] += int(c.get("failed"))
-e2e_state = "not-run" if e2e["total"] == 0 else ("passed" if e2e["failed"] == 0 and e2e["passed"] > 0 else "failed")
+e2e_state = ("failed" if a.e2e else "not-run") if e2e["total"] == 0 else ("passed" if e2e["failed"] == 0 and e2e["passed"] > 0 else "failed")
 def e2e_text():
     return ("IMAP/SMTP end to end against a local Dovecot/Postfix server with TLS and CRL validation (the app's mail engine, Linux runner): "
-            + ("not run." if e2e_state == "not-run" else f"{e2e_state}, {e2e['passed']} passed, {e2e['failed']} failed of {e2e['total']}."))
+            + ("not run." if e2e_state == "not-run" else "FAILED (no result)." if e2e["total"] == 0 else f"{e2e_state}, {e2e['passed']} passed, {e2e['failed']} failed of {e2e['total']}."))
 
 def mailbox_text(arch):
     m = mailbox[arch]
@@ -183,7 +186,7 @@ for f in ev["files"]:
             "device_installation": {"state": ("failed" if kind == "installer" and arch == "x64" and upgrade_state == "failed" else install_state),
                                     "detail": ("GitHub-hosted Windows runner, silent per-user install and uninstall (HCG Executable Maker Test-Installer.ps1)"
                                                + ("; " + upgrade_text() if arch == "x64" else "")) [:1000] if kind == "installer" else "portable: no installation"},
-            "application_launch": {"state": launch_state if display_ok or not display else "failed",
+            "application_launch": {"state": launch_state if display_ok or not a.display else "failed",
                                    "detail": ("main window shown and rendered on start and restart, on a GitHub-hosted Windows runner. " + display_text())[:1000]},
             "runtime_verification": {"state": runtime_state, "detail": ("Credential Manager round trip and TLS certificate validation: "
                                      + ("passed" if all_passed(tls) and all_passed(cred) else "not passed") + ". " + mailbox_text(arch) + " " + e2e_text())[:1000]},
@@ -247,4 +250,4 @@ with open(os.path.join(a.out, "SUMMARY.md"), "w") as s:
     for f, arch, kind, i, l, r, mb, uns in summary_rows:
         s.write(f"| `{f['fileName']}` | {f['sizeBytes']:,} | `{f['sha256']}` | {'no' if uns else 'yes'} | {i} | {l} | {r} | {mb} |\n")
 print(open(os.path.join(a.out, "SUMMARY.md")).read())
-sys.exit(0 if tests["failed"] == 0 and (display_ok or not display) and upgrade_state != "failed" and e2e_state != "failed" else 1)
+sys.exit(0 if tests["failed"] == 0 and (display_ok or not a.display) and upgrade_state != "failed" and e2e_state != "failed" else 1)

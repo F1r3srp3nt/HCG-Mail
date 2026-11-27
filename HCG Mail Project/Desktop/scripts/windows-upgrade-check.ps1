@@ -29,10 +29,8 @@ function Check([bool] $ok, [string] $what) {
   Write-Host ("{0}  {1}" -f ($(if ($ok) { 'PASS' } else { 'FAIL' })), $what)
 }
 
-Add-Type -ReferencedAssemblies System.Drawing -TypeDefinition @'
+Add-Type -TypeDefinition @'
 using System;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class HcgUpgrade
@@ -60,24 +58,28 @@ public static class HcgUpgrade
     }
     public static void Delete(string target) { CredDelete(target, 1, 0); }
 
-    [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
-    [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint f);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint f);
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
-    public static bool Capture(IntPtr hwnd, string path)
-    {
-        RECT r; GetWindowRect(hwnd, out r); int w = r.Right - r.Left, h = r.Bottom - r.Top;
-        if (w <= 0 || h <= 0) return false;
-        using (var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb))
-        {
-            using (var g = Graphics.FromImage(bmp)) { var hdc = g.GetHdc(); PrintWindow(hwnd, hdc, 2); g.ReleaseHdc(hdc); }
-            bmp.Save(path, ImageFormat.Png);
-            var seen = new System.Collections.Generic.HashSet<int>();
-            for (int y = 0; y < h; y += Math.Max(1, h / 40)) for (int x = 0; x < w; x += Math.Max(1, w / 40)) seen.Add(bmp.GetPixel(x, y).ToArgb());
-            return seen.Count > 20;
-        }
-    }
 }
 '@
+
+# The app's own window, rendered by Windows even when something else covers the screen (PW_RENDERFULLCONTENT), as in
+# windows-runtime-check.ps1. Returns "WxH" and whether the window has rendered content (not one flat colour).
+Add-Type -AssemblyName System.Drawing
+function WindowShot([System.IntPtr] $hwnd, [string] $path) {
+  $r = New-Object HcgUpgrade+RECT
+  if (-not [HcgUpgrade]::GetWindowRect($hwnd, [ref]$r)) { return @{ size = '0x0'; content = $false } }
+  $w = $r.Right - $r.Left; $h = $r.Bottom - $r.Top
+  if ($w -le 0 -or $h -le 0) { return @{ size = '0x0'; content = $false } }
+  $bmp = New-Object System.Drawing.Bitmap $w, $h
+  $g = [System.Drawing.Graphics]::FromImage($bmp); $hdc = $g.GetHdc()
+  $ok = [HcgUpgrade]::PrintWindow($hwnd, $hdc, 2)
+  $g.ReleaseHdc($hdc); $g.Dispose()
+  $colors = @{}; for ($x = 0; $x -lt $w; $x += [Math]::Max(1, [int]($w / 40))) { for ($y = 0; $y -lt $h; $y += [Math]::Max(1, [int]($h / 40))) { $colors[$bmp.GetPixel($x, $y).ToArgb()] = 1 } }
+  $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
+  return @{ size = "${w}x${h}"; content = ($ok -and $colors.Count -ge 8) }
+}
 
 function Registrations { @(Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue |
   Where-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName -like 'HCG Mail*' } | ForEach-Object { Get-ItemProperty $_.PSPath }) }
@@ -92,7 +94,7 @@ function RunApp([string] $exe, [string] $shot) {
   while ((Get-Date) -lt $deadline -and ($p.MainWindowHandle -eq 0)) { Start-Sleep -Milliseconds 500; $p.Refresh() }
   Start-Sleep -Seconds 8; $p.Refresh()
   $shown = $p.MainWindowHandle -ne 0
-  $rendered = $shown -and [HcgUpgrade]::Capture($p.MainWindowHandle, (Join-Path $Out $shot))
+  $rendered = $shown -and (WindowShot $p.MainWindowHandle (Join-Path $Out $shot)).content
   if ($shown) { $null = $p.CloseMainWindow() }
   $closed = $p.WaitForExit(20000)
   if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force }
