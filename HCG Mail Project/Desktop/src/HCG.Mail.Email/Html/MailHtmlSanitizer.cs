@@ -63,8 +63,10 @@ public sealed partial class MailHtmlSanitizer : Core.Services.IHtmlSanitizer
             AllowedCssProperties = new HashSet<string>(HtmlSanitizerDefaults.AllowedCssProperties, StringComparer.OrdinalIgnoreCase),
             AllowedSchemes = new HashSet<string>(["http", "https", "mailto", "cid", "data"], StringComparer.OrdinalIgnoreCase),
             UriAttributes = new HashSet<string>(["href", "src", "background", "cite", "action", "longdesc", "poster", "srcset"], StringComparer.OrdinalIgnoreCase),
-            // @import and @font-face would load remote resources; only @media is kept.
-            AllowedAtRules = new HashSet<AngleSharp.Css.Dom.CssRuleType>([AngleSharp.Css.Dom.CssRuleType.Media]),
+            // Ordinary style rules (".code { … }") must be listed explicitly, or every rule in a <style> block is dropped and
+            // stylesheet-based mail loses its layout and colours. They allow the same properties as inline styles; url()
+            // loads are still filtered. @import and @font-face would load remote resources: only @media is added.
+            AllowedAtRules = new HashSet<AngleSharp.Css.Dom.CssRuleType>([AngleSharp.Css.Dom.CssRuleType.Style, AngleSharp.Css.Dom.CssRuleType.Media]),
         })
         {
             KeepChildNodes = true,
@@ -118,6 +120,15 @@ public sealed partial class MailHtmlSanitizer : Core.Services.IHtmlSanitizer
                 e.Tag.ClassList.Add(BlockedBackgroundMarker);
         };
 
+        sanitizer.RemovingAttribute += (_, e) =>
+        {
+            if (e.Attribute.Name.Equals("background", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(e.Attribute.Value))
+            {
+                blocked++;
+                e.Tag.ClassList.Add(BlockedBackgroundMarker);
+            }
+        };
+
         sanitizer.PostProcessNode += (_, e) =>
         {
             if (e.Node is not IElement element)
@@ -146,8 +157,15 @@ public sealed partial class MailHtmlSanitizer : Core.Services.IHtmlSanitizer
             }
         };
 
+        // Codes and other content inside form controls must survive: turn the controls into inert text first.
+        using (var source = new HtmlParser().ParseDocument(html))
+        {
+            FormControls.Flatten(source);
+            html = source.DocumentElement.OuterHtml;
+        }
+
         var output = sanitizer.SanitizeDocument(html);
-        return PostProcess(output, blocked, options.Mode);
+        return PostProcess(output, blocked, options.Mode, options.ViewportWidth);
     }
 
     /// <summary>
@@ -155,7 +173,7 @@ public sealed partial class MailHtmlSanitizer : Core.Services.IHtmlSanitizer
     /// blocked images visible as labelled placeholders, keeps text readable where a blocked background image was
     /// its only backdrop, reports the email's own page colour and low-contrast risks, and builds Readable view.
     /// </summary>
-    private static SanitizedHtml PostProcess(string sanitized, int blocked, MessageViewMode mode)
+    private static SanitizedHtml PostProcess(string sanitized, int blocked, MessageViewMode mode, int viewportWidth)
     {
         var parser = new HtmlParser();
         using var document = parser.ParseDocument(sanitized);
@@ -182,8 +200,11 @@ public sealed partial class MailHtmlSanitizer : Core.Services.IHtmlSanitizer
         }
 
         var cssParser = new CssParser();
+        if (mode == MessageViewMode.Original)
+            RendererCompatibility.Apply(document, cssParser, viewportWidth);
         var canvas = mode == MessageViewMode.Original ? CanvasColorOf(body, cssParser) ?? CanvasColorOf(document.DocumentElement, cssParser) : null;
         var lowContrast = false;
+        var styleRules = mode == MessageViewMode.Original ? RendererCompatibility.BackgroundRules(document, cssParser) : [];
 
         foreach (var element in body.QuerySelectorAll("*").Prepend(body).ToList())
         {
@@ -209,8 +230,14 @@ public sealed partial class MailHtmlSanitizer : Core.Services.IHtmlSanitizer
                 continue;
             }
 
-            if (!lowContrast && HasOwnText(element) && IsLight(OwnTextColor(element, cssParser)) && !HasBackdrop(element, cssParser, canvas))
+            // Text the renderer would draw in (nearly) the colour behind it is invisible: a code in white on a backdrop
+            // the renderer cannot paint, or on no backdrop at all. Keep it legible without changing anything else.
+            if (HasOwnText(element) && !RendererCompatibility.IsLegible(element, OwnTextColor(element, cssParser), cssParser, canvas, styleRules))
+            {
                 lowContrast = true;
+                var light = IsLight(OwnTextColor(element, cssParser));
+                element.SetAttribute("style", (element.GetAttribute("style") ?? "") + (light ? $";background-color:{BlockedBackgroundStandIn}" : ";background-color:#FFFFFF"));
+            }
         }
 
         if (mode == MessageViewMode.Readable)
@@ -246,20 +273,6 @@ public sealed partial class MailHtmlSanitizer : Core.Services.IHtmlSanitizer
     }
 
     private static string? TextColorOf(IElement element, CssParser css) => OwnTextColor(element, css);
-
-    /// <summary>True when the element or an ancestor paints a background (colour, or a background image) behind its text.</summary>
-    private static bool HasBackdrop(IElement element, CssParser css, string? canvas)
-    {
-        for (var e = element; e is not null; e = e.ParentElement)
-        {
-            if (BackgroundColorOf(e, css) is not null)
-                return true;
-            var image = Declared(e, css, "background-image");
-            if (image is not null && !image.Equals("none", StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
-        return canvas is not null && !IsLight(canvas);
-    }
 
     private static string? BackgroundColorOf(IElement element, CssParser css)
     {
@@ -308,12 +321,24 @@ public sealed partial class MailHtmlSanitizer : Core.Services.IHtmlSanitizer
             case "whitesmoke": return (245, 245, 245);
             case "gainsboro": return (220, 220, 220);
             case "lightgray" or "lightgrey": return (211, 211, 211);
+            case "navy": return (0, 0, 128);
+            case "blue": return (0, 0, 255);
+            case "red": return (255, 0, 0);
+            case "green": return (0, 128, 0);
+            case "maroon": return (128, 0, 0);
+            case "purple": return (128, 0, 128);
+            case "teal": return (0, 128, 128);
+            case "orange": return (255, 165, 0);
+            case "yellow": return (255, 255, 0);
+            case "transparent": return null;
         }
         if (!color.StartsWith('#'))
             return null;
         var hex = color[1..];
-        if (hex.Length == 3)
-            hex = string.Concat(hex.Select(c => new string(c, 2)));
+        if (hex.Length is 3 or 4)
+            hex = string.Concat(hex[..3].Select(c => new string(c, 2)));
+        else if (hex.Length == 8)
+            hex = hex[..6]; // #RRGGBBAA: the renderer draws the colour, the alpha is ignored here
         if (hex.Length != 6 || !int.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var v))
             return null;
         return ((byte)(v >> 16), (byte)(v >> 8), (byte)v);

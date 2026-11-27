@@ -41,7 +41,7 @@ public sealed class MailClientFactory : IMailClientFactory
 
     public ISmtpClient CreateSmtpClient(TlsValidationRecorder recorder)
     {
-        var client = new SmtpClient();
+        var client = new Smtp.TransactionTrackingSmtpClient();
         Configure(client, recorder);
         return client;
     }

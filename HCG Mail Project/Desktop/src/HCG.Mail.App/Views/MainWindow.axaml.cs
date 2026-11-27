@@ -1,4 +1,3 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 
@@ -12,10 +11,6 @@ public partial class MainWindow : Window
         TitleBar.PointerPressed += OnTitleBarPointerPressed;
         TitleBar.DoubleTapped += (_, _) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
         KeyDown += OnKeyDown;
-
-        // Leave room for the macOS traffic-light buttons in the extended title bar.
-        if (OperatingSystem.IsMacOS())
-            TitleContent.Margin = new Thickness(84, 0, 0, 0);
     }
 
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)

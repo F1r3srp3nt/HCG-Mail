@@ -60,6 +60,12 @@ $tls = @(
     @{ Target = 'imap.gmail.com:993'; Valid = $true; What = 'IMAP over TLS, valid certificate' },
     @{ Target = 'smtp.gmail.com:465'; Valid = $true; What = 'SMTP over TLS, valid certificate' },
     @{ Target = 'outlook.office365.com:993'; Valid = $true; What = 'IMAP over TLS, valid certificate (second provider)' },
+    # The provider presets offered in account setup (implicit-TLS ports; iCloud's SMTP uses STARTTLS on 587).
+    @{ Target = 'imap.mail.me.com:993'; Valid = $true; What = 'iCloud Mail IMAP preset' },
+    @{ Target = 'imap.mail.yahoo.com:993'; Valid = $true; What = 'Yahoo Mail IMAP preset' },
+    @{ Target = 'smtp.mail.yahoo.com:465'; Valid = $true; What = 'Yahoo Mail SMTP preset' },
+    @{ Target = 'imap.fastmail.com:993'; Valid = $true; What = 'Fastmail IMAP preset' },
+    @{ Target = 'smtp.fastmail.com:465'; Valid = $true; What = 'Fastmail SMTP preset' },
     @{ Target = 'expired.badssl.com:443'; Valid = $false; What = 'expired certificate' },
     @{ Target = 'wrong.host.badssl.com:443'; Valid = $false; What = 'certificate for another host name' },
     @{ Target = 'self-signed.badssl.com:443'; Valid = $false; What = 'self-signed certificate' }
@@ -68,9 +74,17 @@ foreach ($t in $tls) {
     $code = Run @('--diagnose-tls', $t.Target)
     $host_, $port = $t.Target.Split(':')
     $file = Join-Path $data "tls-diagnosis-$host_-$port.txt"
+    # A public test host that did not answer in time says nothing about HCG Mail: try once more. The verdict stays strict:
+    # a second timeout still fails the check.
+    if ((Test-Path $file) -and ((Get-Content $file -Raw) -match 'FAILED after .* Timeout')) {
+        Write-Host "      (network timeout reaching $($t.Target); retrying once)"
+        Start-Sleep -Seconds 5
+        $code = Run @('--diagnose-tls', $t.Target)
+    }
     if (Test-Path $file) { Get-Content $file | ForEach-Object { Write-Host "      $_" } }
     if ($t.Valid) { Check ($code -eq 0) "TLS accepted: $($t.Target) ($($t.What), exit $code)" }
-    else { Check ($code -ne 0 -and (Test-Path $file)) "TLS rejected: $($t.Target) ($($t.What), exit $code)" }
+    # A refusal counts only when the certificate or TLS check refused it, not when the host could not be reached.
+    else { Check ($code -ne 0 -and (Test-Path $file) -and ((Get-Content $file -Raw) -match 'FAILED after .* (Certificate|Tls|RevocationUnavailable)')) "TLS rejected: $($t.Target) ($($t.What), exit $code)" }
 }
 
 # 3. Start-up, rendering, close, restart

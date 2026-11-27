@@ -62,7 +62,7 @@
 
       <!-- Search -->
       <TextBox Grid.Row="1" x:Name="SearchBox" Margin="14,0,14,10" Text="{Binding MessageList.SearchText}"
-               PlaceholderText="Filter loaded messages (Enter: search the whole folder)" IsEnabled="{Binding MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
+               PlaceholderText="Filter messages — Enter searches the server" ToolTip.Tip="Typing filters the messages already loaded in this list. Press Enter to search the whole folder on the server." IsEnabled="{Binding MessageList.Folder, Converter={x:Static ObjectConverters.IsNotNull}}">
         <TextBox.KeyBindings>
           <KeyBinding Gesture="Enter" Command="{Binding MessageList.SearchServerCommand}" />
         </TextBox.KeyBindings>
@@ -79,6 +79,25 @@
       </TextBox>
 
       <StackPanel Grid.Row="2" Spacing="4">
+        <!-- The server cannot be reached: what is shown, why, and what happens next (never a silent stop) -->
+        <Border x:Name="OfflineBanner" IsVisible="{Binding ShowOfflineBanner}" Margin="12,0,12,8" Padding="12,10" CornerRadius="10"
+                Background="{DynamicResource Hcg.Bg.Elevated}" BorderBrush="{DynamicResource Hcg.Warning}" BorderThickness="1">
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="Auto,*">
+              <controls:IconView Data="{StaticResource Icon.Warning}" Width="16" Height="16" Margin="0,1,8,0" Foreground="{DynamicResource Hcg.Warning}" VerticalAlignment="Top" />
+              <TextBlock x:Name="OfflineBannerTitle" Grid.Column="1" Text="{Binding OfflineBannerTitle}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </Grid>
+            <TextBlock x:Name="OfflineBannerText" Text="{Binding OfflineBannerText}" Classes="caption" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding OutboxText}" IsVisible="{Binding HasOutbox}" Classes="caption" Foreground="{DynamicResource Hcg.Text.Accent}" TextWrapping="Wrap" />
+            <WrapPanel Orientation="Horizontal">
+              <Button x:Name="OfflineReconnectButton" Classes="subtle" Margin="0,2,8,0" Content="Try now" Command="{Binding ReconnectCommand}" />
+              <Button x:Name="OfflineDoctorButton" Classes="subtle" Margin="0,2,0,0" Content="Network Doctor" Command="{Binding OpenNetworkDoctorCommand}"
+                      ToolTip.Tip="Find out whether the network, the password, the server or HCG Mail is the problem" />
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+        <TextBlock Text="{Binding OutboxText}" IsVisible="{Binding HasOutbox}" Margin="16,0,14,6" Classes="caption"
+                   Foreground="{DynamicResource Hcg.Text.Accent}" TextWrapping="Wrap" ToolTip.Tip="Sent automatically when the account is connected. See Mail Health › Network Doctor." />
         <Grid ColumnDefinitions="*,Auto" Margin="16,0,14,6" IsVisible="{Binding MessageList.IsSearching}">
           <TextBlock x:Name="SearchScope" Classes="caption" TextWrapping="Wrap" VerticalAlignment="Center" Text="{Binding MessageList.SearchScopeText}" />
           <Button x:Name="SearchServerButton" Grid.Column="1" Classes="link" FontSize="11.5" Margin="8,0,0,0" Content="Search the whole folder"
@@ -94,6 +113,19 @@
         <ListBox x:Name="Messages" Classes="messages" ItemsSource="{Binding MessageList.Items}"
                  SelectedItem="{Binding MessageList.SelectedItem}" SelectionMode="Single"
                  IsVisible="{Binding MessageList.ShowList}" Padding="0,4">
+          <ListBox.ContextMenu>
+            <ContextMenu x:Name="MessageContextMenu">
+              <MenuItem Header="Reply" Command="{Binding ReplyCommand}" InputGesture="Ctrl+R" />
+              <MenuItem Header="Reply all" Command="{Binding ReplyAllCommand}" InputGesture="Ctrl+Shift+R" />
+              <MenuItem Header="Forward" Command="{Binding ForwardCommand}" InputGesture="Ctrl+Shift+F" />
+              <Separator />
+              <MenuItem Header="Mark read / unread" Command="{Binding ToggleReadCommand}" CommandParameter="{x:Null}" InputGesture="Ctrl+U" />
+              <MenuItem Header="Flag / unflag" Command="{Binding ToggleFlagCommand}" CommandParameter="{x:Null}" />
+              <Separator />
+              <MenuItem Header="Archive" Command="{Binding ArchiveCommand}" />
+              <MenuItem Header="Move to Trash" Command="{Binding DeleteCommand}" InputGesture="Delete" />
+            </ContextMenu>
+          </ListBox.ContextMenu>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:MessageItemViewModel">
               <Grid ColumnDefinitions="16,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="8,10,10,10" Background="Transparent">
@@ -161,10 +193,13 @@
           <controls:IconView Data="{StaticResource Icon.Warning}" Width="30" Height="30" Foreground="{DynamicResource Hcg.Danger}" />
           <TextBlock Text="Could not connect" Classes="h3" HorizontalAlignment="Center" />
           <TextBlock Text="{Binding SelectedAccount.StatusText}" Classes="muted" TextAlignment="Center" TextWrapping="Wrap" />
-          <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-            <Button Classes="primary" Content="Reconnect" Command="{Binding ReconnectCommand}" />
-            <Button Classes="subtle" Content="Account settings" Command="{Binding OpenAccountSettingsCommand}" />
-          </StackPanel>
+          <TextBlock x:Name="RecoveryText" Text="{Binding SelectedAccount.RecoveryText}" IsVisible="{Binding SelectedAccount.HasRecoveryText}"
+                     Classes="caption" TextAlignment="Center" TextWrapping="Wrap" />
+          <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button Classes="primary" Margin="4" Content="Reconnect" Command="{Binding ReconnectCommand}" />
+            <Button Classes="subtle" Margin="4" Content="Network Doctor" Command="{Binding OpenNetworkDoctorCommand}" />
+            <Button Classes="subtle" Margin="4" Content="Account settings" Command="{Binding OpenAccountSettingsCommand}" />
+          </WrapPanel>
         </StackPanel>
       </Panel>
 

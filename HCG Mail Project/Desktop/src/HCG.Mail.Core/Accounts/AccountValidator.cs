@@ -21,6 +21,7 @@ public sealed record ValidationError(AccountField Field, string Message);
 public sealed record AccountDraft
 {
     public string DisplayName { get; init; } = "";
+    public string Description { get; init; } = "";
     public string EmailAddress { get; init; } = "";
     public string Username { get; init; } = "";
     public string Password { get; init; } = "";
@@ -46,6 +47,8 @@ public static class AccountValidator
         else if (!EmailAddressValidator.IsValid(draft.EmailAddress.Trim()))
             errors.Add(new(AccountField.EmailAddress, "This does not look like a valid email address."));
 
+        if (draft.Description.Length > 100 || draft.Description.IndexOfAny(['\r', '\n']) >= 0)
+            errors.Add(new(AccountField.DisplayName, "The account description must be one short line (100 characters at most)."));
         if (draft.DisplayName.Length > 200)
             errors.Add(new(AccountField.DisplayName, "The display name is too long."));
         if (draft.DisplayName.IndexOfAny(['\r', '\n']) >= 0)
@@ -80,6 +83,7 @@ public static class AccountValidator
         {
             Id = existingId ?? MailAccount.NewId(),
             DisplayName = draft.DisplayName.Trim(),
+            Description = string.IsNullOrWhiteSpace(draft.Description) ? null : draft.Description.Trim(),
             EmailAddress = email,
             Username = draft.Username.Trim(),
             Imap = new ServerEndpoint(NormalizeHost(draft.ImapHost), int.Parse(draft.ImapPort.Trim(), CultureInfo.InvariantCulture), draft.ImapSecurity),
@@ -91,6 +95,7 @@ public static class AccountValidator
     public static AccountDraft FromAccount(MailAccount account) => new()
     {
         DisplayName = account.DisplayName,
+        Description = account.Description ?? "",
         EmailAddress = account.EmailAddress,
         Username = account.Username,
         ImapHost = account.Imap.Host,

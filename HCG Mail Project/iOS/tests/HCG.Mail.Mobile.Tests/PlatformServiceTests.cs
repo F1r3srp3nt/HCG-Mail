@@ -15,9 +15,20 @@ namespace HCG.Mail.Mobile.Tests;
 public sealed class PlatformServiceTests
 {
     [Fact]
-    public void Real_mode_uses_the_platform_vault_and_Microsoft_sign_in_never_a_file()
+    public void Public_beta_keeps_microsoft_sign_in_inactive_and_explains_why()
     {
         using var platform = new FakeMobilePlatform();
+        using var services = MobileServices.Build(platform, new AppMode(IsPreview: false));
+        var auth = services.GetRequiredService<IMicrosoftAuth>();
+        Assert.NotSame(platform.MicrosoftAuth, auth);
+        Assert.False(auth.IsConfigured);
+        Assert.Contains("Public Beta", auth.ConfigurationProblem);
+    }
+
+    [Fact]
+    public void Real_mode_uses_the_platform_vault_and_Microsoft_sign_in_never_a_file()
+    {
+        using var platform = new FakeMobilePlatform { Capabilities = HCG.Mail.Core.Release.ReleaseCapabilities.Internal };
         using var services = MobileServices.Build(platform, new AppMode(IsPreview: false));
         Assert.Same(platform.CredentialVault, services.GetRequiredService<ICredentialVault>());
         Assert.Same(platform.MicrosoftAuth, services.GetRequiredService<IMicrosoftAuth>());

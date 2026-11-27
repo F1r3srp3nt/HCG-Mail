@@ -27,7 +27,9 @@ public sealed class CertificateValidationTests : IDisposable
         var (chain, errors) = TestPki.Validate(cert, host, trustedRoot);
         using (chain)
         {
-            var recorder = new TlsValidationRecorder();
+            // The recorder exactly as every connection configures it (MailClientFactory): on macOS and iOS with the
+            // verified CRL fallback, elsewhere without one.
+            var recorder = new TlsValidationRecorder { RevocationFallback = new MailClientFactory().RevocationFallback };
             var accepted = recorder.Validate(new object(), cert, chain, errors);
             var error = accepted ? null : MailErrorTranslator.Translate(new SslHandshakeException("handshake failed"), MailProtocol.Imap, Endpoint with { Host = host }, recorder);
             return (accepted, recorder, error);

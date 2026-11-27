@@ -25,6 +25,9 @@ public interface IMobilePlatform
     /// <summary>Microsoft sign-in for this platform, or an unconfigured instance that explains why it is unavailable.</summary>
     IMicrosoftAuth MicrosoftAuth { get; }
 
+    /// <summary>The build's release capabilities. Public Beta unless the build says otherwise (fails closed).</summary>
+    HCG.Mail.Core.Release.ReleaseCapabilities Capabilities => HCG.Mail.Core.Release.ReleaseCapabilities.PublicBeta;
+
     /// <summary>True on iPad (regular-width idiom); layout itself follows the actual window size.</summary>
     bool IsTablet { get; }
 

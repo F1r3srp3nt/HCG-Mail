@@ -30,7 +30,7 @@ namespace HCG.Mail.Email.Imap;
 /// MailKit command tears down the connection, so started commands run to completion (bounded
 /// by the client timeout) and callers simply ignore results they no longer need.
 /// </remarks>
-public sealed class MailKitMailSession : IMailSession
+public sealed class MailKitMailSession : IMailSession, IStaleConnectionAware
 {
     private const int MessageCacheSize = 6;
     private const int PreviewLength = 220;
@@ -53,6 +53,20 @@ public sealed class MailKitMailSession : IMailSession
     private IReadOnlyList<MailFolder>? _folders;
     private MailConnectionState _state = MailConnectionState.Disconnected;
     private bool _disposed;
+    private volatile bool _stale;
+    private long _lastUsed = Environment.TickCount64;
+
+    /// <summary>
+    /// An open IMAP connection unused for this long is checked with a short NOOP before the next command. School, hotel and
+    /// mobile networks drop idle connections without telling either end; without this check the next click would wait for
+    /// the full command timeout before reconnecting. The check runs only in front of a command the user asked for.
+    /// </summary>
+    public static TimeSpan IdleCheckAfter { get; set; } = TimeSpan.FromMinutes(3);
+
+    public static TimeSpan IdleCheckTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>The network changed or the computer slept: drop the open connection and reconnect on the next command.</summary>
+    public void MarkConnectionStale() => _stale = true;
 
     public MailKitMailSession(MailAccount account, string password, IMailClientFactory clientFactory, IHtmlToTextConverter htmlToText, ILogger<MailKitMailSession> logger, IDeliveryLog? deliveryLog = null)
     {
@@ -355,6 +369,7 @@ public sealed class MailKitMailSession : IMailSession
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            await DropStaleConnectionAsync().ConfigureAwait(false);
             for (var attempt = 0; ; attempt++)
             {
                 var hadConnection = _imap is { IsConnected: true, IsAuthenticated: true };
@@ -383,7 +398,43 @@ public sealed class MailKitMailSession : IMailSession
         }
         finally
         {
+            _lastUsed = Environment.TickCount64;
             _gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Replaces a connection that is known or likely to be dead before using it: after a network change or sleep
+    /// (<see cref="MarkConnectionStale"/>), or after <see cref="IdleCheckAfter"/> without use when a short NOOP gets no answer.
+    /// </summary>
+    private async Task DropStaleConnectionAsync()
+    {
+        var client = _imap;
+        if (client is null)
+        {
+            _stale = false;
+            return;
+        }
+        if (_stale)
+        {
+            _stale = false;
+            _logger.LogInformation("IMAP connection for account {AccountId} is stale after a network change or sleep; reconnecting", Account.Id);
+            await ResetConnectionAsync(graceful: false).ConfigureAwait(false);
+            return;
+        }
+        if (!client.IsConnected || Environment.TickCount64 - _lastUsed < IdleCheckAfter.TotalMilliseconds)
+            return;
+        var previous = client.Timeout;
+        try
+        {
+            client.Timeout = (int)IdleCheckTimeout.TotalMilliseconds;
+            await client.NoOpAsync().ConfigureAwait(false);
+            client.Timeout = previous;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogInformation("Idle IMAP connection for account {AccountId} no longer answers ({Error}); reconnecting", Account.Id, ex.GetType().Name);
+            await ResetConnectionAsync(graceful: false).ConfigureAwait(false);
         }
     }
 
@@ -631,7 +682,9 @@ public sealed class MailKitMailSession : IMailSession
             if (!smtp.Capabilities.HasFlag(SmtpCapabilities.Authentication))
                 throw new MailOperationException(MailErrorKind.Authentication, "The outgoing server does not offer authentication. Check the outgoing server name and port.");
             await smtp.AuthenticateAsync(new NetworkCredential(Account.Username, _password)).ConfigureAwait(false);
-            transactionStarted = true;
+            // From here the server may receive the message. With the tracking client it is narrowed to "a recipient was
+            // accepted" (before that no message data can have been sent); other clients count everything after AUTH.
+            transactionStarted = smtp is not Smtp.TransactionTrackingSmtpClient;
             var reply = await smtp.SendAsync(mime).ConfigureAwait(false);
             // MailKit returns only after a 250 reply to the end of the message data.
             record = record with { State = DeliveryState.Accepted, SmtpStatusCode = 250, ServerReply = Truncate(reply) };
@@ -653,9 +706,14 @@ public sealed class MailKitMailSession : IMailSession
         }
         catch (Exception ex)
         {
+            if (smtp is Smtp.TransactionTrackingSmtpClient tracking && tracking.RecipientAccepted)
+                transactionStarted = true;
             var translated = MailErrorTranslator.Translate(ex, MailProtocol.Smtp, endpoint, recorder);
-            Record(ClassifyFailure(record, ex, transactionStarted) with { ErrorMessage = translated.UserMessage });
+            var classified = ClassifyFailure(record, ex, transactionStarted) with { ErrorMessage = translated.UserMessage };
+            Record(classified);
             _logger.LogWarning("SMTP send failed for account {AccountId}: {Kind} ({Error})", Account.Id, translated.Kind, ex.GetType().Name);
+            if (classified.State == DeliveryState.Submitted)
+                throw new MailOperationException(translated.Kind, translated.UserMessage, ex) { OutcomeUnknown = true }; // never resend silently
             throw translated;
         }
     }

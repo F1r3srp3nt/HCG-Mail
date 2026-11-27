@@ -1,20 +1,25 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="HCG.Mail.App.Views.BrandMark">
-  <StackPanel Orientation="Horizontal" Spacing="9">
-    <!-- Official HCG logo (assets/branding/hcg-logo-source.png), transparent version at ~6× display size
-         for sharp rendering on high-DPI screens. The backing is transparent in HCG Future and a slim
-         graphite plate in HCG Classic, because the artwork is designed for a dark background. -->
-    <Border Background="{DynamicResource Hcg.Brush.LogoBacking}" CornerRadius="7" Padding="{DynamicResource Hcg.LogoPadding}"
-            VerticalAlignment="Center">
-      <Image Source="/Assets/Branding/hcg-logo.png" Height="{DynamicResource Hcg.LogoHeight}" Stretch="Uniform"
-             RenderOptions.BitmapInterpolationMode="HighQuality"
-             ToolTip.Tip="Hakmi Capital Group" />
-    </Border>
-    <StackPanel VerticalAlignment="Center" Spacing="1">
-      <TextBlock Classes="wordmark" Text="HCG MAIL" FontSize="16" />
-      <TextBlock Text="HAKMI CAPITAL GROUP" FontSize="8.5" LetterSpacing="1.6" FontWeight="SemiBold"
-                 Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+  <!-- The one HCG Mail wordmark of the main window. It scales down as a whole (never up) when its column is narrower than
+       its natural size, so the logo and the two lines of text keep their proportions and are never clipped, at any
+       sidebar width, display scaling or font fallback. -->
+  <Viewbox Stretch="Uniform" StretchDirection="DownOnly" HorizontalAlignment="Left">
+    <StackPanel Orientation="Horizontal" Spacing="10">
+      <!-- Official HCG logo (assets/branding/hcg-logo-source.png): transparent master with opaque letters and the blue light
+           as transparency (assets/branding/make-transparent-logo.py), at ~6× display size for sharp high-DPI rendering. No
+           backing plate in any theme. -->
+      <Border Background="{DynamicResource Hcg.Brush.LogoBacking}" CornerRadius="7" Padding="{DynamicResource Hcg.LogoPadding}"
+              VerticalAlignment="Center">
+        <Image Source="/Assets/Branding/hcg-logo.png" Height="{DynamicResource Hcg.LogoHeight}" Stretch="Uniform"
+               RenderOptions.BitmapInterpolationMode="HighQuality"
+               ToolTip.Tip="Hakmi Capital Group" />
+      </Border>
+      <StackPanel VerticalAlignment="Center" Spacing="2">
+        <TextBlock Classes="wordmark" Text="HCG MAIL" FontSize="16" />
+        <TextBlock Text="HAKMI CAPITAL GROUP" FontSize="8.5" LetterSpacing="1.4" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Hcg.Text.Tertiary}" />
+      </StackPanel>
     </StackPanel>
-  </StackPanel>
+  </Viewbox>
 </UserControl>

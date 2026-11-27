@@ -261,7 +261,8 @@ public sealed class FlowTests
     [AvaloniaFact]
     public async Task Microsoft_sign_in_is_shown_as_pending_when_this_build_has_no_client_id()
     {
-        await using var ui = await MobileHarness.StartAsync(Devices.IPhone);
+        // Internal builds only: the public beta never opens the Microsoft sheet (see Public_beta_never_offers_…).
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone, new FakeMobilePlatform { Capabilities = HCG.Mail.Core.Release.ReleaseCapabilities.Internal });
         var showing = ui.Mail.AddMicrosoftAccountCommand.ExecuteAsync(null);
         await MobileHarness.Settle();
         var microsoft = Assert.IsType<MicrosoftAccountViewModel>(ui.Overlays.CurrentSheet);
@@ -310,11 +311,28 @@ public sealed class FlowTests
     }
 
     [AvaloniaFact]
-    public async Task Configured_microsoft_sign_in_is_offered()
+    public async Task Public_beta_never_offers_microsoft_sign_in_even_when_configured()
     {
         var auth = NSubstitute.Substitute.For<HCG.Mail.Core.Accounts.IMicrosoftAuth>();
         auth.IsConfigured.Returns(true);
-        await using var ui = await MobileHarness.StartAsync(Devices.IPhone, realMode: true,
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone, realMode: true, configure: s => s.AddSingleton(auth));
+        Assert.False(ui.Mail.ShowMicrosoftSignIn);
+        Assert.DoesNotContain(Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(ui.View).OfType<Avalonia.Controls.Button>(),
+            b => b.Name == "AddMicrosoftAccountButton" && b.IsEffectivelyVisible);
+        Assert.DoesNotContain("Microsoft", ui.Mail.WelcomeText);
+
+        await ui.Mail.AddMicrosoftAccountCommand.ExecuteAsync(null); // even invoked directly, nothing opens
+        await MobileHarness.Settle();
+        Assert.False(ui.Overlays.HasSheet);
+    }
+
+    [AvaloniaFact]
+    public async Task Configured_microsoft_sign_in_is_offered_in_an_internal_build()
+    {
+        var auth = NSubstitute.Substitute.For<HCG.Mail.Core.Accounts.IMicrosoftAuth>();
+        auth.IsConfigured.Returns(true);
+        var platform = new FakeMobilePlatform { Capabilities = HCG.Mail.Core.Release.ReleaseCapabilities.Internal };
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone, platform, realMode: true,
             configure: s => s.AddSingleton(auth));
         Assert.True(ui.Mail.ShowMicrosoftSignIn);
         var button = Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(ui.View).OfType<Avalonia.Controls.Button>()
@@ -325,7 +343,7 @@ public sealed class FlowTests
     [AvaloniaFact]
     public async Task Google_sign_in_is_not_offered_on_iphone_and_its_sheet_explains_why()
     {
-        await using var ui = await MobileHarness.StartAsync(Devices.IPhone);
+        await using var ui = await MobileHarness.StartAsync(Devices.IPhone, new FakeMobilePlatform { Capabilities = HCG.Mail.Core.Release.ReleaseCapabilities.Internal });
         // No Google button on iPhone/iPad until an iOS Google OAuth client exists.
         Assert.DoesNotContain(Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(ui.View).OfType<Avalonia.Controls.Button>(),
             b => b.Content is string text && text.Contains("Google"));

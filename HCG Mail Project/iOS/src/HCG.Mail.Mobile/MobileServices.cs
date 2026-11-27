@@ -1,3 +1,7 @@
+using HCG.Mail.Infrastructure.Network;
+using HCG.Mail.Email.Offline;
+using HCG.Mail.Core.Compose;
+using HCG.Mail.Core.Network;
 using HCG.Mail.App.Preview;
 using HCG.Mail.App.Services;
 using HCG.Mail.App.ViewModels;
@@ -70,7 +74,12 @@ public static class MobileServices
             services.AddSingleton<ICredentialVault>(vault);
             services.AddSingleton<IAccountStore>(accounts);
             services.AddSingleton<IAppSettingsStore>(new InMemoryAppSettingsStore());
-            services.AddSingleton<IMailSessionFactory, PreviewMailSessionFactory>();
+            services.AddSingleton<PreviewMailSessionFactory>();
+            services.AddSingleton<INetworkMonitor, ManualNetworkMonitor>();
+            services.AddSingleton<IMailCache, NoMailCache>();
+            services.AddSingleton<IOutboxStore, InMemoryOutboxStore>();
+            services.AddSingleton<IMailSessionFactory>(sp => new OfflineCapableSessionFactory(sp.GetRequiredService<PreviewMailSessionFactory>(),
+                sp.GetRequiredService<IMailCache>(), sp.GetRequiredService<INetworkMonitor>(), sp.GetRequiredService<ILoggerFactory>()));
             services.AddSingleton<IConnectionTester, PreviewConnectionTester>();
             services.AddSingleton<IDeliveryLog, InMemoryDeliveryLog>();
             services.AddSingleton<IMailDns, OfflineMailDns>();
@@ -82,8 +91,24 @@ public static class MobileServices
             services.AddSingleton(platform.CredentialVault);
             services.AddSingleton<IAccountStore, JsonAccountStore>();
             services.AddSingleton<IAppSettingsStore, JsonAppSettingsStore>();
-            services.AddSingleton<IMailSessionFactory, MailSessionFactory>();
-            services.AddSingleton(platform.MicrosoftAuth);
+            services.AddSingleton<MailSessionFactory>();
+            services.AddSingleton<INetworkMonitor, SystemNetworkMonitor>();
+            // Offline copies and the Outbox are encrypted per account; the keys live only in the credential store.
+            services.AddSingleton<HCG.Mail.Infrastructure.Security.AccountDataProtector>();
+            services.AddSingleton<IMailCache>(sp => new JsonMailCache(sp.GetRequiredService<AppPaths>(),
+                () => sp.GetRequiredService<AppSettingsService>().Current.GetOfflinePolicy(),
+                sp.GetRequiredService<HCG.Mail.Infrastructure.Security.AccountDataProtector>(), sp.GetRequiredService<ILogger<JsonMailCache>>()));
+            // Without a persistent credential store the keys would be lost at exit, so the Outbox then lives for this session.
+            services.AddSingleton<IOutboxStore>(sp => sp.GetRequiredService<ICredentialVault>().IsPersistent
+                ? ActivatorUtilities.CreateInstance<JsonOutboxStore>(sp)
+                : new InMemoryOutboxStore());
+            // Every session keeps mail readable offline and fails fast while the server cannot be reached.
+            services.AddSingleton<IMailSessionFactory>(sp => new OfflineCapableSessionFactory(sp.GetRequiredService<MailSessionFactory>(),
+                sp.GetRequiredService<IMailCache>(), sp.GetRequiredService<INetworkMonitor>(), sp.GetRequiredService<ILoggerFactory>()));
+            // A build without the Microsoft capability never activates Microsoft sign-in; existing accounts stay as they are.
+            services.AddSingleton(platform.Capabilities.MicrosoftSignIn
+                ? platform.MicrosoftAuth
+                : new UnconfiguredMicrosoftAuth(HCG.Mail.Core.Release.ReleaseCapabilities.MicrosoftUnavailableMessage));
             // Google sign-in needs its own iOS OAuth client and redirect; until that exists the shared view models see
             // an unavailable provider, and the iPhone/iPad views offer no Google button.
             services.AddSingleton<IGoogleAuth>(new UnconfiguredGoogleAuth(GoogleNotOnIos));
@@ -95,12 +120,31 @@ public static class MobileServices
         services.AddSingleton<IMailClientFactory, MailClientFactory>();
         services.AddSingleton<IDnsResolver, SystemDnsResolver>();
         services.AddSingleton<ITcpProbe, SystemTcpProbe>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<INetworkInterfaces, SystemNetworkInterfaces>();
+        services.AddSingleton<IHttpProbe, SystemHttpProbe>();
+        services.AddSingleton(sp =>
+        {
+            // An HCG-operated connectivity endpoint is optional: offered only when the build or environment names one.
+            var hcg = HcgConnectivityEndpoint.Resolve(typeof(MobileServices).Assembly);
+            var settings = sp.GetRequiredService<AppSettingsService>();
+            return new ConnectivityProviderSelection(() => ConnectivityProviders.Resolve(settings.Current.ConnectivityCheckProvider, hcg),
+                ConnectivityProviders.Available(hcg));
+        });
+        services.AddSingleton<NetworkDoctor>();
+        // Optional: a host that ships HCG VPN registers its own IHcgVpn. HCG Mail never requires it.
+        services.AddSingleton<IHcgVpn, NoHcgVpn>();
+        services.AddSingleton<OutboxService>();
+        services.AddSingleton<ConnectionRecoveryService>();
         services.AddSingleton<IHtmlToTextConverter, HtmlToTextConverter>();
         services.AddSingleton<IHtmlSanitizer, MailHtmlSanitizer>();
+        // Messages are laid out at phone width: the sender's phone breakpoints (@media max-width) apply, as in Apple Mail.
+        MessageReaderViewModel.LayoutWidth = 420;
 
         // A store release offers only sign-in providers that are configured in this build (Microsoft needs a client ID;
         // Google has no iOS client yet). Their implementation stays in place for later activation.
-        services.AddSingleton(new SignInPresentation(OfferUnconfiguredProviders: false));
+        services.AddSingleton(platform.Capabilities);
+        services.AddSingleton(new SignInPresentation(OfferUnconfiguredProviders: false, platform.Capabilities.MicrosoftSignIn, platform.Capabilities.GoogleSignIn));
         services.AddSingleton<AppSettingsService>();
         services.AddSingleton<ThemeService>();
         services.AddSingleton<MobileOverlays>();

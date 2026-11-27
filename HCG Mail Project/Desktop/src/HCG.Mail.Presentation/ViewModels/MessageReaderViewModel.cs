@@ -85,6 +85,9 @@ public sealed partial class MessageReaderViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(HtmlBackground))]
     private string? _canvasColor;
 
+    /// <summary>Width the message is laid out in (desktop reading pane by default; the iPhone app sets its screen width).</summary>
+    public static int LayoutWidth { get; set; } = 800;
+
     public MessageReaderViewModel(IHtmlSanitizer sanitizer)
     {
         _sanitizer = sanitizer;
@@ -276,7 +279,7 @@ public sealed partial class MessageReaderViewModel : ObservableObject
         try
         {
             var mode = Mode == ReaderBodyMode.Readable ? MessageViewMode.Readable : MessageViewMode.Original;
-            _sanitized = _sanitizer.Sanitize(html, new HtmlSanitizeOptions(RemoteImagesAllowed, mode));
+            _sanitized = _sanitizer.Sanitize(html, new HtmlSanitizeOptions(RemoteImagesAllowed, mode, LayoutWidth));
             if (!_sanitized.HasVisibleContent && !string.IsNullOrWhiteSpace(Content.TextBody))
             {
                 SanitizedHtml = null;

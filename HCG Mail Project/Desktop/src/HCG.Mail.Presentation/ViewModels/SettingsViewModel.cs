@@ -1,3 +1,4 @@
+using HCG.Mail.Core.Services;
 using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -41,6 +42,12 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private RefreshOption _selectedRefresh;
     [ObservableProperty] private ViewModeOption _selectedViewMode;
     [ObservableProperty] private bool _loadRemoteImagesAutomatically;
+    [ObservableProperty] private bool _reconnectAutomatically;
+    [ObservableProperty] private bool _keepOfflineCopies;
+    [ObservableProperty] private string? _offlineCopiesStatus;
+    [ObservableProperty] private OfflineOption _selectedRetention;
+    [ObservableProperty] private OfflineOption _selectedStorageLimit;
+    [ObservableProperty] private HCG.Mail.Core.Network.ConnectivityProvider _selectedConnectivityProvider;
 
     public SettingsViewModel(AppSettingsService settings, ThemeService themes, IDialogService dialogs, AppPaths paths, ICredentialVault vault, MainWindowViewModel main)
     {
@@ -57,11 +64,83 @@ public sealed partial class SettingsViewModel : ObservableObject
         _saveCopyToSentFolder = s.SaveCopyToSentFolder;
         _confirmBeforeOpeningLinks = s.ConfirmBeforeOpeningLinks;
         _connectOnStartup = s.ConnectOnStartup;
+        _signatureAccount = main.SelectedAccount ?? main.Accounts.FirstOrDefault();
+        _signatureText = _signatureAccount is null ? "" : s.SignatureFor(_signatureAccount.Account.Id) ?? "";
         _askWhereToSaveAttachments = s.AskWhereToSaveAttachments;
         _downloadDirectory = s.DownloadDirectory ?? AppPaths.DefaultDownloadDirectory();
         _selectedRefresh = RefreshOptions.FirstOrDefault(o => o.Minutes == s.AutomaticRefreshMinutes) ?? RefreshOptions[0];
         _selectedViewMode = ViewModeOptions.First(o => o.Mode == s.DefaultMessageView);
         _loadRemoteImagesAutomatically = s.LoadRemoteImagesAutomatically;
+        _reconnectAutomatically = s.ReconnectAutomatically;
+        _keepOfflineCopies = s.KeepOfflineCopies;
+        _selectedRetention = RetentionOptions.First(o => o.Value == s.OfflineRetentionDays);
+        _selectedStorageLimit = StorageLimitOptions.First(o => o.Value == s.OfflineStorageLimitMegabytes);
+        ConnectivityProviders = main.ConnectivityProviders;
+        _selectedConnectivityProvider = ConnectivityProviders.FirstOrDefault(p => p.Id == s.ConnectivityCheckProvider) ?? ConnectivityProviders[0];
+        RefreshOfflineUsage();
+    }
+
+    public IReadOnlyList<OfflineOption> RetentionOptions { get; } =
+        OfflineCachePolicy.RetentionChoices.Select(d => new OfflineOption(d, d == 365 ? "1 year" : $"{d} days")).ToList();
+
+    public IReadOnlyList<OfflineOption> StorageLimitOptions { get; } =
+        OfflineCachePolicy.StorageLimitChoices.Select(m => new OfflineOption(m, m >= 1000 ? $"{m / 1000} GB per account" : $"{m} MB per account")).ToList();
+
+    public ObservableCollection<OfflineUsageRow> OfflineUsage { get; } = [];
+
+    /// <summary>Interchangeable providers for the Network Doctor's connectivity checks, including "off".</summary>
+    public IReadOnlyList<HCG.Mail.Core.Network.ConnectivityProvider> ConnectivityProviders { get; }
+
+    public string ConnectivityProviderText => SelectedConnectivityProvider.ContactedHostsText;
+
+    partial void OnSelectedConnectivityProviderChanged(HCG.Mail.Core.Network.ConnectivityProvider value)
+    {
+        _settings.Update(s => s with { ConnectivityCheckProvider = value.Id });
+        OnPropertyChanged(nameof(ConnectivityProviderText));
+    }
+
+    /// <summary>How offline copies are protected on this system (or why they cannot be kept).</summary>
+    public string OfflineProtectionText => _main.OfflineCache switch
+    {
+        null => "Offline copies are not kept in this mode.",
+        { UnavailableReason: { } reason } => reason,
+        { SurvivesRestart: true } => $"Each account's copy is encrypted (AES-256-GCM) with its own key, kept only in {_vault.StorageDescription} — never in a file. " +
+                                     "Copies stay on this device: HCG Mail never uploads them to HCG or anyone else.",
+        _ => "This system has no secure credential store HCG Mail can use, so copies are encrypted with a key that exists only while HCG Mail is open: " +
+             "they are unreadable, and deleted, after it closes. Copies stay on this device and are never uploaded.",
+    };
+
+    partial void OnSelectedRetentionChanged(OfflineOption value)
+    {
+        _settings.Update(s => s with { OfflineRetentionDays = value.Value });
+        _main.ApplyOfflinePolicy();
+        RefreshOfflineUsage();
+    }
+
+    partial void OnSelectedStorageLimitChanged(OfflineOption value)
+    {
+        _settings.Update(s => s with { OfflineStorageLimitMegabytes = value.Value });
+        _main.ApplyOfflinePolicy();
+        RefreshOfflineUsage();
+    }
+
+    [RelayCommand]
+    private void DeleteOfflineCopy(OfflineUsageRow? row)
+    {
+        if (row is null)
+            return;
+        _main.DeleteOfflineCopy(row.Account);
+        OfflineCopiesStatus = $"The offline copy of {row.Account.EmailAddress} and its key were deleted from this {PlatformText.Device}.";
+        RefreshOfflineUsage();
+    }
+
+    private void RefreshOfflineUsage()
+    {
+        OfflineUsage.Clear();
+        if (_main.OfflineCache is not { } cache)
+            return;
+        foreach (var account in _main.Accounts)
+            OfflineUsage.Add(new OfflineUsageRow(account, account.EmailAddress, AttachmentViewModel.FormatSize(cache.SizeOf(account.Account.Id))));
     }
 
     public IReadOnlyList<RefreshOption> RefreshOptions { get; } =
@@ -75,6 +154,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public string MicrosoftSignInStatus => _main.MicrosoftSignInStatus;
     public bool ShowMicrosoftSignIn => _main.ShowMicrosoftSignIn;
+    public bool ShowGoogleSignIn => _main.ShowGoogleSignIn;
     public string GoogleSignInStatus => _main.GoogleSignInStatus;
 
     public IReadOnlyList<ThemeOption> Themes { get; } =
@@ -84,6 +164,33 @@ public sealed partial class SettingsViewModel : ObservableObject
     ];
 
     public ObservableCollection<AccountViewModel> Accounts => _main.Accounts;
+    public bool HasAccounts => Accounts.Count > 0;
+
+    // ---- Signatures -----------------------------------------------------------------------------
+
+    [ObservableProperty] private AccountViewModel? _signatureAccount;
+    [ObservableProperty] private string _signatureText = "";
+    [ObservableProperty] private string _signatureStatus = "";
+
+    partial void OnSignatureAccountChanged(AccountViewModel? value)
+    {
+        SignatureText = value is null ? "" : _settings.Current.SignatureFor(value.Account.Id) ?? "";
+        SignatureStatus = "";
+    }
+
+    partial void OnSignatureTextChanged(string value) => SignatureStatus = "";
+
+    [RelayCommand]
+    private void SaveSignature()
+    {
+        if (SignatureAccount is not { } account)
+            return;
+        _settings.Update(s => s.WithSignature(account.Account.Id, SignatureText));
+        SignatureStatus = string.IsNullOrWhiteSpace(SignatureText) ? "Signature removed." : "Signature saved.";
+    }
+
+    [RelayCommand]
+    private void OpenMailHealth() => _main.OpenMailHealthCommand.Execute(null);
 
     public string Version { get; } =
         typeof(SettingsViewModel).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0";
@@ -101,6 +208,27 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnAskWhereToSaveAttachmentsChanged(bool value) => _settings.Update(s => s with { AskWhereToSaveAttachments = value });
     partial void OnSelectedViewModeChanged(ViewModeOption value) => _settings.Update(s => s with { DefaultMessageView = value.Mode });
     partial void OnLoadRemoteImagesAutomaticallyChanged(bool value) => _settings.Update(s => s with { LoadRemoteImagesAutomatically = value });
+    partial void OnReconnectAutomaticallyChanged(bool value) => _settings.Update(s => s with { ReconnectAutomatically = value });
+
+    partial void OnKeepOfflineCopiesChanged(bool value)
+    {
+        _settings.Update(s => s with { KeepOfflineCopies = value });
+        if (!value)
+        {
+            // Turning the copies off removes the ones already kept, and their keys: nothing of the mail stays on this device.
+            _main.ClearOfflineCopies();
+            OfflineCopiesStatus = "Offline copies and their keys were deleted from this " + PlatformText.Device + ".";
+        }
+        RefreshOfflineUsage();
+    }
+
+    [RelayCommand]
+    private void DeleteOfflineCopies()
+    {
+        _main.ClearOfflineCopies();
+        OfflineCopiesStatus = "All offline copies and their keys were deleted from this " + PlatformText.Device + ". New ones are kept as you read mail" + (KeepOfflineCopies ? "." : " only if you turn the option on again.");
+        RefreshOfflineUsage();
+    }
 
     partial void OnSelectedRefreshChanged(RefreshOption value)
     {
@@ -143,3 +271,10 @@ public sealed partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private Task RemoveAccountAsync(AccountViewModel account) => _main.RemoveAccountAsync(account.Account);
 }
+
+public sealed record OfflineOption(int Value, string Label)
+{
+    public override string ToString() => Label;
+}
+
+public sealed record OfflineUsageRow(AccountViewModel Account, string Label, string SizeText);

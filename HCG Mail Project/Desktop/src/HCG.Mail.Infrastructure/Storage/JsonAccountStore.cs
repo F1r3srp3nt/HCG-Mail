@@ -56,6 +56,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
         public EndpointDto? Imap { get; set; }
         public EndpointDto? Smtp { get; set; }
         public string? PresetId { get; set; }
+        public string? Description { get; set; }
         public MailProviderKind? Provider { get; set; }
         public string? MicrosoftAccountId { get; set; }
         public string? GoogleAccountId { get; set; }
@@ -69,6 +70,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
             Imap = EndpointDto.From(a.Imap),
             Smtp = EndpointDto.From(a.Smtp),
             PresetId = a.PresetId,
+            Description = string.IsNullOrWhiteSpace(a.Description) ? null : a.Description,
             Provider = a.Provider == MailProviderKind.ImapSmtp ? null : a.Provider,
             MicrosoftAccountId = a.MicrosoftAccountId,
             GoogleAccountId = a.GoogleAccountId,
@@ -86,6 +88,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
                 {
                     Id = Id,
                     DisplayName = DisplayName ?? "",
+                    Description = Description,
                     EmailAddress = EmailAddress,
                     Username = Username,
                     Imap = MailAccount.GraphEndpoint,
@@ -102,6 +105,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
                 {
                     Id = Id,
                     DisplayName = DisplayName ?? "",
+                    Description = Description,
                     EmailAddress = EmailAddress,
                     Username = Username,
                     Imap = MailAccount.GmailEndpoint,
@@ -116,6 +120,7 @@ public sealed class JsonAccountStore(AppPaths paths, ILogger<JsonAccountStore> l
             {
                 Id = Id,
                 DisplayName = DisplayName ?? "",
+                    Description = Description,
                 EmailAddress = EmailAddress,
                 Username = Username,
                 Imap = imap,

@@ -7,6 +7,7 @@ namespace HCG.Mail.App.Views;
 public partial class ComposeWindow : Window
 {
     private bool _closeConfirmed;
+    private readonly Avalonia.Threading.DispatcherTimer _autosave = new() { Interval = TimeSpan.FromMinutes(1) };
 
     public ComposeWindow()
     {
@@ -33,6 +34,13 @@ public partial class ComposeWindow : Window
             }
         };
         Closing += OnClosing;
+        _autosave.Tick += async (_, _) =>
+        {
+            if (DataContext is ComposeViewModel vm)
+                await vm.AutosaveAsync();
+        };
+        Opened += (_, _) => _autosave.Start();
+        Closed += (_, _) => _autosave.Stop();
     }
 
     private async void OnClosing(object? sender, WindowClosingEventArgs e)

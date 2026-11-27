@@ -42,6 +42,30 @@ public sealed record AppSettings
     public int AutomaticRefreshMinutes { get; init; }
 
     public static readonly IReadOnlyList<int> AutomaticRefreshChoices = [0, 5, 15, 30, 60];
+
+    /// <summary>
+    /// After a connection problem (no network, a timeout, a blocked port, sleep), reconnect by itself with increasing pauses
+    /// (5 s up to 5 minutes) and at once when the network changes, then send what waits in the Outbox. A refused password is
+    /// never retried automatically. This only repairs a failed connection; it does not check for new mail on a timer.
+    /// </summary>
+    public bool ReconnectAutomatically { get; init; } = true;
+
+    /// <summary>Keep a copy of the folder list, recent messages and opened messages on this device for reading while offline.</summary>
+    public bool KeepOfflineCopies { get; init; } = true;
+
+    /// <summary>Offline copies older than this many days are deleted.</summary>
+    public int OfflineRetentionDays { get; init; } = Services.OfflineCachePolicy.Default.RetentionDays;
+
+    /// <summary>At most this much disk space per account for offline copies; the oldest are deleted first.</summary>
+    public int OfflineStorageLimitMegabytes { get; init; } = Services.OfflineCachePolicy.Default.StorageLimitMegabytes;
+
+    /// <summary>
+    /// Where the Network Doctor's general connectivity checks go ("google", "apple", "microsoft", "hcg" when this build has
+    /// an HCG endpoint, or "off" for checks against the user's own mail servers only).
+    /// </summary>
+    public string ConnectivityCheckProvider { get; init; } = Network.ConnectivityProviders.Google.Id;
+
+    public Services.OfflineCachePolicy GetOfflinePolicy() => new(KeepOfflineCopies, OfflineRetentionDays, OfflineStorageLimitMegabytes);
     public string? LastAccountId { get; init; }
 
     /// <summary>
@@ -49,6 +73,17 @@ public sealed record AppSettings
     /// the deletion at every start until it succeeds. Contains key names only, never secrets.
     /// </summary>
     public IReadOnlyList<string> PendingCredentialDeletions { get; init; } = [];
+
+    /// <summary>Per-account plain-text signatures, inserted into new messages, replies and forwards from that account.</summary>
+    public IReadOnlyList<AccountSignature> Signatures { get; init; } = [];
+
+    public string? SignatureFor(string accountId) => Signatures.FirstOrDefault(s => s.AccountId == accountId)?.Text;
+
+    public AppSettings WithSignature(string accountId, string? text) => this with
+    {
+        Signatures = [.. Signatures.Where(s => s.AccountId != accountId),
+            .. string.IsNullOrWhiteSpace(text) ? Array.Empty<AccountSignature>() : [new AccountSignature(accountId, text.Replace("\r\n", "\n").TrimEnd())]],
+    };
 
     // Returns the same instance when nothing changes, so value equality of AppSettings (used to skip
     // needless saves) is not broken by a fresh list allocation.
@@ -67,9 +102,13 @@ public sealed record AppSettings
         DownloadDirectory = string.IsNullOrWhiteSpace(DownloadDirectory) ? null : DownloadDirectory,
         DefaultMessageView = Enum.IsDefined(DefaultMessageView) ? DefaultMessageView : Services.MessageViewMode.Original,
         AutomaticRefreshMinutes = AutomaticRefreshChoices.Contains(AutomaticRefreshMinutes) ? AutomaticRefreshMinutes : 0,
+        OfflineRetentionDays = Services.OfflineCachePolicy.RetentionChoices.Contains(OfflineRetentionDays) ? OfflineRetentionDays : Services.OfflineCachePolicy.Default.RetentionDays,
+        OfflineStorageLimitMegabytes = Services.OfflineCachePolicy.StorageLimitChoices.Contains(OfflineStorageLimitMegabytes) ? OfflineStorageLimitMegabytes : Services.OfflineCachePolicy.Default.StorageLimitMegabytes,
         PendingCredentialDeletions = NormalizeKeys(PendingCredentialDeletions),
     };
 }
+
+public sealed record AccountSignature(string AccountId, string Text);
 
 public interface IAppSettingsStore
 {

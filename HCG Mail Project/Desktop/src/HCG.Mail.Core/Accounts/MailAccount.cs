@@ -32,6 +32,9 @@ public sealed record MailAccount
     public required ServerEndpoint Imap { get; init; }
     public required ServerEndpoint Smtp { get; init; }
 
+    /// <summary>The user's own label for the account ("Work", "Personal"), shown next to the address. Optional.</summary>
+    public string? Description { get; init; }
+
     /// <summary>Identifier of the provider preset used to create the account, if any.</summary>
     public string? PresetId { get; init; }
 
@@ -67,4 +70,7 @@ public static class CredentialKeys
 
     /// <summary>Where a Google account's refresh token is kept: one entry per Google account, never shared.</summary>
     public static string ForGoogle(string googleAccountId) => $"oauth:google:{googleAccountId}";
+
+    /// <summary>The encryption key of an account's offline copy: one per account, only ever in the credential store.</summary>
+    public static string ForOfflineCache(string accountId) => $"offline-cache:{accountId}";
 }

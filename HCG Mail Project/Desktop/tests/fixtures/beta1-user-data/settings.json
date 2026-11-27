@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "theme": "HcgClassic",
+  "askWhereToSaveAttachments": false,
+  "connectOnStartup": true,
+  "markAsReadWhenOpened": true,
+  "saveCopyToSentFolder": true,
+  "confirmBeforeOpeningLinks": true,
+  "defaultMessageView": "Original",
+  "loadRemoteImagesAutomatically": false,
+  "automaticRefreshMinutes": 0,
+  "pendingCredentialDeletions": [],
+  "signatures": []
+}

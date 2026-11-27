@@ -1,0 +1,214 @@
+# HCG Mail for macOS and Linux, public beta prerelease: packaged by HCG Executable Maker's engine (pinned), then
+# installed and run on real macOS and Linux runners (each architecture natively). Publishes nothing: the artifacts and
+# evidence are for the owner's review. macOS builds carry only the .NET SDK's ad-hoc signature (no Developer ID, not
+# notarized) and Linux executables are not signed; the evidence says so.
+name: Desktop prerelease (macOS, Linux)
+
+on:
+  push:
+    branches: ['release/**']
+    # Documentation-only pushes do not rebuild the release: the candidate's files stay the ones already built.
+    paths-ignore: ['**/*.md', '**/docs/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VERSION: 1.0.0-beta.2
+  BUILD_NUMBER: 4
+  MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
+  HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
+  DOTNET_NOLOGO: 1
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  package:
+    name: Package with HCG Executable Maker (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos, runner: macos-15, targets: 'osx-arm64,osx-x64' }
+          - { os: linux, runner: ubuntu-24.04, targets: 'linux-x64,linux-arm64' }
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: hcg-mail
+      - uses: actions/checkout@v5
+        with:
+          repository: F1r3srp3nt/HCG-Executable-Maker
+          ref: ${{ env.MAKER_COMMIT }}
+          path: maker
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Package (Executable Maker's engine, HCG Mail identity)
+        shell: bash
+        run: |
+          set -o pipefail
+          pack="$RUNNER_TEMP/pack"; mkdir -p "$pack"
+          sed "s|@MAKER@|$PWD/maker|g" "hcg-mail/HCG Mail Project/Desktop/scripts/maker/package-desktop.cs.template" > "$pack/package-desktop.cs"
+          dotnet run --no-cache "$pack/package-desktop.cs" -- "$PWD/hcg-mail/HCG Mail Project/Desktop" "$RUNNER_TEMP/out" \
+            --version "$VERSION" --targets "${{ matrix.targets }}" --dist "$RUNNER_TEMP/dist" | tee "$RUNNER_TEMP/package.log"
+      - name: Seal the .app (ad-hoc) and rebuild the disk image (macOS)
+        # Executable Maker (pinned 595e989) assembles the bundle around an app host that only carries the .NET SDK's ad-hoc
+        # signature, so the bundle itself is not sealed: codesign --verify --deep fails and Gatekeeper reports "code has
+        # no resources but signature indicates they must be present" (macOS then calls a downloaded app damaged). Until
+        # that is fixed in Maker, every file in Contents/MacOS and then the bundle are signed ad-hoc here, verified strictly, and the
+        # DMG is rebuilt with Maker's layout (the app and an Applications link). Maker's own DMG checksums are recorded.
+        # Ad-hoc is not a Developer ID signature: Gatekeeper still treats the app as from an unidentified developer.
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/seal.log"; : > "$log"
+          for rid in osx-arm64 osx-x64; do
+            app="$RUNNER_TEMP/out/HCG Mail-$VERSION-$rid/HCG Mail.app"
+            dmg="$RUNNER_TEMP/dist/HCGMail-$VERSION-$rid.dmg"
+            { echo "== $rid"; echo "Maker's DMG: $(shasum -a 256 "$dmg")"; echo "Before: $(codesign --verify --deep --strict "$app" 2>&1 | tr '\n' ' ')"; } | tee -a "$log"
+            # Every file in Contents/MacOS is nested code to codesign, the .NET assemblies (.dll) included: an unsigned one
+            # fails the bundle ("code object is not signed at all, In subcomponent: …dll"). A non-Mach-O file's signature
+            # is kept in extended attributes, which the HFS+ disk image and ditto preserve.
+            signed=0
+            while IFS= read -r -d '' f; do codesign --force --sign - --timestamp=none "$f" 2>&1 | grep -v "replacing existing signature" || true; signed=$((signed + 1)); done \
+              < <(find "$app/Contents/MacOS" -type f -print0)
+            echo "Signed ad-hoc: $signed files in Contents/MacOS" | tee -a "$log"
+            codesign --force --sign - --timestamp=none "$app"
+            codesign --verify --deep --strict --verbose=2 "$app" 2>&1 | tee -a "$log"
+            stage="$RUNNER_TEMP/dmg-stage-$rid"; rm -rf "$stage"; mkdir -p "$stage"
+            ditto "$app" "$stage/HCG Mail.app"; ln -s /Applications "$stage/Applications"
+            rm -f "$dmg"
+            # hdiutil on hosted runners intermittently fails with "Resource busy": retry a few times.
+            for i in 1 2 3 4; do
+              hdiutil create -volname "HCG Mail" -srcfolder "$stage" -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "$dmg" 2>&1 | tee -a "$log" && [ -s "$dmg" ] && break
+              [ "$i" = 4 ] && exit 1; echo "hdiutil create failed (attempt $i), retrying" | tee -a "$log"; sleep $((i * 10))
+            done
+            hdiutil verify "$dmg" 2>&1 | tail -1 | tee -a "$log"
+            echo "Sealed DMG: $(shasum -a 256 "$dmg")" | tee -a "$log"
+          done
+      - name: Evidence — checksums, sizes, toolchain
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/dist" && ls -la && shasum -a 256 * | tee SHA256SUMS.txt
+          python3 - <<'PY'
+          import hashlib, json, os, platform, subprocess
+          dist = os.path.join(os.environ["RUNNER_TEMP"], "dist")
+          sdk = subprocess.run(["dotnet", "--version"], capture_output=True, text=True, cwd="${{ github.workspace }}/hcg-mail/HCG Mail Project/Desktop").stdout.strip()
+          files = []
+          for name in sorted(os.listdir(dist)):
+              if name == "SHA256SUMS.txt":
+                  continue
+              path = os.path.join(dist, name)
+              files.append({"fileName": name, "sizeBytes": os.path.getsize(path), "sha256": hashlib.sha256(open(path, "rb").read()).hexdigest()})
+          json.dump({"version": os.environ["VERSION"], "buildNumber": int(os.environ["BUILD_NUMBER"]),
+                     "source": {"repository": "${{ github.repository }}", "commit": "${{ github.sha }}", "branch": "${{ github.ref_name }}"},
+                     "build": {"provider": "github-actions", "runId": "${{ github.run_id }}", "runner": "${{ matrix.runner }}",
+                               "toolchain": f".NET SDK {sdk}; HCG Executable Maker engine {os.environ['MAKER_COMMIT'][:7]}; host {platform.platform()}"},
+                     "files": files}, open(os.path.join(os.environ["RUNNER_TEMP"], "build-evidence-${{ matrix.os }}.json"), "w"), indent=2)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hcg-mail-${{ matrix.os }}-${{ env.VERSION }}
+          path: ${{ runner.temp }}/dist
+          retention-days: 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hcg-mail-${{ matrix.os }}-build-evidence
+          path: |
+            ${{ runner.temp }}/build-evidence-${{ matrix.os }}.json
+            ${{ runner.temp }}/package.log
+            ${{ runner.temp }}/seal.log
+          retention-days: 90
+
+  runtime:
+    name: Install and run on real ${{ matrix.rid }}
+    needs: package
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: osx-arm64, os: macos, runner: macos-15 }
+          - { rid: osx-x64, os: macos, runner: macos-15-intel }
+          - { rid: linux-x64, os: linux, runner: ubuntu-24.04 }
+          - { rid: linux-arm64, os: linux, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: hcg-mail
+          sparse-checkout: HCG Mail Project/Desktop/scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: hcg-mail-${{ matrix.os }}-${{ env.VERSION }}
+          path: dist
+      - name: Install from the DMG (as a user would) and run
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/runtime"; mkdir -p "$out"
+          dmg="dist/HCGMail-$VERSION-${{ matrix.rid }}.dmg"
+          { echo "DMG: $dmg"; hdiutil verify "$dmg" 2>&1 | tail -2; } | tee "$out/install.txt"
+          hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" | tee -a "$out/install.txt"
+          ls -la "$RUNNER_TEMP/dmg" | tee -a "$out/install.txt"
+          ditto "$RUNNER_TEMP/dmg/HCG Mail.app" "$RUNNER_TEMP/Applications/HCG Mail.app"
+          hdiutil detach "$RUNNER_TEMP/dmg"
+          app="$RUNNER_TEMP/Applications/HCG Mail.app"
+          { echo "Installed: $app"; plutil -p "$app/Contents/Info.plist"; echo; echo "Code signature (codesign --verify --deep --strict):"; codesign --verify --deep --strict --verbose=2 "$app" 2>&1 && echo "SEAL OK" || echo "SEAL BROKEN"; echo; echo "Gatekeeper (spctl --assess):"; spctl --assess --type execute -vv "$app" 2>&1 || true; } | tee -a "$out/install.txt"
+          echo "INSTALL OK" >> "$out/install.txt"
+          bash "hcg-mail/HCG Mail Project/Desktop/scripts/unix-runtime-check.sh" "$app/Contents/MacOS/HCGMail" "$out"
+      - name: Extract the portable ZIP and run (virtual display)
+        if: matrix.os == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb imagemagick > /dev/null
+          out="$RUNNER_TEMP/runtime"; mkdir -p "$out"
+          zip="dist/HCGMail-$VERSION-${{ matrix.rid }}.zip"
+          mkdir -p "$RUNNER_TEMP/app" && unzip -q "$zip" -d "$RUNNER_TEMP/app"
+          exe="$(find "$RUNNER_TEMP/app" -type f -name HCGMail | head -1)"
+          { echo "ZIP: $zip"; echo "Extracted executable: $exe"; ls -la "$exe"; echo "INSTALL OK"; } | tee "$out/install.txt"
+          xvfb-run -a -s "-screen 0 1440x900x24" bash "hcg-mail/HCG Mail Project/Desktop/scripts/unix-runtime-check.sh" "$exe" "$out"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-runtime-${{ matrix.rid }}
+          path: ${{ runner.temp }}/runtime
+          retention-days: 30
+
+  evidence:
+    name: Release manifest and Release Passports (from the evidence; nothing is sent)
+    needs: [package, runtime]
+    if: always() && needs.package.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: hcg-mail
+      - uses: actions/checkout@v5
+        with:
+          repository: F1r3srp3nt/HCG-repo
+          ref: ${{ env.HCG_REPO_COMMIT }}
+          path: hcg-repo
+          sparse-checkout: docs/schemas
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'hcg-mail-*-${{ env.VERSION }}', path: dist, merge-multiple: true }
+      - uses: actions/download-artifact@v4
+        with: { pattern: 'hcg-mail-*-build-evidence', path: evidence, merge-multiple: true }
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with: { pattern: 'hcg-mail-runtime-*', path: runtime }
+      - name: Generate and validate
+        run: |
+          pip install --quiet jsonschema
+          python3 -I "hcg-mail/HCG Mail Project/Desktop/scripts/maker/desktop-evidence.py" --dist dist --evidence evidence --runtime runtime \
+            --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out manifest | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hcg-mail-desktop-release-manifest
+          path: manifest
+          retention-days: 90

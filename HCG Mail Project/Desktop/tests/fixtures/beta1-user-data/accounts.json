@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "accounts": [
+    {
+      "id": "beta1-upgrade-test",
+      "displayName": "HCG Mail Test",
+      "emailAddress": "test@example.com",
+      "username": "test@example.com",
+      "imap": {
+        "host": "mail.example.com",
+        "port": 993,
+        "security": "SslTls"
+      },
+      "smtp": {
+        "host": "mail.example.com",
+        "port": 465,
+        "security": "SslTls"
+      },
+      "description": "Upgrade test (sanitized)"
+    }
+  ]
+}

@@ -44,7 +44,10 @@ public sealed class DeliveryRecordViewModel(DeliveryRecord record)
     public string Reply => record.ServerReply is null ? "No reply text" : $"{record.SmtpStatusCode} {record.ServerReply}".Trim();
     public string Details => $"{record.RecipientCount} recipient(s) · priority {record.Priority.ToString().ToLowerInvariant()} · via {record.SmtpServer}" +
                              (record.MessageId is null ? "" : $" · Message-ID <{record.MessageId}>");
-    public string Explanation => record.ErrorMessage ?? record.Explanation;
+    // An unknown outcome must say so ("may or may not have been accepted"), not just repeat the connection error.
+    public string Explanation => record.State == HCG.Mail.Core.Delivery.DeliveryState.Submitted && record.ErrorMessage is { } error
+        ? record.Explanation + " (" + error + ")"
+        : record.ErrorMessage ?? record.Explanation;
 }
 
 /// <summary>
@@ -79,6 +82,17 @@ public sealed partial class MailHealthViewModel : ObservableObject
         _dialogs = dialogs;
         LoadHistory();
     }
+
+    /// <summary>Connection health of the live account (Mail Health › Connection); null when opened without one.</summary>
+    public ConnectionHealthViewModel? Connection { get; init; }
+    public bool HasConnection => Connection is not null;
+
+    /// <summary>Mail Health › Network Doctor for the live account; null for accounts it does not apply to (Microsoft/Google sign-in).</summary>
+    public NetworkDoctorViewModel? Network { get; init; }
+    public bool HasNetwork => Network is not null;
+
+    /// <summary>Open on the Network Doctor tab (from the offline banner).</summary>
+    public bool StartOnNetworkDoctor { get; set; }
 
     public string AccountAddress => _account.EmailAddress;
     public string Domain => DomainNames.DomainOf(_account.EmailAddress) ?? _account.EmailAddress;
@@ -235,7 +249,8 @@ public sealed partial class MailHealthViewModel : ObservableObject
             foreach (var check in AnalysisChecks)
                 text.AppendLine($"[{check.StatusLabel}] {check.Title}: {check.Detail}");
         }
-        return text.ToString();
+        // Shared outside HCG Mail: addresses keep only their domain, and anything credential-like is removed.
+        return Infrastructure.Logging.LogRedactor.Redact(text.ToString());
     }
 
     private void LoadHistory()

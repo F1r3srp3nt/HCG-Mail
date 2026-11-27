@@ -24,7 +24,9 @@ public enum MessageViewMode
     Readable,
 }
 
-public sealed record HtmlSanitizeOptions(bool AllowRemoteImages, MessageViewMode Mode = MessageViewMode.Original);
+/// <param name="ViewportWidth">Width of the reading surface in pixels, used to decide which of the sender's <c>@media</c>
+/// rules apply (a phone layout on an iPhone, the desktop layout in a wide reading pane).</param>
+public sealed record HtmlSanitizeOptions(bool AllowRemoteImages, MessageViewMode Mode = MessageViewMode.Original, int ViewportWidth = 800);
 
 /// <summary>
 /// Removes scripts, event handlers, forms, frames, embedded objects and other active content

@@ -19,6 +19,11 @@
     <ProjectReference Include="..\..\src\HCG.Mail.App\HCG.Mail.App.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Test doubles shared with the engine tests: a manual clock and a mail session whose server can be switched off. -->
+    <Compile Include="..\HCG.Mail.Tests\Network\ManualTimeProvider.cs" Link="Shared\ManualTimeProvider.cs" />
+    <Compile Include="..\HCG.Mail.Tests\Network\SwitchableSession.cs" Link="Shared\SwitchableSession.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 </Project>

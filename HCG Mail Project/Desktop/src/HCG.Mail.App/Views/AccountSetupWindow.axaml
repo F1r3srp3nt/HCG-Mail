@@ -33,7 +33,7 @@
         <StackPanel Margin="30,26,26,20">
           <TextBlock Classes="h1" Text="{Binding Title}" />
           <TextBlock Classes="muted" Margin="0,6,0,0" TextWrapping="Wrap"
-                     Text="Connect an existing mailbox with IMAP (incoming) and SMTP (outgoing). Your provider gives you these details." />
+                     Text="Connect an existing mailbox with IMAP (incoming) and SMTP (outgoing). Not every provider allows this with your normal password: many require an app password, and some do not offer IMAP at all. Your provider's help pages give these details." />
           <Border Classes="banner" Margin="0,14,0,0" IsVisible="{Binding CanUseMicrosoft}">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
@@ -61,6 +61,9 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
           <TextBlock Classes="caption" Text="{Binding HostnameHint}" TextWrapping="Wrap" Margin="2,6,0,0" />
+          <Border x:Name="PasswordGuidanceBanner" Classes="banner" Margin="0,10,0,0" IsVisible="{Binding HasPasswordGuidance}">
+            <TextBlock Text="{Binding PasswordGuidance}" TextWrapping="Wrap" />
+          </Border>
 
           <TextBlock Classes="section" Text="YOUR DETAILS" Margin="0,22,0,10" />
           <Grid ColumnDefinitions="*,16,*">
@@ -75,6 +78,13 @@
               <TextBlock Classes="error" Text="{Binding DisplayNameError}" IsVisible="{Binding DisplayNameError, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="0,4,0,0" />
             </StackPanel>
           </Grid>
+          <Border x:Name="ProviderNoticeBanner" Classes="banner" Margin="0,0,0,12" IsVisible="{Binding HasProviderNotice}">
+            <TextBlock Text="{Binding ProviderNotice}" TextWrapping="Wrap" Foreground="{DynamicResource Hcg.Text.Accent}" />
+          </Border>
+          <StackPanel Classes="field">
+            <TextBlock Classes="label" Text="Account description (optional)" />
+            <TextBox x:Name="DescriptionBox" Text="{Binding Description}" PlaceholderText="For example Work or Personal — shown only to you" MaxLength="100" />
+          </StackPanel>
           <Grid ColumnDefinitions="*,16,*">
             <StackPanel Classes="field">
               <TextBlock Classes="label" Text="Username" />

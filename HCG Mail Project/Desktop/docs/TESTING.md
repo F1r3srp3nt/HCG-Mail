@@ -50,6 +50,12 @@ through a relay that the test cuts and restores): error state while offline, lis
 automatic recovery on refresh using the new connection. That test caught — and now guards against — a
 bug where the message list kept using the closed connection after a reconnect.
 
+## Dedicated test mailbox (authenticated IMAP/SMTP)
+
+`tests/HCG.Mail.Tests/Integration/DedicatedMailboxTests.cs` signs in to a real, dedicated test mailbox. It needs the
+`HCG_TEST_MAILBOX_*` variables (in CI, repository secrets) and is skipped without them. See
+[DEDICATED_TEST_MAILBOX.md](DEDICATED_TEST_MAILBOX.md).
+
 ## Last recorded run (development container, Ubuntu 24.04, .NET SDK 10.0.114, 2026-11-12)
 
 ```
