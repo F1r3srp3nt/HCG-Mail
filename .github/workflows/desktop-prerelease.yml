@@ -57,7 +57,7 @@ jobs:
         # Executable Maker (pinned 595e989) assembles the bundle around an app host that only carries the .NET SDK's ad-hoc
         # signature, so the bundle itself is not sealed: codesign --verify --deep fails and Gatekeeper reports "code has
         # no resources but signature indicates they must be present" (macOS then calls a downloaded app damaged). Until
-        # that is fixed in Maker, every Mach-O file and then the bundle are signed ad-hoc here, verified strictly, and the
+        # that is fixed in Maker, every file in Contents/MacOS and then the bundle are signed ad-hoc here, verified strictly, and the
         # DMG is rebuilt with Maker's layout (the app and an Applications link). Maker's own DMG checksums are recorded.
         # Ad-hoc is not a Developer ID signature: Gatekeeper still treats the app as from an unidentified developer.
         if: matrix.os == 'macos'
@@ -69,9 +69,13 @@ jobs:
             app="$RUNNER_TEMP/out/HCG Mail-$VERSION-$rid/HCG Mail.app"
             dmg="$RUNNER_TEMP/dist/HCGMail-$VERSION-$rid.dmg"
             { echo "== $rid"; echo "Maker's DMG: $(shasum -a 256 "$dmg")"; echo "Before: $(codesign --verify --deep --strict "$app" 2>&1 | tr '\n' ' ')"; } | tee -a "$log"
-            find "$app/Contents/MacOS" -type f | while read -r f; do
-              if file "$f" | grep -q 'Mach-O'; then codesign --force --sign - --timestamp=none "$f"; fi
-            done
+            # Every file in Contents/MacOS is nested code to codesign, the .NET assemblies (.dll) included: an unsigned one
+            # fails the bundle ("code object is not signed at all, In subcomponent: …dll"). A non-Mach-O file's signature
+            # is kept in extended attributes, which the HFS+ disk image and ditto preserve.
+            signed=0
+            while IFS= read -r -d '' f; do codesign --force --sign - --timestamp=none "$f" 2>&1 | grep -v "replacing existing signature" || true; signed=$((signed + 1)); done \
+              < <(find "$app/Contents/MacOS" -type f -print0)
+            echo "Signed ad-hoc: $signed files in Contents/MacOS" | tee -a "$log"
             codesign --force --sign - --timestamp=none "$app"
             codesign --verify --deep --strict --verbose=2 "$app" 2>&1 | tee -a "$log"
             stage="$RUNNER_TEMP/dmg-stage-$rid"; rm -rf "$stage"; mkdir -p "$stage"
