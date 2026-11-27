@@ -214,7 +214,7 @@ jobs:
           - { arch: arm64, runner: windows-11-arm }
     defaults:
       run:
-        working-directory: Windows-executable-Application
+        working-directory: HCG Mail Project/Desktop
     env:
       HCG_TEST_MAILBOX_ADDRESS: ${{ secrets.HCG_TEST_MAILBOX_ADDRESS }}
       HCG_TEST_MAILBOX_USERNAME: ${{ secrets.HCG_TEST_MAILBOX_USERNAME }}
