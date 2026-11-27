@@ -28,6 +28,7 @@ public sealed partial class HtmlToTextConverter : IHtmlToTextConverter
 
         var parser = new HtmlParser();
         using var document = parser.ParseDocument(html);
+        FormControls.Flatten(document); // a code in an <input> or <button> is content, not a control
         var sb = new StringBuilder();
         if (document.Body is not null)
             Walk(document.Body, sb);
@@ -109,6 +110,7 @@ public sealed partial class HtmlToTextConverter : IHtmlToTextConverter
         using var document = parser.ParseDocument(html);
         if (document.Body is null)
             return false;
+        FormControls.Flatten(document);
         var text = new StringBuilder();
         Walk(document.Body, text);
         if (text.ToString().Any(c => !char.IsWhiteSpace(c) && !PreviewText.IsInvisible(c)))

@@ -97,6 +97,8 @@ public static class MobileServices
         services.AddSingleton<ITcpProbe, SystemTcpProbe>();
         services.AddSingleton<IHtmlToTextConverter, HtmlToTextConverter>();
         services.AddSingleton<IHtmlSanitizer, MailHtmlSanitizer>();
+        // Messages are laid out at phone width: the sender's phone breakpoints (@media max-width) apply, as in Apple Mail.
+        MessageReaderViewModel.LayoutWidth = 420;
 
         // A store release offers only sign-in providers that are configured in this build (Microsoft needs a client ID;
         // Google has no iOS client yet). Their implementation stays in place for later activation.
