@@ -49,9 +49,9 @@ jobs:
         run: |
           $maker = (Resolve-Path maker).Path.Replace('\', '/')
           $pack = Join-Path $env:RUNNER_TEMP 'pack'; New-Item -ItemType Directory -Force $pack | Out-Null
-          (Get-Content hcg-mail/Windows-executable-Application/scripts/maker/package-windows.cs.template -Raw).Replace('@MAKER@', $maker) |
+          (Get-Content 'hcg-mail/HCG Mail Project/Desktop/scripts/maker/package-windows.cs.template' -Raw).Replace('@MAKER@', $maker) |
             Set-Content (Join-Path $pack 'package-windows.cs') -Encoding utf8
-          dotnet run --no-cache (Join-Path $pack 'package-windows.cs') -- (Resolve-Path hcg-mail/Windows-executable-Application).Path `
+          dotnet run --no-cache (Join-Path $pack 'package-windows.cs') -- (Resolve-Path 'hcg-mail/HCG Mail Project/Desktop').Path `
             "$env:RUNNER_TEMP\out" --version $env:VERSION --targets win-x64,win-arm64 --dist "$env:RUNNER_TEMP\dist" --installer |
             Tee-Object -FilePath "$env:RUNNER_TEMP\package.log"
           if ($LASTEXITCODE -ne 0) { throw "packaging failed ($LASTEXITCODE)" }
@@ -63,7 +63,7 @@ jobs:
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } | Set-Content "$dist\SHA256SUMS.txt" -Encoding ascii
           Get-Content "$dist\SHA256SUMS.txt"
           # The SDK the build used is the one HCG Mail's global.json selects in its own folder (the runner also has newer ones).
-          Push-Location hcg-mail/Windows-executable-Application; $sdk = (dotnet --version); Pop-Location
+          Push-Location 'hcg-mail/HCG Mail Project/Desktop'; $sdk = (dotnet --version); Pop-Location
           # Inno Setup's own version, from its uninstall registration (ISCC /? prints no version number and exits 1).
           $innoKey = Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1', 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1' -ErrorAction SilentlyContinue | Select-Object -First 1
           $inno = "Inno Setup $(if ($innoKey) { $innoKey.DisplayVersion } else { (Get-Item "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe").VersionInfo.FileVersion })"
@@ -136,7 +136,7 @@ jobs:
     timeout-minutes: 40
     defaults:
       run:
-        working-directory: Windows-executable-Application
+        working-directory: HCG Mail Project/Desktop
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-dotnet@v5
@@ -182,7 +182,7 @@ jobs:
           $zip = Get-ChildItem dist -Filter "HCGMail-$env:VERSION-win-${{ matrix.arch }}.zip" | Select-Object -First 1
           $dir = Join-Path $env:RUNNER_TEMP 'portable'; Expand-Archive $zip.FullName $dir -Force
           $exe = (Get-ChildItem $dir -Recurse -Filter HCGMail.exe | Select-Object -First 1).FullName
-          ./hcg-mail/Windows-executable-Application/scripts/windows-runtime-check.ps1 -Exe $exe -Out "$env:RUNNER_TEMP\runtime-portable"
+          & './hcg-mail/HCG Mail Project/Desktop/scripts/windows-runtime-check.ps1' -Exe $exe -Out "$env:RUNNER_TEMP\runtime-portable"
       - name: Installer — silent install, files, shortcuts, registration, launch, silent uninstall (Executable Maker's test)
         shell: pwsh
         run: |
@@ -225,7 +225,7 @@ jobs:
       - name: Generate and validate
         run: |
           pip install --quiet jsonschema
-          python3 -I hcg-mail/Windows-executable-Application/scripts/maker/store-draft.py --dist dist --evidence evidence/build-evidence.json \
+          python3 -I "hcg-mail/HCG Mail Project/Desktop/scripts/maker/store-draft.py" --dist dist --evidence evidence/build-evidence.json \
             --runtime runtime --tests tests --schema hcg-repo/docs/schemas/release-passport-v1.schema.json \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" --out store-draft | tee -a "$GITHUB_STEP_SUMMARY"
           cp dist/SHA256SUMS.txt store-draft/

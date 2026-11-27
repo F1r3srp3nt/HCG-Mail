@@ -7,54 +7,54 @@
       "id": "hcg-mail-desktop",
       "name": "HCG Mail (desktop)",
       "platforms": ["windows", "macos", "linux"],
-      "project": "Windows-executable-Application/src/HCG.Mail.App/HCG.Mail.App.csproj",
-      "solution": "Windows-executable-Application/HCG.Mail.sln",
+      "project": "HCG Mail Project/Desktop/src/HCG.Mail.App/HCG.Mail.App.csproj",
+      "solution": "HCG Mail Project/Desktop/HCG.Mail.sln",
       "targetFramework": "net10.0",
       "outputType": "WinExe",
       "buildHost": ["windows", "macos", "linux"],
-      "build": "dotnet publish Windows-executable-Application/src/HCG.Mail.App/HCG.Mail.App.csproj -c Release -r win-x64 --self-contained",
-      "docs": "Windows-executable-Application/docs/WINDOWS_BUILD.md"
+      "build": "dotnet publish \"HCG Mail Project/Desktop/src/HCG.Mail.App/HCG.Mail.App.csproj\" -c Release -r win-x64 --self-contained",
+      "docs": "HCG Mail Project/Desktop/docs/WINDOWS_BUILD.md"
     },
     {
       "id": "hcg-mail-ios",
       "name": "HCG Mail for iPhone and iPad",
       "platforms": ["ios"],
-      "project": "iOS App Store Submission/src/HCG.Mail.iOS/HCG.Mail.iOS.csproj",
-      "solution": "iOS App Store Submission/HCG.Mail.iOS.sln",
-      "workingDirectory": "iOS App Store Submission",
+      "project": "HCG Mail Project/iOS/src/HCG.Mail.iOS/HCG.Mail.iOS.csproj",
+      "solution": "HCG Mail Project/iOS/HCG.Mail.iOS.sln",
+      "workingDirectory": "HCG Mail Project/iOS",
       "targetFramework": "net10.0-ios",
       "outputType": "Exe",
       "bundleId": "com.hakmicapitalgroup.hcgmail",
       "buildHost": ["macos"],
-      "toolchain": "iOS App Store Submission/toolchain.props",
-      "sharedRoot": "Windows-executable-Application",
-      "sharedRootOverride": "-p:HcgSharedRoot=<absolute path to Windows-executable-Application> or environment HCG_SHARED_ROOT",
-      "check": "iOS App Store Submission/scripts/doctor.sh",
-      "xcodeProject": "iOS App Store Submission/HCGMail.xcodeproj",
+      "toolchain": "HCG Mail Project/iOS/toolchain.props",
+      "sharedRoot": "HCG Mail Project/Desktop",
+      "sharedRootOverride": "-p:HcgSharedRoot=<absolute path to HCG Mail Project/Desktop> or environment HCG_SHARED_ROOT",
+      "check": "HCG Mail Project/iOS/scripts/doctor.sh",
+      "xcodeProject": "HCG Mail Project/iOS/HCGMail.xcodeproj",
       "xcodeSchemes": {
         "HCG Mail": "builds the app through the .NET build (simulator, or unsigned compile for devices); Archive is not supported",
         "HCG Mail Simulator": "builds, installs and starts the app in the iOS Simulator"
       },
       "build": {
-        "simulator": "iOS App Store Submission/scripts/build-simulator.sh Debug",
-        "device": "dotnet build \"iOS App Store Submission/src/HCG.Mail.iOS/HCG.Mail.iOS.csproj\" -c Release -f net10.0-ios -r ios-arm64 -p:CodesignKey=<identity> -p:CodesignProvision=<profile>",
-        "ipa": "iOS App Store Submission/scripts/export-ipa.sh"
+        "simulator": "\"HCG Mail Project/iOS/scripts/build-simulator.sh\" Debug",
+        "device": "dotnet build \"HCG Mail Project/iOS/src/HCG.Mail.iOS/HCG.Mail.iOS.csproj\" -c Release -f net10.0-ios -r ios-arm64 -p:CodesignKey=<identity> -p:CodesignProvision=<profile>",
+        "ipa": "\"HCG Mail Project/iOS/scripts/export-ipa.sh\""
       },
-      "verify": "python3 \"iOS App Store Submission/scripts/verify-ios-build.py\" app <.app or .ipa>",
-      "docs": "iOS App Store Submission/README.md",
-      "submission": "iOS App Store Submission/APP_STORE_SUBMISSION.md"
+      "verify": "python3 \"HCG Mail Project/iOS/scripts/verify-ios-build.py\" app <.app or .ipa>",
+      "docs": "HCG Mail Project/iOS/README.md",
+      "submission": "HCG Mail Project/iOS/APP_STORE_SUBMISSION.md"
     }
   ],
   "libraries": [
-    "Windows-executable-Application/src/HCG.Mail.Core/HCG.Mail.Core.csproj",
-    "Windows-executable-Application/src/HCG.Mail.Email/HCG.Mail.Email.csproj",
-    "Windows-executable-Application/src/HCG.Mail.Infrastructure/HCG.Mail.Infrastructure.csproj",
-    "Windows-executable-Application/src/HCG.Mail.Presentation/HCG.Mail.Presentation.csproj",
-    "iOS App Store Submission/src/HCG.Mail.Mobile/HCG.Mail.Mobile.csproj"
+    "HCG Mail Project/Desktop/src/HCG.Mail.Core/HCG.Mail.Core.csproj",
+    "HCG Mail Project/Desktop/src/HCG.Mail.Email/HCG.Mail.Email.csproj",
+    "HCG Mail Project/Desktop/src/HCG.Mail.Infrastructure/HCG.Mail.Infrastructure.csproj",
+    "HCG Mail Project/Desktop/src/HCG.Mail.Presentation/HCG.Mail.Presentation.csproj",
+    "HCG Mail Project/iOS/src/HCG.Mail.Mobile/HCG.Mail.Mobile.csproj"
   ],
   "tests": [
-    "Windows-executable-Application/tests/HCG.Mail.Tests/HCG.Mail.Tests.csproj",
-    "Windows-executable-Application/tests/HCG.Mail.App.Tests/HCG.Mail.App.Tests.csproj",
-    "iOS App Store Submission/tests/HCG.Mail.Mobile.Tests/HCG.Mail.Mobile.Tests.csproj"
+    "HCG Mail Project/Desktop/tests/HCG.Mail.Tests/HCG.Mail.Tests.csproj",
+    "HCG Mail Project/Desktop/tests/HCG.Mail.App.Tests/HCG.Mail.App.Tests.csproj",
+    "HCG Mail Project/iOS/tests/HCG.Mail.Mobile.Tests/HCG.Mail.Mobile.Tests.csproj"
   ]
 }
