@@ -60,6 +60,12 @@ $tls = @(
     @{ Target = 'imap.gmail.com:993'; Valid = $true; What = 'IMAP over TLS, valid certificate' },
     @{ Target = 'smtp.gmail.com:465'; Valid = $true; What = 'SMTP over TLS, valid certificate' },
     @{ Target = 'outlook.office365.com:993'; Valid = $true; What = 'IMAP over TLS, valid certificate (second provider)' },
+    # The provider presets offered in account setup (implicit-TLS ports; iCloud's SMTP uses STARTTLS on 587).
+    @{ Target = 'imap.mail.me.com:993'; Valid = $true; What = 'iCloud Mail IMAP preset' },
+    @{ Target = 'imap.mail.yahoo.com:993'; Valid = $true; What = 'Yahoo Mail IMAP preset' },
+    @{ Target = 'smtp.mail.yahoo.com:465'; Valid = $true; What = 'Yahoo Mail SMTP preset' },
+    @{ Target = 'imap.fastmail.com:993'; Valid = $true; What = 'Fastmail IMAP preset' },
+    @{ Target = 'smtp.fastmail.com:465'; Valid = $true; What = 'Fastmail SMTP preset' },
     @{ Target = 'expired.badssl.com:443'; Valid = $false; What = 'expired certificate' },
     @{ Target = 'wrong.host.badssl.com:443'; Valid = $false; What = 'certificate for another host name' },
     @{ Target = 'self-signed.badssl.com:443'; Valid = $false; What = 'self-signed certificate' }

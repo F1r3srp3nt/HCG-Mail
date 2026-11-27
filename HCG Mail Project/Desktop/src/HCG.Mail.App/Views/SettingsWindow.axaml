@@ -119,7 +119,7 @@
                       </Border>
                       <StackPanel Grid.Column="1" Margin="12,0" Spacing="2">
                         <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding EmailAddress}" Classes="caption" />
+                        <TextBlock Text="{Binding AddressLine}" Classes="caption" TextWrapping="Wrap" />
                         <TextBlock Classes="caption" TextWrapping="Wrap">
                           <Run Text="{Binding ProviderLabel}" />
                           <Run Text="·" />

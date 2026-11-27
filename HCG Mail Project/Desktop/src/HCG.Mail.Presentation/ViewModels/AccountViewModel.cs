@@ -106,6 +106,9 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
 
     public string DisplayName => string.IsNullOrWhiteSpace(Account.DisplayName) ? Account.EmailAddress : Account.DisplayName;
     public string EmailAddress => Account.EmailAddress;
+
+    /// <summary>The address, after the user's own description when there is one ("Work · ola@example.com").</summary>
+    public string AddressLine => string.IsNullOrWhiteSpace(Account.Description) ? Account.EmailAddress : $"{Account.Description} · {Account.EmailAddress}";
     public string Initials => MakeInitials(DisplayName);
     public bool IsConnected => Status == AccountStatus.Connected;
     public bool IsConnecting => Status == AccountStatus.Connecting;
@@ -231,6 +234,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         Account = account;
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(EmailAddress));
+        OnPropertyChanged(nameof(AddressLine));
         OnPropertyChanged(nameof(Initials));
         OnPropertyChanged(nameof(ProviderLabel));
         await DisposeSessionAsync();

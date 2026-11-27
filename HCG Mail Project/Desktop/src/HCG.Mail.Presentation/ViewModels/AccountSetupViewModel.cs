@@ -52,6 +52,7 @@ public sealed partial class AccountSetupViewModel : ObservableObject
 
     [ObservableProperty] private ProviderPreset _selectedPreset;
     [ObservableProperty] private string _displayName = "";
+    [ObservableProperty] private string _description = "";
     [ObservableProperty] private string _emailAddress = "";
     [ObservableProperty] private string _username = "";
     [ObservableProperty] private string _password = "";
@@ -109,6 +110,7 @@ public sealed partial class AccountSetupViewModel : ObservableObject
         {
             var draft = AccountValidator.FromAccount(existing);
             _displayName = draft.DisplayName;
+            _description = draft.Description;
             _emailAddress = draft.EmailAddress;
             _username = draft.Username;
             _imapHost = draft.ImapHost;
@@ -142,17 +144,54 @@ public sealed partial class AccountSetupViewModel : ObservableObject
     /// <summary>Raised with true after a successful save, false on cancel.</summary>
     public event EventHandler<bool>? CloseRequested;
 
+    /// <summary>App-password guidance for the selected provider (where the provider requires one).</summary>
+    public string? PasswordGuidance => SelectedPreset.PasswordGuidance;
+    public bool HasPasswordGuidance => SelectedPreset.HasPasswordGuidance;
+
+    /// <summary>Why the typed address cannot be added this way in this release (Outlook.com, Proton Mail), if it cannot.</summary>
+    public string? ProviderNotice => ProviderPresets.NoticeFor(EmailAddress);
+    public bool HasProviderNotice => ProviderNotice is not null;
+
+    // Hosts filled in from a preset; replaced or cleared when the preset changes, never when the user typed their own.
+    private string? _presetImapHost;
+    private string? _presetSmtpHost;
+    private bool _applyingPreset;
+
     partial void OnSelectedPresetChanged(ProviderPreset value)
     {
-        ImapPort = value.ImapPort.ToString(CultureInfo.InvariantCulture);
-        ImapSecurity = SecurityOption.All.First(o => o.Mode == value.ImapSecurity);
-        SmtpPort = value.SmtpPort.ToString(CultureInfo.InvariantCulture);
-        SmtpSecurity = SecurityOption.All.First(o => o.Mode == value.SmtpSecurity);
+        _applyingPreset = true;
+        try
+        {
+            ImapPort = value.ImapPort.ToString(CultureInfo.InvariantCulture);
+            ImapSecurity = SecurityOption.All.First(o => o.Mode == value.ImapSecurity);
+            SmtpPort = value.SmtpPort.ToString(CultureInfo.InvariantCulture);
+            SmtpSecurity = SecurityOption.All.First(o => o.Mode == value.SmtpSecurity);
+            if (string.IsNullOrWhiteSpace(ImapHost) || ImapHost == _presetImapHost)
+                ImapHost = value.ImapHost ?? "";
+            if (string.IsNullOrWhiteSpace(SmtpHost) || SmtpHost == _presetSmtpHost || SmtpHost == _lastAutoSmtpHost)
+                SmtpHost = value.SmtpHost ?? ImapHost;
+            _presetImapHost = value.ImapHost;
+            _presetSmtpHost = value.SmtpHost;
+            if (value.SmtpHost is not null)
+                _lastAutoSmtpHost = null;
+        }
+        finally
+        {
+            _applyingPreset = false;
+        }
         OnPropertyChanged(nameof(HostnameHint));
+        OnPropertyChanged(nameof(PasswordGuidance));
+        OnPropertyChanged(nameof(HasPasswordGuidance));
     }
 
     partial void OnEmailAddressChanged(string? oldValue, string newValue)
     {
+        // A known mailbox provider's published settings are suggested from the address (new accounts only).
+        if (!IsEditing && ProviderPresets.ForAddress(newValue) is { } detected && detected != SelectedPreset
+            && (string.IsNullOrWhiteSpace(ImapHost) || ImapHost == _presetImapHost))
+            SelectedPreset = detected;
+        OnPropertyChanged(nameof(ProviderNotice));
+        OnPropertyChanged(nameof(HasProviderNotice));
         if (!_usernameEdited || string.Equals(Username, oldValue?.Trim(), StringComparison.OrdinalIgnoreCase))
         {
             Username = newValue.Trim();
@@ -183,6 +222,11 @@ public sealed partial class AccountSetupViewModel : ObservableObject
     partial void OnImapHostChanged(string value)
     {
         // Most providers use one server name for both directions; prefill SMTP until the user edits it.
+        if (_applyingPreset)
+        {
+            Revalidate();
+            return;
+        }
         if (string.IsNullOrWhiteSpace(SmtpHost) || SmtpHost == _lastAutoSmtpHost)
         {
             SmtpHost = value.Trim();
@@ -194,6 +238,7 @@ public sealed partial class AccountSetupViewModel : ObservableObject
     private string? _lastAutoSmtpHost;
 
     partial void OnDisplayNameChanged(string value) => Revalidate();
+    partial void OnDescriptionChanged(string value) => Revalidate();
     partial void OnPasswordChanged(string value) => Revalidate();
     partial void OnImapPortChanged(string value) => Revalidate();
     partial void OnSmtpHostChanged(string value) => Revalidate();
@@ -341,6 +386,7 @@ public sealed partial class AccountSetupViewModel : ObservableObject
     private AccountDraft BuildDraft() => new()
     {
         DisplayName = DisplayName,
+        Description = Description,
         EmailAddress = EmailAddress,
         Username = Username,
         Password = Password,

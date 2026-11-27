@@ -32,6 +32,9 @@ public sealed record MailAccount
     public required ServerEndpoint Imap { get; init; }
     public required ServerEndpoint Smtp { get; init; }
 
+    /// <summary>The user's own label for the account ("Work", "Personal"), shown next to the address. Optional.</summary>
+    public string? Description { get; init; }
+
     /// <summary>Identifier of the provider preset used to create the account, if any.</summary>
     public string? PresetId { get; init; }
 
