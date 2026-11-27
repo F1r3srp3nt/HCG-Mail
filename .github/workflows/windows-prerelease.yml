@@ -7,6 +7,8 @@ name: Windows prerelease
 on:
   push:
     branches: ['windows/**', 'release/**']
+    # Documentation-only pushes do not rebuild the release: the candidate's files stay the ones already built.
+    paths-ignore: ['**/*.md', '**/docs/**']
   workflow_dispatch:
 
 permissions:
