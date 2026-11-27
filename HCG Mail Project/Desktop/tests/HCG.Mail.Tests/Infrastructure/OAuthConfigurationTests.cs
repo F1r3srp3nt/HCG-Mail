@@ -33,7 +33,7 @@ public sealed class OAuthConfigurationTests
         foreach (var p in properties)
             start.ArgumentList.Add("-p:" + p);
         // A clean environment for the values under test, whatever the machine running the tests has set.
-        foreach (var name in new[] { "HCG_MICROSOFT_CLIENT_ID", "HCG_GOOGLE_CLIENT_ID", "HCG_GOOGLE_CLIENT_SECRET" })
+        foreach (var name in new[] { "HCG_MICROSOFT_CLIENT_ID", "HCG_GOOGLE_CLIENT_ID", "HCG_GOOGLE_CLIENT_SECRET", "HCG_RELEASE_CHANNEL" })
             start.Environment[name] = env is not null && env.TryGetValue(name, out var v) ? v : null;
         using var process = Process.Start(start)!;
         var output = process.StandardOutput.ReadToEnd();
@@ -127,5 +127,20 @@ public sealed class OAuthConfigurationTests
         Assert.DoesNotMatch(new Regex(@"<HcgGoogleClientSecret[^>]*>[^<$]"), committed); // only $(…) environment fallbacks
         foreach (Match m in Regex.Matches(committed, @"<HcgMicrosoftClientId Condition=""[^""]*"">([^<$]+)<"))
             Assert.Matches("^[0-9a-fA-F-]{36}$", m.Groups[1].Value);
+    }
+
+    [Fact]
+    public void Builds_are_public_beta_unless_internal_is_asked_for()
+    {
+        Assert.Equal("PublicBeta", Metadata()["HcgReleaseChannel"]);
+        // An unknown value given on the command line reaches the build as written, and the app reads it as Public Beta.
+        var unknown = Metadata(null, "HcgReleaseChannel=Something")["HcgReleaseChannel"];
+        Assert.Equal(HCG.Mail.Core.Release.ReleaseChannel.PublicBeta, HCG.Mail.Core.Release.ReleaseCapabilities.Parse(unknown).Channel);
+        Assert.Equal("Internal", Metadata(null, "HcgReleaseChannel=Internal")["HcgReleaseChannel"]);
+        Assert.Equal("Internal", Metadata(new() { ["HCG_RELEASE_CHANNEL"] = "Internal" })["HcgReleaseChannel"]);
+
+        Assert.False(HCG.Mail.Core.Release.ReleaseCapabilities.Parse("PublicBeta").MicrosoftSignIn);
+        Assert.False(HCG.Mail.Core.Release.ReleaseCapabilities.Parse(null).GoogleSignIn);
+        Assert.True(HCG.Mail.Core.Release.ReleaseCapabilities.Parse("internal").MicrosoftSignIn);
     }
 }

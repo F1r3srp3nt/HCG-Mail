@@ -39,6 +39,9 @@ public sealed class IosPlatform : IMobilePlatform, IDisposable
     public static string AppName { get; } =
         NSBundle.MainBundle.ObjectForInfoDictionary("CFBundleName")?.ToString() is { Length: > 0 } name ? name : "HCG Mail";
     public IMicrosoftAuth MicrosoftAuth => _microsoftAuth.Value;
+
+    /// <summary>From -p:HcgReleaseChannel at build time (HcgBuildInfo); Public Beta unless it says Internal.</summary>
+    public HCG.Mail.Core.Release.ReleaseCapabilities Capabilities { get; } = HCG.Mail.Core.Release.ReleaseCapabilities.Parse(HcgBuildInfo.ReleaseChannel);
     public bool IsTablet => UIDevice.CurrentDevice.UserInterfaceIdiom == UIUserInterfaceIdiom.Pad;
 
     /// <summary>Dynamic Type: how much the user's text size scales 17-point body text.</summary>

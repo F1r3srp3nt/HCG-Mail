@@ -214,6 +214,50 @@ public class RealAccountModeTests
     }
 
     [AvaloniaFact]
+    public async Task Public_beta_hides_microsoft_and_google_and_keeps_an_existing_microsoft_account_unchanged()
+    {
+        var dir = Directory.CreateTempSubdirectory("hcg-mail-public-beta-").FullName;
+        try
+        {
+            var paths = new AppPaths(dir);
+            var existing = new MailAccount
+            {
+                Id = "ms-1", DisplayName = "Kari", EmailAddress = "kari@example.com", Username = "kari@example.com",
+                Imap = MailAccount.GraphEndpoint, Smtp = MailAccount.GraphEndpoint,
+                Provider = MailProviderKind.MicrosoftGraph, MicrosoftAccountId = "home-account-id",
+            };
+            new JsonAccountStore(paths, NullLogger<JsonAccountStore>.Instance).Save([existing]);
+            var before = File.ReadAllBytes(paths.AccountsFile);
+
+            // Microsoft is configured in this build, but the release capability (Public Beta) still hides it.
+            Assert.False(AppServices.Capabilities.MicrosoftSignIn);
+            var (services, window, vm) = await StartNormalAsync(dir);
+            var settings = new SettingsViewModel(services.GetRequiredService<AppSettingsService>(), services.GetRequiredService<ThemeService>(),
+                services.GetRequiredService<IDialogService>(), paths, services.GetRequiredService<ICredentialVault>(), vm);
+
+            Assert.False(vm.ShowMicrosoftSignIn);
+            Assert.False(vm.ShowGoogleSignIn);
+            Assert.False(settings.ShowMicrosoftSignIn);
+            Assert.False(HasVisibleButton(window, "AddMicrosoftAccountButton"));
+            Assert.False(HasVisibleButton(window, "AddGoogleAccountButton"));
+
+            var account = Assert.Single(vm.Accounts);
+            Assert.Equal(MailProviderKind.MicrosoftGraph, account.Account.Provider);
+            Assert.Contains("not available in HCG Mail 1.0 Public Beta", account.StatusText);
+            Assert.Contains("kept unchanged", account.StatusText);
+            Assert.Equal(before, File.ReadAllBytes(paths.AccountsFile)); // not deleted, not converted
+
+            window.Close();
+            await vm.DisposeAsync();
+            await services.DisposeAsync();
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [AvaloniaFact]
     public async Task A_configured_sign_in_provider_is_offered_and_named()
     {
         var dir = Directory.CreateTempSubdirectory("hcg-mail-configured-").FullName;
@@ -221,7 +265,8 @@ public class RealAccountModeTests
         {
             var microsoft = Substitute.For<IMicrosoftAuth>();
             microsoft.IsConfigured.Returns(true);
-            var (services, window, vm) = await StartNormalAsync(dir, s => s.AddSingleton(microsoft));
+            // An internal development build: release capabilities allow the provider.
+            var (services, window, vm) = await StartNormalAsync(dir, s => s.AddSingleton(microsoft).AddSingleton(new SignInPresentation(false, AllowMicrosoft: true, AllowGoogle: true)));
             Assert.True(HasVisibleButton(window, "AddMicrosoftAccountButton"));
             Assert.False(HasVisibleButton(window, "AddGoogleAccountButton"));
             Assert.Contains("Microsoft account", vm.WelcomeText);

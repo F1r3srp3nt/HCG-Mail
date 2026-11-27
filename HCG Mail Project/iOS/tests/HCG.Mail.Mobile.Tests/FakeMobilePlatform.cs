@@ -24,6 +24,7 @@ public sealed class FakeMobilePlatform : IMobilePlatform, IDisposable
     public string TemporaryFilesDirectory { get; }
     public ICredentialVault CredentialVault { get; } = new SessionCredentialVault();
     public IMicrosoftAuth MicrosoftAuth { get; set; } = new UnconfiguredMicrosoftAuth("Microsoft sign-in is not set up in this test build.");
+    public HCG.Mail.Core.Release.ReleaseCapabilities Capabilities { get; set; } = HCG.Mail.Core.Release.ReleaseCapabilities.PublicBeta;
     public bool IsTablet { get; set; }
     public List<Uri> OpenedUrls { get; } = [];
     public List<string> SharedFiles { get; } = [];

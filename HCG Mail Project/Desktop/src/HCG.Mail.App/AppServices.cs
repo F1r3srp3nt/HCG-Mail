@@ -3,6 +3,7 @@ using HCG.Mail.App.Services;
 using HCG.Mail.App.ViewModels;
 using HCG.Mail.Core.Accounts;
 using HCG.Mail.Core.Delivery;
+using HCG.Mail.Core.Release;
 using HCG.Mail.Core.Security;
 using HCG.Mail.Core.Services;
 using HCG.Mail.Core.Settings;
@@ -26,6 +27,9 @@ namespace HCG.Mail.App;
 /// <summary>Composition root. Preview mode swaps every persistent or networked service for an in-memory one.</summary>
 public static class AppServices
 {
+    /// <summary>This build's release capabilities (from -p:HcgReleaseChannel). Tests may replace it.</summary>
+    public static ReleaseCapabilities Capabilities { get; set; } = ReleaseCapabilities.FromAssembly(typeof(AppServices).Assembly);
+
     public static ServiceProvider Build(AppMode mode, Action<IServiceCollection>? configure = null)
     {
         var services = new ServiceCollection();
@@ -75,6 +79,9 @@ public static class AppServices
             services.AddSingleton<IMailSessionFactory, MailSessionFactory>();
             services.AddSingleton<IMicrosoftAuth>(sp =>
             {
+                // A build without the Microsoft capability never activates Microsoft sign-in, whatever is configured.
+                if (!Capabilities.MicrosoftSignIn)
+                    return new UnconfiguredMicrosoftAuth(ReleaseCapabilities.MicrosoftUnavailableMessage);
                 var clientId = MicrosoftAuthOptions.ResolveClientId(typeof(AppServices).Assembly);
                 return MicrosoftAuthOptions.IsValidClientId(clientId)
                     ? new MsalMicrosoftAuth(clientId!, sp.GetRequiredService<AppPaths>(), sp.GetRequiredService<ILogger<MsalMicrosoftAuth>>())
@@ -82,6 +89,8 @@ public static class AppServices
             });
             services.AddSingleton<IGoogleAuth>(sp =>
             {
+                if (!Capabilities.GoogleSignIn)
+                    return new UnconfiguredGoogleAuth(ReleaseCapabilities.GoogleUnavailableMessage);
                 var clientId = GoogleAuthOptions.ResolveClientId(typeof(AppServices).Assembly);
                 var clientSecret = GoogleAuthOptions.ResolveClientSecret(typeof(AppServices).Assembly);
                 return GoogleAuthOptions.ConfigurationProblem(clientId, clientSecret) is { } problem
@@ -110,7 +119,8 @@ public static class AppServices
         services.AddSingleton<MailHealthViewModelFactory>();
         // Sign-in providers this build is not configured for (no client ID) are not offered: their buttons are hidden and
         // Settings says the sign-in is not set up in this build. Configured providers are always offered.
-        services.AddSingleton(new SignInPresentation(OfferUnconfiguredProviders: false));
+        services.AddSingleton(Capabilities);
+        services.AddSingleton(new SignInPresentation(OfferUnconfiguredProviders: false, Capabilities.MicrosoftSignIn, Capabilities.GoogleSignIn));
         services.AddSingleton<MainWindowViewModel>();
 
         configure?.Invoke(services);

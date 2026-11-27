@@ -12,6 +12,12 @@
          here because the iOS app uses it as CFBundleShortVersionString. -->
     <InformationalVersion Condition="'$(InformationalVersion)' == ''">$(Version)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <!-- Release capability flags (HCG.Mail.Core/Release/ReleaseCapabilities.cs, docs/RELEASE_CAPABILITIES.md).
+         PublicBeta (the default): IMAP and SMTP only; Microsoft and Google sign-in are hidden but kept in the code.
+         Internal: development builds with every implemented feature. -p:HcgReleaseChannel=Internal or the
+         HCG_RELEASE_CHANNEL environment variable. Any other value counts as PublicBeta (the app fails closed). -->
+    <HcgReleaseChannel Condition="'$(HcgReleaseChannel)' == ''">$(HCG_RELEASE_CHANNEL)</HcgReleaseChannel>
+    <HcgReleaseChannel Condition="'$(HcgReleaseChannel)' != 'Internal'">PublicBeta</HcgReleaseChannel>
     <Company>Hakmi Capital Group</Company>
     <Product>HCG Mail</Product>
     <Copyright>© Hakmi Capital Group</Copyright>

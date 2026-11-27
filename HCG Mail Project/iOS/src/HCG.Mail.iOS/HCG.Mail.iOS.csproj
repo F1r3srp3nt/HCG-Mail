@@ -76,7 +76,7 @@
       <_HcgClientIdLiteral>$(HcgMicrosoftClientId.Trim().Replace('"', '""'))</_HcgClientIdLiteral>
     </PropertyGroup>
     <WriteLinesToFile File="$(_HcgBuildInfoFile)" Overwrite="true" WriteOnlyWhenDifferent="true"
-                      Lines="namespace HCG.Mail.iOS%3B;internal static class HcgBuildInfo { public const string MicrosoftClientId = @&quot;$(_HcgClientIdLiteral)&quot;%3B }" />
+                      Lines="namespace HCG.Mail.iOS%3B;internal static class HcgBuildInfo { public const string MicrosoftClientId = @&quot;$(_HcgClientIdLiteral)&quot;%3B public const string ReleaseChannel = &quot;$(HcgReleaseChannel)&quot;%3B }" />
     <ItemGroup>
       <Compile Include="$(_HcgBuildInfoFile)" />
       <FileWrites Include="$(_HcgBuildInfoFile)" />

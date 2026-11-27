@@ -140,10 +140,10 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     public bool ShowNeedsSignIn => SelectedAccount?.NeedsSignIn == true;
 
     /// <summary>Whether "Add Microsoft account" is offered: always when configured; otherwise per <see cref="SignInPresentation"/>.</summary>
-    public bool ShowMicrosoftSignIn => _microsoftAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders;
+    public bool ShowMicrosoftSignIn => _signInPresentation.AllowMicrosoft && (_microsoftAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders);
 
     /// <summary>Whether "Add Google account" is offered: always when configured; otherwise per <see cref="SignInPresentation"/>.</summary>
-    public bool ShowGoogleSignIn => _googleAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders;
+    public bool ShowGoogleSignIn => _signInPresentation.AllowGoogle && (_googleAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders);
 
     /// <summary>The welcome text: names only the sign-in methods this build offers.</summary>
     public string WelcomeText
@@ -765,6 +765,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [RelayCommand]
     private async Task AddMicrosoftAccountAsync()
     {
+        if (!_signInPresentation.AllowMicrosoft)
+            return; // not part of this release (release capability): the sign-in never starts
         var vm = new MicrosoftAccountViewModel(_microsoftAuth, _sessionFactory, async account =>
         {
             _accountStore.Save(Accounts.Select(a => a.Account).Append(account).ToList());
@@ -800,6 +802,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     [RelayCommand]
     private async Task AddGoogleAccountAsync()
     {
+        if (!_signInPresentation.AllowGoogle)
+            return;
         var vm = new GoogleAccountViewModel(_googleAuth, _sessionFactory, async account =>
         {
             _accountStore.Save(Accounts.Select(a => a.Account).Append(account).ToList());
@@ -944,6 +948,13 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         {
             try
             {
+                if (!_microsoftAuth.IsConfigured)
+                {
+                    // This build cannot open the Microsoft token store (release capability or no client ID): say so.
+                    _notifications.Info("Account removed",
+                        $"{account.EmailAddress} was removed from HCG Mail. Its Microsoft sign-in stays in this {PlatformText.Device}'s protected token store until a build with Microsoft accounts signs it out. No email was deleted from the server.");
+                    return true;
+                }
                 if (account.MicrosoftAccountId is { } key && !IsMicrosoftKeyInUse(key))
                     await _microsoftAuth.SignOutAsync(key);
                 _notifications.Success("Account removed", $"{account.EmailAddress} and its Microsoft sign-in were removed from this {PlatformText.Device}. No email was deleted from the server.");
@@ -964,7 +975,12 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             {
                 // Only this device's token is deleted: revoking at Google would also sign out the user's other devices.
                 if (account.GoogleAccountId is { } key && !IsGoogleKeyInUse(key))
-                    await _googleAuth.SignOutAsync(key);
+                {
+                    if (_googleAuth.IsConfigured)
+                        await _googleAuth.SignOutAsync(key);
+                    else
+                        await _vault.DeleteAsync(CredentialKeys.ForGoogle(key)); // the token is a credential-store entry: delete it even without Google sign-in
+                }
                 _notifications.Success("Account removed", $"{account.EmailAddress} and its Google sign-in were removed from this {PlatformText.Device}. No email was deleted from the server.");
             }
             catch (Exception ex)

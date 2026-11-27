@@ -83,7 +83,10 @@ public static class MobileServices
             services.AddSingleton<IAccountStore, JsonAccountStore>();
             services.AddSingleton<IAppSettingsStore, JsonAppSettingsStore>();
             services.AddSingleton<IMailSessionFactory, MailSessionFactory>();
-            services.AddSingleton(platform.MicrosoftAuth);
+            // A build without the Microsoft capability never activates Microsoft sign-in; existing accounts stay as they are.
+            services.AddSingleton(platform.Capabilities.MicrosoftSignIn
+                ? platform.MicrosoftAuth
+                : new UnconfiguredMicrosoftAuth(HCG.Mail.Core.Release.ReleaseCapabilities.MicrosoftUnavailableMessage));
             // Google sign-in needs its own iOS OAuth client and redirect; until that exists the shared view models see
             // an unavailable provider, and the iPhone/iPad views offer no Google button.
             services.AddSingleton<IGoogleAuth>(new UnconfiguredGoogleAuth(GoogleNotOnIos));
@@ -102,7 +105,8 @@ public static class MobileServices
 
         // A store release offers only sign-in providers that are configured in this build (Microsoft needs a client ID;
         // Google has no iOS client yet). Their implementation stays in place for later activation.
-        services.AddSingleton(new SignInPresentation(OfferUnconfiguredProviders: false));
+        services.AddSingleton(platform.Capabilities);
+        services.AddSingleton(new SignInPresentation(OfferUnconfiguredProviders: false, platform.Capabilities.MicrosoftSignIn, platform.Capabilities.GoogleSignIn));
         services.AddSingleton<AppSettingsService>();
         services.AddSingleton<ThemeService>();
         services.AddSingleton<MobileOverlays>();
