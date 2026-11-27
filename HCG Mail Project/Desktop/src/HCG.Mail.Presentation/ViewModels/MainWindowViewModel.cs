@@ -300,6 +300,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
                 MessageList.UseSession(account.Session!);
                 await MessageList.RefreshAsync();
                 _lastChecked = DateTimeOffset.Now;
+                if (!MessageList.HasError)
+                    account.MarkSynced();
                 UpdateStatusText();
             }
             else
@@ -350,6 +352,8 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
         Reader.Clear();
         await MessageList.LoadAsync(session, folder);
         _lastChecked = DateTimeOffset.Now;
+        if (!MessageList.HasError)
+            SelectedAccount?.MarkSynced();
         UpdateStatusText();
         RefreshCommandStates();
     }
@@ -458,6 +462,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     private void ReportRefreshed(AccountViewModel account, int newMessages)
     {
         _lastChecked = DateTimeOffset.Now;
+        account.MarkSynced();
         var folder = string.IsNullOrEmpty(MessageList.FolderTitle) ? "Mailbox" : MessageList.FolderTitle;
         _notifications.Success(
             newMessages switch { 0 => $"{folder} is up to date", 1 => "1 new message", _ => $"{newMessages} new messages" },
@@ -843,7 +848,7 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
             _notifications.Info("Mail Health", "Add an account first.");
             return;
         }
-        _dialogs.ShowMailHealth(_mailHealth.Create(SelectedAccount.Account));
+        _dialogs.ShowMailHealth(_mailHealth.Create(SelectedAccount));
     }
 
     [RelayCommand]

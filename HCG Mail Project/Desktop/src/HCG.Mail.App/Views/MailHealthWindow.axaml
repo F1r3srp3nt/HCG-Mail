@@ -97,6 +97,54 @@
     </Border>
 
     <TabControl x:Name="Tabs" Grid.Row="1" Margin="12,6,12,0">
+      <!-- Connection: what HCG Mail observed or measured for this account -->
+      <TabItem x:Name="ConnectionTab" Header="Connection" IsVisible="{Binding HasConnection}">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="10,12,10,20" Spacing="14" DataContext="{Binding Connection}">
+            <Border Classes="card" Padding="16,14">
+              <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                <Border Classes="badge" Width="96" VerticalAlignment="Top" Margin="0,2,14,0"
+                        Classes.verified="{Binding IsHealthy}" Classes.warning="{Binding IsDegraded}" Classes.failed="{Binding IsFailing}">
+                  <TextBlock Text="{Binding StateBadge}" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="4">
+                  <TextBlock x:Name="ConnectionStateTitle" Text="{Binding StateTitle}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock Classes="detail" Text="{Binding StateExplanation}" TextWrapping="Wrap" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                  <Button x:Name="CopyDiagnosticsButton" Classes="toolbar" Click="OnCopyDiagnostics"
+                          ToolTip.Tip="Copy these results as text for support. Passwords, tokens and message content are never included; addresses keep only their domain.">
+                    <TextBlock Text="Copy diagnostics" />
+                  </Button>
+                  <Button x:Name="CheckConnectionButton" Classes="primary" Command="{Binding CheckConnectionCommand}">
+                    <TextBlock Text="Check connection" />
+                  </Button>
+                </StackPanel>
+                <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Classes="caption" Margin="0,8,0,0" TextWrapping="Wrap" Text="{Binding CheckStatus}" />
+              </Grid>
+            </Border>
+            <Border Classes="card" Padding="16,8">
+              <ItemsControl x:Name="ConnectionRows" ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:HealthRow">
+                    <Grid ColumnDefinitions="110,*" Margin="0,7">
+                      <Border Classes="badge" HorizontalAlignment="Left" VerticalAlignment="Top"
+                              Classes.verified="{Binding IsOk}" Classes.warning="{Binding IsWarning}" Classes.failed="{Binding IsProblem}">
+                        <TextBlock Text="{Binding ResultLabel}" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12.5" Foreground="{DynamicResource Hcg.Text.Secondary}" />
+                      </StackPanel>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
       <!-- Checks -->
       <TabItem Header="Domain &amp; sending checks">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled">

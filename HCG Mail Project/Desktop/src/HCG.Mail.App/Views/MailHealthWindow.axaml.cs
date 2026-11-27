@@ -16,4 +16,12 @@ public partial class MailHealthWindow : Window
         await Clipboard.SetTextAsync(vm.BuildReportText());
         vm.StatusText = "Report copied to the clipboard.";
     }
+
+    private async void OnCopyDiagnostics(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MailHealthViewModel { Connection: { } connection } || Clipboard is null)
+            return;
+        await Clipboard.SetTextAsync(connection.BuildDiagnosticsText());
+        connection.CheckStatus = "Diagnostics copied to the clipboard (no passwords, tokens or message content).";
+    }
 }

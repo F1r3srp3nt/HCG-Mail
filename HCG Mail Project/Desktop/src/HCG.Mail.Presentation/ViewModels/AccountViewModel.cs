@@ -22,6 +22,23 @@ public enum AccountStatus
     Error,
 }
 
+/// <summary>How an account is doing, from what actually happened (never from the configuration alone).</summary>
+public enum AccountHealth
+{
+    NotConnected,
+    Connecting,
+    Connected,
+    /// <summary>Connected, but an operation has failed since (for example a refresh or a folder).</summary>
+    Degraded,
+    /// <summary>The server cannot be reached (network, DNS, timeout).</summary>
+    Offline,
+    /// <summary>The server refused the user name and password (or the sign-in expired).</summary>
+    AuthenticationFailed,
+    /// <summary>HCG Mail refused the connection: TLS or the server certificate did not pass validation.</summary>
+    SecurityProblem,
+    PasswordNeeded,
+}
+
 /// <summary>One configured account: its live session, connection status and folder tree.</summary>
 public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposable
 {
@@ -34,6 +51,44 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
     private AccountStatus _status = AccountStatus.Offline;
 
     [ObservableProperty] private string _statusText = "Not connected";
+
+    /// <summary>When the session last signed in to the incoming server.</summary>
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(Health))] private DateTimeOffset? _lastConnectedAt;
+
+    /// <summary>When a folder's messages were last loaded or refreshed without an error.</summary>
+    [ObservableProperty] private DateTimeOffset? _lastSyncedAt;
+
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(Health))] private MailErrorKind? _lastErrorKind;
+    [ObservableProperty] private string? _lastErrorMessage;
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(Health))] private DateTimeOffset? _lastErrorAt;
+
+    public AccountHealth Health => Status switch
+    {
+        AccountStatus.Connecting => AccountHealth.Connecting,
+        AccountStatus.Connected => LastErrorAt is { } e && (LastConnectedAt is null || e > LastConnectedAt) ? AccountHealth.Degraded : AccountHealth.Connected,
+        AccountStatus.NeedsPassword => AccountHealth.PasswordNeeded,
+        AccountStatus.NeedsSignIn => AccountHealth.AuthenticationFailed,
+        AccountStatus.Error => LastErrorKind switch
+        {
+            MailErrorKind.Authentication or MailErrorKind.ReconnectRequired => AccountHealth.AuthenticationFailed,
+            MailErrorKind.Tls or MailErrorKind.Certificate or MailErrorKind.RevocationUnavailable => AccountHealth.SecurityProblem,
+            MailErrorKind.Network or MailErrorKind.Dns or MailErrorKind.Timeout or MailErrorKind.Throttled => AccountHealth.Offline,
+            null => AccountHealth.Offline, // "connection lost" reported by the session itself
+            _ => AccountHealth.Degraded,
+        },
+        _ => AccountHealth.NotConnected,
+    };
+
+    /// <summary>Records a failed operation for Mail Health (kind, message, time).</summary>
+    public void RecordError(MailOperationException ex)
+    {
+        LastErrorKind = ex.Kind;
+        LastErrorMessage = ex.UserMessage;
+        LastErrorAt = DateTimeOffset.Now;
+    }
+
+    /// <summary>A folder's messages were loaded or refreshed without an error.</summary>
+    public void MarkSynced() => LastSyncedAt = DateTimeOffset.Now;
 
     public AccountViewModel(MailAccount account, IMailSessionFactory sessionFactory, ICredentialVault vault, ILogger logger)
     {
@@ -118,11 +173,13 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
         {
             await session.ConnectAsync();
             await RefreshFoldersAsync();
+            LastConnectedAt = DateTimeOffset.Now;
             SetStatus(AccountStatus.Connected, "Connected");
             return true;
         }
         catch (MailOperationException ex)
         {
+            RecordError(ex);
             SetStatus(ex.Kind == MailErrorKind.ReconnectRequired ? AccountStatus.NeedsSignIn : AccountStatus.Error, ex.UserMessage);
             return false;
         }
@@ -184,6 +241,7 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
 
     public void ReportError(MailOperationException ex)
     {
+        RecordError(ex);
         if (ex.Kind == MailErrorKind.ReconnectRequired)
         {
             SetStatus(AccountStatus.NeedsSignIn, ex.UserMessage);
@@ -217,6 +275,9 @@ public sealed partial class AccountViewModel : ObservableObject, IAsyncDisposabl
                 SetStatus(AccountStatus.Connected, "Connected");
                 break;
             case MailConnectionState.Failed when Status != AccountStatus.Error:
+                LastErrorKind = null;
+                LastErrorMessage = "Connection lost";
+                LastErrorAt = DateTimeOffset.Now;
                 SetStatus(AccountStatus.Error, "Connection lost — will retry on the next refresh");
                 break;
         }

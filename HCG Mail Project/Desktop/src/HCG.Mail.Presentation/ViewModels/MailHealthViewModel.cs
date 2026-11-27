@@ -83,6 +83,10 @@ public sealed partial class MailHealthViewModel : ObservableObject
         LoadHistory();
     }
 
+    /// <summary>Connection health of the live account (Mail Health › Connection); null when opened without one.</summary>
+    public ConnectionHealthViewModel? Connection { get; init; }
+    public bool HasConnection => Connection is not null;
+
     public string AccountAddress => _account.EmailAddress;
     public string Domain => DomainNames.DomainOf(_account.EmailAddress) ?? _account.EmailAddress;
     public string WindowTitle => $"Mail Health — {AccountAddress}";
@@ -238,7 +242,8 @@ public sealed partial class MailHealthViewModel : ObservableObject
             foreach (var check in AnalysisChecks)
                 text.AppendLine($"[{check.StatusLabel}] {check.Title}: {check.Detail}");
         }
-        return text.ToString();
+        // Shared outside HCG Mail: addresses keep only their domain, and anything credential-like is removed.
+        return Infrastructure.Logging.LogRedactor.Redact(text.ToString());
     }
 
     private void LoadHistory()
