@@ -94,6 +94,19 @@
         <ListBox x:Name="Messages" Classes="messages" ItemsSource="{Binding MessageList.Items}"
                  SelectedItem="{Binding MessageList.SelectedItem}" SelectionMode="Single"
                  IsVisible="{Binding MessageList.ShowList}" Padding="0,4">
+          <ListBox.ContextMenu>
+            <ContextMenu x:Name="MessageContextMenu">
+              <MenuItem Header="Reply" Command="{Binding ReplyCommand}" InputGesture="Ctrl+R" />
+              <MenuItem Header="Reply all" Command="{Binding ReplyAllCommand}" InputGesture="Ctrl+Shift+R" />
+              <MenuItem Header="Forward" Command="{Binding ForwardCommand}" InputGesture="Ctrl+Shift+F" />
+              <Separator />
+              <MenuItem Header="Mark read / unread" Command="{Binding ToggleReadCommand}" CommandParameter="{x:Null}" InputGesture="Ctrl+U" />
+              <MenuItem Header="Flag / unflag" Command="{Binding ToggleFlagCommand}" CommandParameter="{x:Null}" />
+              <Separator />
+              <MenuItem Header="Archive" Command="{Binding ArchiveCommand}" />
+              <MenuItem Header="Move to Trash" Command="{Binding DeleteCommand}" InputGesture="Delete" />
+            </ContextMenu>
+          </ListBox.ContextMenu>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:MessageItemViewModel">
               <Grid ColumnDefinitions="16,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="8,10,10,10" Background="Transparent">

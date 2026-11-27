@@ -285,7 +285,7 @@ public class RealAccountModeTests
     public void The_drawn_title_bar_shows_only_caption_buttons_under_the_apps_own_title()
     {
         var window = new MainWindow();
-        Assert.True(window.MinWidth >= 256 + 400 + 1 + 380, "the window's minimum width must fit the three columns at their default widths");
+        Assert.True(window.MinWidth >= 256 + 1 + 400 + 1 + 380, "the window's minimum width must fit the three columns and both splitters at their default widths");
         Assert.Equal(Avalonia.Controls.Chrome.TitleBarDecorations.MinimizeButton | Avalonia.Controls.Chrome.TitleBarDecorations.MaximizeButton
                      | Avalonia.Controls.Chrome.TitleBarDecorations.CloseButton,
             Avalonia.Controls.Chrome.WindowDrawnDecorations.GetTitleBarDecorations(window));

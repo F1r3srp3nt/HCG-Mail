@@ -55,15 +55,17 @@
       <Grid.ColumnDefinitions>
         <!-- MinWidth of the window (1040) covers these columns at their default and minimum widths (256 + 400 + 1 + 380):
              below that the reader column was pushed past the window edge and cut off. -->
-        <ColumnDefinition Width="256" MinWidth="220" />
+        <ColumnDefinition Width="256" MinWidth="220" MaxWidth="420" />
+        <ColumnDefinition Width="1" />
         <ColumnDefinition Width="400" MinWidth="300" />
         <ColumnDefinition Width="1" />
         <ColumnDefinition Width="*" MinWidth="380" />
       </Grid.ColumnDefinitions>
       <views:NavigationPane Grid.Column="0" />
-      <views:MessageListPane x:Name="MessageListPane" Grid.Column="1" />
-      <GridSplitter Grid.Column="2" ResizeDirection="Columns" />
-      <views:ReaderPane Grid.Column="3" />
+      <GridSplitter x:Name="NavigationSplitter" Grid.Column="1" ResizeDirection="Columns" />
+      <views:MessageListPane x:Name="MessageListPane" Grid.Column="2" />
+      <GridSplitter Grid.Column="3" ResizeDirection="Columns" />
+      <views:ReaderPane Grid.Column="4" />
     </Grid>
 
     <!-- Status bar -->
