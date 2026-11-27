@@ -51,6 +51,25 @@ If Gatekeeper complains about a file, that file is not a release.
   - When the owner's signing secrets exist, the same script signs with Developer ID, notarizes and staples.
   - The download check then runs on both architectures, and `scripts/macos/macos-evidence.py` writes the release manifest, `SHA256SUMS.txt` and Release Passports.
 
+## Verified so far (run 45942931119, commit `8bc1bc1`)
+
+These results were produced without a certificate, from the release commands with an ad-hoc identity. They prove
+the layout, the hardened runtime and the entitlements. They do not prove Developer ID signing or notarization: those
+need your certificates.
+
+| Check | Apple silicon (macOS 15, `macos-15`) | Intel (`macos-15-intel`) |
+|---|---|---|
+| `Contents/MacOS` | 4 files, all Mach-O | 4 files, all Mach-O |
+| Signature seals the whole bundle (`codesign --verify --deep --strict`) | passed | passed |
+| Hardened runtime on the app and on each of the 3 libraries; entitlements exactly `allow-jit` | passed | passed |
+| ZIP, DMG and PKG (PKG installed into `/Applications` by `installer`, root-owned, no scripts) | installed, seal intact | installed, seal intact |
+| HCG Mail started, captured on screen, quit and restarted under the hardened runtime; Keychain round trip; TLS refusal of bad certificates | passed from all three files | passed from all three files |
+| Gatekeeper | rejected, as expected without Developer ID | rejected, as expected |
+| Executable Maker Signing Doctor (`431c8b3`) | ad-hoc, hardened runtime on, `allow-jit` the only exception, strict verification passes, no ticket | — |
+
+The Developer ID job reported **not configured**, so nothing was signed with Developer ID or notarized. The unsigned
+signing input is the run's artifact `hcg-mail-macos-signing-input-1.0.0-beta.2`.
+
 ## What you need from Apple
 
 | # | What | Where | Notes |
