@@ -1,10 +1,11 @@
-# HCG Mail for macOS, public release: Developer ID signing, notarization, stapling and the ZIP, PKG and DMG for HCG Store.
+# HCG Mail for macOS (Apple silicon), public beta: Developer ID signing, notarization, stapling, and the two HCG Store
+# downloads "HCG Mail.app.zip" and "HCG Mail-<version>-osx-arm64.pkg".
 # Publishes nothing. Stages:
 #   package           HCG Executable Maker's engine (pinned) builds the .app for Apple silicon and Intel; the layout is
 #                     audited (code only in Contents/MacOS) and the unsigned app is kept as the signing input.
 #   hardened-runtime  On real Macs of each architecture: the release signing commands with an ad-hoc identity (no
 #                     certificate), the same hardened runtime and entitlements; Maker's Signing Doctor; then each test
-#                     ZIP/PKG/DMG is installed and HCG Mail started and checked under the hardened runtime. These test
+#                     ZIP and PKG are installed and HCG Mail started and checked under the hardened runtime. These test
 #                     files are never release artifacts.
 #   developer-id      Only when the owner has configured the Apple signing secrets (environment "macos-signing",
 #                     docs/MACOS_SIGNING.md): Developer ID signing, notarization and stapling. Otherwise it reports
@@ -25,8 +26,9 @@ permissions:
   contents: read
 
 env:
-  VERSION: 1.0.0-beta.2
-  BUILD_NUMBER: 4
+  VERSION: 1.0.0-beta.1
+  BUILD_NUMBER: 4          # CFBundleVersion; build 3 was the earlier unsigned macOS DMG of 1.0.0-beta.1
+  ZIP_NAME: HCG Mail.app.zip
   MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f          # packaging engine (unchanged since 1.0.0-beta.1)
   MAKER_DOCTOR_COMMIT: 431c8b3b3fcd9ca95af27658c81398aee877bc17   # Signing Doctor (--mac-signing-doctor), read only
   HCG_REPO_COMMIT: 0c25d955fe37accb9c83cde4632637b6dfcd623c
@@ -52,14 +54,16 @@ jobs:
           pack="$RUNNER_TEMP/pack"; mkdir -p "$pack"
           sed "s|@MAKER@|$PWD/maker|g" "hcg-mail/HCG Mail Project/Desktop/scripts/maker/package-desktop.cs.template" > "$pack/package-desktop.cs"
           dotnet run --no-cache "$pack/package-desktop.cs" -- "$PWD/hcg-mail/HCG Mail Project/Desktop" "$RUNNER_TEMP/out" \
-            --version "$VERSION" --targets osx-arm64,osx-x64 | tee "$RUNNER_TEMP/package.log"
+            --version "$VERSION" --targets osx-arm64 | tee "$RUNNER_TEMP/package.log"
       - name: Bundle audit and signing input (the unsigned .app, never distributed)
         shell: bash
         run: |
           set -euo pipefail
           in="$RUNNER_TEMP/signing-input"; mkdir -p "$in"
-          for rid in osx-arm64 osx-x64; do
+          for rid in osx-arm64; do
             app="$RUNNER_TEMP/out/HCG Mail-$VERSION-$rid/HCG Mail.app"
+            # The build number goes into CFBundleVersion (Maker writes the version there); signing follows, so the seal covers it.
+            plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$app/Contents/Info.plist"
             {
               echo "== $rid: $app"
               plutil -p "$app/Contents/Info.plist"
@@ -93,13 +97,12 @@ jobs:
       matrix:
         include:
           - { rid: osx-arm64, arch: arm64, runner: macos-15, doctor: true }
-          - { rid: osx-x64, arch: x64, runner: macos-15-intel, doctor: false }
     steps:
       - uses: actions/checkout@v5
         with: { path: hcg-mail, sparse-checkout: "HCG Mail Project/Desktop/scripts\nHCG Mail Project/Desktop/packaging" }
       - uses: actions/download-artifact@v4
         with: { name: 'hcg-mail-macos-signing-input-${{ env.VERSION }}', path: input }
-      - name: Sign with the release commands (ad-hoc identity), build the test ZIP, PKG and DMG
+      - name: Sign with the release commands (ad-hoc identity), build the test ZIP and PKG
         shell: bash
         run: |
           set -euo pipefail
@@ -124,7 +127,7 @@ jobs:
         shell: bash
         run: |
           s="$PWD/hcg-mail/HCG Mail Project/Desktop/scripts/macos"; rc=0
-          for f in "$RUNNER_TEMP"/test/*.zip "$RUNNER_TEMP"/test/*.dmg "$RUNNER_TEMP"/test/*.pkg; do
+          for f in "$RUNNER_TEMP"/test/*.zip "$RUNNER_TEMP"/test/*.pkg; do
             bash "$s/verify-distribution.sh" "$f" "$RUNNER_TEMP/test/verify/$(basename "$f")" --expect test --install || rc=1
             sudo rm -rf "/Applications/HCG Mail.app"
           done
@@ -203,11 +206,12 @@ jobs:
         run: |
           set -euo pipefail
           s="$PWD/hcg-mail/HCG Mail Project/Desktop/scripts/macos"
-          for arch in arm64 x64; do
+          for arch in arm64; do
             mkdir -p "$RUNNER_TEMP/app-$arch" && ditto -x -k "input/signing-input/HCGMail-$VERSION-osx-$arch-unsigned-app.zip" "$RUNNER_TEMP/app-$arch"
             bash "$s/sign-and-notarize.sh" --app "$RUNNER_TEMP/app-$arch/HCG Mail.app" --version "$VERSION" --arch $arch --build-number "$BUILD_NUMBER" \
               --out "$RUNNER_TEMP/dist" --keychain "$KEYCHAIN" --identity "$APP_SHA" --installer-identity "$PKG_SHA" \
-              --notary-key "$RUNNER_TEMP/AuthKey_$NOTARY_KEY_ID.p8" --notary-key-id "$NOTARY_KEY_ID" --notary-issuer "$NOTARY_ISSUER"
+              --notary-key "$RUNNER_TEMP/AuthKey_$NOTARY_KEY_ID.p8" --notary-key-id "$NOTARY_KEY_ID" --notary-issuer "$NOTARY_ISSUER" \
+              --zip-name "$ZIP_NAME" --pkg-name "HCG Mail-$VERSION-osx-$arch.pkg"
           done
           mkdir -p "$RUNNER_TEMP/evidence" && mv "$RUNNER_TEMP"/dist/signing-evidence-*.json "$RUNNER_TEMP"/dist/SHA256SUMS-*.txt "$RUNNER_TEMP/dist/logs" "$RUNNER_TEMP/evidence/"
       - name: Remove the keychain and the API key
@@ -234,7 +238,6 @@ jobs:
       matrix:
         include:
           - { rid: osx-arm64, runner: macos-15 }
-          - { rid: osx-x64, runner: macos-15-intel }
     steps:
       - uses: actions/checkout@v5
         with: { path: hcg-mail, sparse-checkout: "HCG Mail Project/Desktop/scripts" }
@@ -244,7 +247,7 @@ jobs:
         shell: bash
         run: |
           s="$PWD/hcg-mail/HCG Mail Project/Desktop/scripts/macos"; rc=0
-          for f in dist/HCGMail-$VERSION-${{ matrix.rid }}.zip dist/HCGMail-$VERSION-${{ matrix.rid }}.dmg dist/HCGMail-$VERSION-${{ matrix.rid }}.pkg; do
+          for f in "dist/$ZIP_NAME" "dist/HCG Mail-$VERSION-${{ matrix.rid }}.pkg"; do
             bash "$s/verify-distribution.sh" "$f" "$RUNNER_TEMP/verify/$(basename "$f")" --expect developer-id --install || rc=1
             sudo rm -rf "/Applications/HCG Mail.app"
           done

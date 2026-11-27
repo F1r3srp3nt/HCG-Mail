@@ -11,18 +11,22 @@
 #       --installer-identity <Developer ID Installer: SHA-1 or full name>
 #       (--notary-profile <keychain profile> | --notary-key <AuthKey_XXXX.p8> --notary-key-id <id> --notary-issuer <uuid>)
 #       [--keychain <path>] [--entitlements <plist>] [--build-number N]
+#       [--zip-name "HCG Mail.app.zip"] [--pkg-name "HCG Mail-<version>-osx-<arch>.pkg"] [--dmg]
 #
 #   sign-and-notarize.sh --app "<HCG Mail.app>" --version … --arch … --out <dir> --identity - --test
 #       Ad-hoc test build: the same layout checks, hardened runtime and entitlements, but no certificate and no
 #       notarization. For testing on build machines only: Gatekeeper rejects it on every other Mac. Never distribute it.
 #
-# The input .app is never changed: it is copied first. Output in --out:
-#   HCGMail-<version>-osx-<arch>.zip   the notarized, stapled app (ditto ZIP)
-#   HCGMail-<version>-osx-<arch>.pkg   installer for /Applications, signed Developer ID Installer, notarized, stapled
-#   HCGMail-<version>-osx-<arch>.dmg   disk image with the app and an Applications link, signed, notarized, stapled
+# The input .app is never changed: it is copied first. Output in --out (names configurable):
+#   HCG Mail.app.zip                        the notarized, stapled app (ditto ZIP)
+#   HCG Mail-<version>-osx-<arch>.pkg       installer for /Applications, signed Developer ID Installer, notarized, stapled
+#   HCG Mail-<version>-osx-<arch>.dmg       with --dmg: the app and an Applications link, signed, notarized, stapled
 #   signing-evidence-osx-<arch>.json   what was signed with what, every verification, notarization submissions
 #   logs/                              codesign, notarytool, stapler, spctl and pkgutil output
-# Test builds use the suffix -adhoc-TEST-not-for-distribution instead.
+# Test builds are named HCGMail-<version>-osx-<arch>-adhoc-TEST-not-for-distribution.{zip,pkg,dmg}.
+# Version consistency is checked: Info.plist CFBundleShortVersionString is the numeric part of --version,
+# CFBundleVersion is --build-number, the app's own version (AssemblyInformationalVersion) is --version, and the
+# installer package carries --version.
 set -euo pipefail
 
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -30,7 +34,7 @@ say() { echo "── $*"; }
 here="$(cd "$(dirname "$0")" && pwd)"
 
 APP="" VERSION="" ARCH="" OUT="" IDENTITY="" INSTALLER="" PROFILE="" KEY="" KEY_ID="" ISSUER="" KEYCHAIN="" BUILD=""
-ENTITLEMENTS="$here/../../packaging/macos/HCGMail.entitlements" TEST=0 CHECK=0
+ENTITLEMENTS="$here/../../packaging/macos/HCGMail.entitlements" TEST=0 CHECK=0 ZIP_NAME="" PKG_NAME_OUT="" WANT_DMG=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --app) APP="$2"; shift 2 ;;
@@ -47,6 +51,9 @@ while [ $# -gt 0 ]; do
     --entitlements) ENTITLEMENTS="$2"; shift 2 ;;
     --build-number) BUILD="$2"; shift 2 ;;
     --test) TEST=1; shift ;;
+    --zip-name) ZIP_NAME="$2"; shift 2 ;;
+    --pkg-name) PKG_NAME_OUT="$2"; shift 2 ;;
+    --dmg) WANT_DMG=1; shift ;;
     --check-setup) CHECK=1; shift ;;
     *) die "unknown option $1 (see the header of this script)" ;;
   esac
@@ -148,6 +155,16 @@ other="$(find "$A/Contents" -type f ! -path "$A/Contents/MacOS/*" -print0 | xarg
 check $([ "$other" = 0 ] && echo 0 || echo 1) "No code outside Contents/MacOS" "$other Mach-O file(s) elsewhere"
 [ "$other" = 0 ] || die "code outside Contents/MacOS is not handled by this script"
 
+# ---------------------------------------------------------------------------------------------- version consistency
+say "Version"
+CORE="${VERSION%%-*}"; BVER="$(plutil -extract CFBundleVersion raw -o - "$A/Contents/Info.plist" 2>/dev/null || echo '')"
+check $([ "$SHORT" = "$CORE" ] && echo 0 || echo 1) "Version: CFBundleShortVersionString" "$SHORT (expected $CORE, the numeric part of $VERSION)"
+if [ -n "$BUILD" ]; then check $([ "$BVER" = "$BUILD" ] && echo 0 || echo 1) "Version: CFBundleVersion" "$BVER (expected build $BUILD)"; fi
+# The app reports AssemblyInformationalVersion (Settings › About, Mail Health diagnostics); it is in the single-file host.
+VERSION_IN_APP="$(LC_ALL=C grep -a -o "$VERSION[+0-9a-f]*" "$A/Contents/MacOS/$MAIN" | sort | uniq -c | sort -rn | head -1 | awk '{print $2}')"
+check $([ -n "$VERSION_IN_APP" ] && echo 0 || echo 1) "Version: the app's own version" "${VERSION_IN_APP:-$VERSION not found in $MAIN}"
+grep -q '^false' "$CHECKS" && die "version mismatch (see above)"
+
 # ----------------------------------------------------------------------------------------------------------- 2. signing
 # Inside out: every library and helper, then the bundle (which signs the main executable with the entitlements).
 say "2. Code signing (hardened runtime, $([ "$TS" = --timestamp ] && echo 'secure timestamp' || echo 'no timestamp: test build'))"
@@ -214,7 +231,10 @@ fi
 
 # ---------------------------------------------------------------------------------------------- 5. distribution files
 say "5. Distribution files"
-ZIP="$OUT/$BASE.zip"; PKG="$OUT/$BASE.pkg"; DMG="$OUT/$BASE.dmg"
+if [ -n "$SUFFIX" ]; then ZIP="$OUT/$BASE.zip"; PKG="$OUT/$BASE.pkg"; DMG="$OUT/$BASE.dmg"
+else
+  ZIP="$OUT/${ZIP_NAME:-HCG Mail.app.zip}"; PKG="$OUT/${PKG_NAME_OUT:-HCG Mail-$VERSION-osx-$ARCH.pkg}"; DMG="$OUT/HCG Mail-$VERSION-osx-$ARCH.dmg"
+fi
 rm -f "$ZIP" "$PKG" "$DMG"
 ditto -c -k --sequesterRsrc --keepParent "$A" "$ZIP"
 
@@ -252,14 +272,16 @@ fi
 expanded="$WORK/pkg-expanded"; pkgutil --expand "$PKG" "$expanded"
 check $([ -z "$(find "$expanded" -name Scripts -o -name preinstall -o -name postinstall | head -1)" ] && echo 0 || echo 1) "Installer runs no scripts" "no Scripts, preinstall or postinstall"
 
+if [ "$WANT_DMG" = 1 ]; then
 stage="$WORK/dmg"; mkdir -p "$stage"; ditto "$A" "$stage/HCG Mail.app"; ln -s /Applications "$stage/Applications"
 hdiutil create -volname "HCG Mail" -srcfolder "$stage" -fs HFS+ -format UDZO -imagekey zlib-level=9 -ov "$DMG" > "$LOGS/hdiutil-$ARCH$SUFFIX.log" 2>&1 || { cat "$LOGS/hdiutil-$ARCH$SUFFIX.log"; die "hdiutil failed"; }
 if [ "$APP_SHA" != - ]; then codesign --force --timestamp --sign "$APP_SHA" ${KC[@]+"${KC[@]}"} "$DMG" >> "$sign_log" 2>&1 || die "codesign failed on the disk image"; fi
+fi
 
 if [ "$APP_SHA" != - ]; then
-  say "6. Notarization of the installer and the disk image"
+  say "6. Notarization of the installer$([ "$WANT_DMG" = 1 ] && echo ' and the disk image')"
   notarize "$PKG" "pkg-$ARCH"; staple "$PKG" "pkg-$ARCH"
-  notarize "$DMG" "dmg-$ARCH"; staple "$DMG" "dmg-$ARCH"
+  if [ "$WANT_DMG" = 1 ]; then notarize "$DMG" "dmg-$ARCH"; staple "$DMG" "dmg-$ARCH"; fi
 fi
 
 # -------------------------------------------------------------------------------------------------------- 7. Gatekeeper
@@ -277,7 +299,7 @@ gk() { # gk <label> <spctl args…>
 }
 gk "app-$ARCH$SUFFIX" --assess --type execute -vv "$A"
 gk "pkg-$ARCH$SUFFIX" --assess --type install -vv "$PKG"
-gk "dmg-$ARCH$SUFFIX" --assess --type open --context context:primary-signature -vv "$DMG"
+[ "$WANT_DMG" = 1 ] && gk "dmg-$ARCH$SUFFIX" --assess --type open --context context:primary-signature -vv "$DMG"
 if command -v syspolicy_check > /dev/null 2>&1; then
   sp="$(syspolicy_check distribution "$A" 2>&1)" && ok=0 || ok=1
   echo "$sp" > "$LOGS/syspolicy_check-$ARCH$SUFFIX.txt"
@@ -287,22 +309,25 @@ fi
 
 # ------------------------------------------------------------------------------------------------------- 8. evidence
 say "8. Evidence"
-for f in "$ZIP" "$PKG" "$DMG"; do printf '%s  %s\n' "$(shasum -a 256 "$f" | cut -d' ' -f1)" "$(basename "$f")"; done > "$OUT/SHA256SUMS-osx-$ARCH$SUFFIX.txt"
+FILES=("$ZIP" "$PKG"); [ "$WANT_DMG" = 1 ] && FILES+=("$DMG")
+for f in "${FILES[@]}"; do printf '%s  %s\n' "$(shasum -a 256 "$f" | cut -d' ' -f1)" "$(basename "$f")"; done > "$OUT/SHA256SUMS-osx-$ARCH$SUFFIX.txt"
 cat "$OUT/SHA256SUMS-osx-$ARCH$SUFFIX.txt"
 /usr/bin/python3 - "$OUT/signing-evidence-osx-$ARCH$SUFFIX.json" "$CHECKS" "$SUBMISSIONS" "$VERSION" "$ARCH" "$APP_NAME" "${TEAM:-}" \
-  "${PKG_NAME:-}" "$([ "$APP_SHA" = - ] && echo test || echo developer-id)" "$SHORT" "$MINOS" "${BUILD:-}" "$ZIP" "$PKG" "$DMG" <<'PY'
+  "${PKG_NAME:-}" "$([ "$APP_SHA" = - ] && echo test || echo developer-id)" "$SHORT" "$MINOS" "${BUILD:-}" "$VERSION_IN_APP" "${FILES[@]}" <<'PY'
 import hashlib, json, os, platform, subprocess, sys
-out, checks, subs, version, arch, app_name, team, pkg_name, mode, short, minos, build, *files = sys.argv[1:]
+out, checks, subs, version, arch, app_name, team, pkg_name, mode, short, minos, build, app_version, *files = sys.argv[1:]
 def sha(p, algo):
     h = hashlib.new(algo)
     with open(p, "rb") as f:
         for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
     return h.hexdigest()
+def bundle_version():
+    return [x for x in c if x["check"] == "Version: CFBundleVersion"][0]["detail"].split()[0] if any(x["check"] == "Version: CFBundleVersion" for x in c) else None
 c = [{"check": l.split("\t")[1], "passed": l.startswith("true"), "detail": l.rstrip("\n").split("\t")[2]} for l in open(checks) if "\t" in l]
 s = [dict(zip(("container", "submissionId", "status"), l.rstrip("\n").split("\t"))) for l in open(subs) if "\t" in l]
 json.dump({
     "format": "hcg-mail.macos-signing-evidence", "formatVersion": 1, "mode": mode,
-    "version": version, "buildNumber": int(build) if build else None, "architecture": arch, "bundleShortVersion": short, "minimumSystemVersion": minos or None,
+    "version": version, "buildNumber": int(build) if build else None, "architecture": arch, "bundleShortVersion": short, "bundleVersion": bundle_version(), "appVersion": app_version, "minimumSystemVersion": minos or None,
     "signing": {"application": app_name, "installer": pkg_name or None, "teamId": team or None, "hardenedRuntime": True,
                 "entitlements": ["com.apple.security.cs.allow-jit"]},
     "host": {"macos": platform.mac_ver()[0], "machine": platform.machine(),

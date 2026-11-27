@@ -8,7 +8,9 @@ Inputs:
   --schema      HCG Repo's release-passport-v1 schema (optional: without jsonschema or the schema the passports are
                 written and reported as "not validated")
   --run-url     where the evidence comes from (a workflow run, or "signed on the owner's Mac on <date>")
-Outputs, in --out: release-manifest.json, passports/<file>.passport.json, SHA256SUMS.txt, SUMMARY.md.
+Outputs, in --out: release-manifest.json, passports/<file>.passport.json, SHA256SUMS.txt, SUMMARY.md, and
+store-release-draft.json: the body for HCG Store's POST /api/v1/publishing/releases (a PRIVATE DRAFT, edition
+macos-desktop, channel beta, free) and one ArtifactInput per file, the same shape as the Windows draft. Nothing is sent.
 
 Nothing is invented: a file is "developer-id-notarized" only when its signing evidence says so AND a download check
 on a Mac accepted it as "Notarized Developer ID". Test builds (ad-hoc) are refused: they are never release artifacts.
@@ -29,7 +31,8 @@ ap.add_argument("--run-id", type=int, default=int(os.environ.get("GITHUB_RUN_ID"
 a = ap.parse_args()
 
 FORMAT = {".zip": "zip", ".pkg": "pkg", ".dmg": "dmg"}
-MIN_OS = {"arm64": "macOS versions supported by .NET 10, Apple silicon", "x64": "macOS versions supported by .NET 10, Intel"}
+MIN_OS = {"arm64": "macOS 11 or later (the app's LSMinimumSystemVersion), on .NET 10's supported macOS versions; Apple silicon",
+          "x64": "macOS 11 or later (the app's LSMinimumSystemVersion), on .NET 10's supported macOS versions; Intel"}
 LIMITATIONS = [
     "The window needs a display at least 1040 points wide.",
     "Passwords are kept in the macOS login Keychain. Passwords saved by an earlier ad-hoc signed test build were bound to "
@@ -63,7 +66,7 @@ for p in glob.glob(os.path.join(a.verify, "**", "verification-*.json"), recursiv
     v = json.load(open(p))
     verified.setdefault(v["file"], []).append(v)
 
-artifacts, passports, rows = [], [], []
+artifacts, passports, rows, store_artifacts = [], [], [], []
 for name in sorted(signing):
     ev = signing[name]
     path = os.path.join(a.dist, name)
@@ -134,6 +137,22 @@ for name in sorted(signing):
                   f"Evidence: {a.run_url}"],
     })
     rows.append((name, fe["sizeBytes"], fe["sha256"], status, gatekeeper, install, launch))
+    store_artifacts.append({
+        "fileName": name, "platform": "macos", "format": kind, "sizeBytes": fe["sizeBytes"], "sha256": fe["sha256"],
+        "architectures": [arch], "minimumOs": MIN_OS[arch],
+        "signing": {"status": "signed" if notarized else "unsigned",
+                    "evidence": f"codesign: {ev['signing']['application']}, hardened runtime, secure timestamp"
+                                + (f"; pkgutil: {ev['signing']['installer']}" if kind == "pkg" else "")
+                                + f"; notarytool: {', '.join(s['submissionId'] + ' ' + s['status'] for s in signing_record['notarization'])}; stapled"
+                                + f"; spctl on the quarantined download: {gatekeeper}",
+                    "tool": "codesign, pkgutil, xcrun notarytool, xcrun stapler, spctl"},
+        "kind": "installer" if kind == "pkg" else "portable-app",
+        "package": "com.hakmicapitalgroup.hcgmail", "sourceCommit": a.commit, "buildProvider": "github-actions" if a.run_id else "owner-mac",
+        "toolchain": f"HCG Executable Maker engine; signed on macOS {ev['host']['macos']} ({ev['host']['machine']})",
+        "validationReport": {"tool": "HCG Mail macos-release.yml (sign-and-notarize.sh, verify-distribution.sh, HCG Executable Maker Signing Doctor)",
+                             "passed": notarized and install == "passed" and launch == "passed", "summary": validation[:4000]},
+        "replaces": None,
+    })
 
 validated = "not validated (no schema given)"
 if a.schema:
@@ -151,6 +170,25 @@ json.dump({"release": "HCG Mail 1.0 Public Beta — macOS", "evidence": a.run_ur
           open(os.path.join(a.out, "release-manifest.json"), "w"), indent=2)
 for p in passports:
     json.dump(p, open(os.path.join(a.out, "passports", p["artifact"]["filename"] + ".passport.json"), "w"), indent=2)
+ev0 = next(iter(signing.values()))
+release = {
+    "productId": "hcg-mail", "editionId": "macos-desktop", "version": ev0["version"], "build": str(ev0["buildNumber"]), "channel": "beta",
+    "releaseNotes": [
+        f"HCG Mail {ev0['version']} for Mac: public testing prerelease, free during testing (temporary; not a permanent free price).",
+        "IMAP/SMTP email for your own mailbox. Passwords in the macOS Keychain; TLS with certificate validation only.",
+        "Signed with HCG's Developer ID and notarized by Apple. Installer package for /Applications, or the app as a ZIP.",
+        "For Macs with Apple silicon." if {x["architectures"][0] for x in store_artifacts} == {"arm64"} else "For Macs with Apple silicon and Intel.",
+        "Microsoft and Google sign-in are not available in this build (the options are hidden). Use IMAP/SMTP.",
+    ],
+    "compatibility": {"minimumOs": {"macos": f"macOS {ev0['minimumSystemVersion']}" if ev0.get("minimumSystemVersion") else "not recorded"},
+                      "architectures": sorted({x["architectures"][0] for x in store_artifacts}),
+                      "notes": ["Verified on " + (", ".join(sorted({h for x in artifacts for h in x["validation"]["verifiedOn"]})) or "no Mac yet") + "."]},
+    "distribution": "free", "eligibility": "private", "destinations": ["hcg-store"],
+}
+json.dump({"_note": "Body for HCG Store POST /api/v1/publishing/releases (creates a PRIVATE DRAFT) and the ArtifactInput for each file. "
+                    "Not sent: publication is the owner's, through the Store Control Center. 'Public beta' maps to channel 'beta' with a "
+                    "SemVer pre-release version; 'free during the beta' maps to distribution 'free'.",
+           "release": release, "artifacts": store_artifacts}, open(os.path.join(a.out, "store-release-draft.json"), "w"), indent=2)
 with open(os.path.join(a.out, "SHA256SUMS.txt"), "w") as s:
     for r in rows:
         s.write(f"{r[2]}  {r[0]}\n")

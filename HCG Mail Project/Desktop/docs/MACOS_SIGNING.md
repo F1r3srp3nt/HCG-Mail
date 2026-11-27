@@ -20,7 +20,7 @@ If Gatekeeper complains about a file, that file is not a release.
 | HCG Executable Maker (`595e989`) leaves the bundle **unsealed**: only the .NET app host has the SDK's ad-hoc signature | `codesign --verify --deep` fails ("code has no resources but signature indicates they must be present") |
 | No hardened runtime and no secure timestamp | Apple's notary service rejects both |
 
-## What changed (1.0.0-beta.2 for macOS)
+## What changed (1.0.0-beta.1 for Mac, build 4)
 
 - **Code only in `Contents/MacOS`.**
   - On macOS, HCG Mail is published as a single-file app: one Mach-O host with the managed code inside, plus 3 native libraries (`libAvaloniaNative`, `libSkiaSharp`, `libHarfBuzzSharp`).
@@ -68,7 +68,7 @@ need your certificates.
 | Executable Maker Signing Doctor (`431c8b3`) | ad-hoc, hardened runtime on, `allow-jit` the only exception, strict verification passes, no ticket | — |
 
 The Developer ID job reported **not configured**, so nothing was signed with Developer ID or notarized. The unsigned
-signing input is the run's artifact `hcg-mail-macos-signing-input-1.0.0-beta.2`.
+signing input is the run's artifact `hcg-mail-macos-signing-input-1.0.0-beta.1`.
 
 ## What you need from Apple
 
@@ -111,31 +111,33 @@ You do **not** need these for HCG Store:
 
 ### A. On your MacBook: the keys stay on it
 
-1. From the macOS release workflow run, download `hcg-mail-macos-signing-input-1.0.0-beta.2`. It holds the unsigned `.app` for each architecture, which is not for distribution.
+1. From the macOS release workflow run, download `hcg-mail-macos-signing-input-1.0.0-beta.1`. It holds the unsigned `.app` for each architecture, which is not for distribution.
 2. Check the input files against `SHA256SUMS-signing-input.txt`:
    ```bash
    shasum -a 256 -c SHA256SUMS-signing-input.txt
    ```
-3. Unpack the two apps:
+3. Unpack the app:
    ```bash
-   ditto -x -k HCGMail-1.0.0-beta.2-osx-arm64-unsigned-app.zip in-arm64
-   ditto -x -k HCGMail-1.0.0-beta.2-osx-x64-unsigned-app.zip in-x64
+   ditto -x -k HCGMail-1.0.0-beta.1-osx-arm64-unsigned-app.zip in-arm64
    ```
-4. Sign, notarize and build the files for each architecture:
+4. Sign, notarize and build the two downloads:
    ```bash
    S="HCG Mail Project/Desktop/scripts/macos"
-   for arch in arm64 x64; do
-     "$S/sign-and-notarize.sh" --app "in-$arch/HCG Mail.app" --version 1.0.0-beta.2 --build-number 4 --arch $arch --out dist \
-       --identity "Developer ID Application: <Name> (<Team ID>)" \
-       --installer-identity "Developer ID Installer: <Name> (<Team ID>)" \
-       --notary-profile hcg-notary
-   done
+   "$S/sign-and-notarize.sh" --app "in-arm64/HCG Mail.app" --version 1.0.0-beta.1 --build-number 4 --arch arm64 --out dist \
+     --identity "Developer ID Application: <Name> (<Team ID>)" \
+     --installer-identity "Developer ID Installer: <Name> (<Team ID>)" \
+     --notary-profile hcg-notary \
+     --zip-name "HCG Mail.app.zip" --pkg-name "HCG Mail-1.0.0-beta.1-osx-arm64.pkg"
    ```
-5. Run the download check on your Mac for each file. Each must report "Download check passed".
+   It stops at the first problem and says what it was. It writes `dist/HCG Mail.app.zip`,
+   `dist/HCG Mail-1.0.0-beta.1-osx-arm64.pkg`, `dist/signing-evidence-osx-arm64.json`, `dist/SHA256SUMS-osx-arm64.txt`
+   and `dist/logs/`.
+5. Run the download check on your Mac for both files. Each must report "Download check passed".
    ```bash
-   for f in dist/*.zip dist/*.dmg dist/*.pkg; do "$S/verify-distribution.sh" "$f" "verify/$(basename "$f")" --expect developer-id; done
+   "$S/verify-distribution.sh" "dist/HCG Mail.app.zip" "verify/zip" --expect developer-id
+   "$S/verify-distribution.sh" "dist/HCG Mail-1.0.0-beta.1-osx-arm64.pkg" "verify/pkg" --expect developer-id --install
    ```
-   - Add `--install` for the `.pkg` to also install it into `/Applications`.
+   - `--install` installs the package into `/Applications` (administrator password), as a customer would.
    - The checks use a separate data folder, so your own accounts are not touched.
 6. Write the manifest and the passports:
    ```bash
@@ -163,12 +165,12 @@ This path puts encrypted copies of the two private keys in GitHub. Path A avoids
    | `APPLE_NOTARY_API_ISSUER_ID` | the Issuer ID |
 
    Also add the **variable** `APPLE_TEAM_ID` (your Team ID).
-3. Run **macOS release (Developer ID)** with Actions › Run workflow on the `macos/1.0.0-beta.2` branch, then approve the `macos-signing` step.
+3. Run **macOS release (Developer ID)** with Actions › Run workflow on the `macos/1.0.0-beta.1` branch, then approve the `macos-signing` step.
 4. Each run uses a temporary keychain that is deleted at the end of the job. Nothing is ever printed.
 5. The run produces:
-   - `hcg-mail-macos-1.0.0-beta.2`: the files;
+   - `hcg-mail-macos-1.0.0-beta.1`: `HCG Mail.app.zip` and `HCG Mail-1.0.0-beta.1-osx-arm64.pkg`;
    - `hcg-mail-macos-verify-*`: the download checks;
-   - `hcg-mail-macos-release-manifest`: the manifest, `SHA256SUMS.txt` and passports.
+   - `hcg-mail-macos-release-manifest`: the manifest, `SHA256SUMS.txt`, the passports and `store-release-draft.json`.
 
 ## Customers with an earlier build
 
