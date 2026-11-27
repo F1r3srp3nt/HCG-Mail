@@ -34,7 +34,7 @@
           <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
             <controls:IconView Data="{StaticResource Icon.Shield}" Width="16" Height="16" Foreground="{DynamicResource Hcg.Accent}" VerticalAlignment="Top" Margin="0,1,8,0" />
             <TextBlock x:Name="WelcomeSecurityText" Grid.Column="1" Classes="caption" TextWrapping="Wrap" VerticalAlignment="Center"
-                       Text="Encrypted connections only. Passwords stay in your operating system's secure credential store." />
+                       Text="{Binding WelcomeSecurityText}" />
           </Grid>
           <Border CornerRadius="10" BoxShadow="{DynamicResource Hcg.Shadow.Glow}" HorizontalAlignment="Left" Margin="0,8,0,0">
             <Button Classes="primary" Command="{Binding AddAccountCommand}" Padding="18,10">

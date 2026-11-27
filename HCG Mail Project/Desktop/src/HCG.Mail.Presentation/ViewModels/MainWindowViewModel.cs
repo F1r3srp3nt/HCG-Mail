@@ -146,6 +146,11 @@ public sealed partial class MainWindowViewModel : ObservableObject, IAsyncDispos
     public bool ShowGoogleSignIn => _signInPresentation.AllowGoogle && (_googleAuth.IsConfigured || _signInPresentation.OfferUnconfiguredProviders);
 
     /// <summary>The welcome text: names only the sign-in methods this build offers.</summary>
+    /// <summary>Where passwords really go on this system (Linux has no store HCG Mail can use yet).</summary>
+    public string WelcomeSecurityText => _vault.IsPersistent
+        ? $"Encrypted connections only. Passwords are kept in {_vault.StorageDescription}, never in a file."
+        : "Encrypted connections only. This system has no secure password store that HCG Mail can use, so passwords are kept only until HCG Mail closes.";
+
     public string WelcomeText
     {
         get

@@ -6,15 +6,15 @@ name: Windows prerelease
 
 on:
   push:
-    branches: ['windows/**']
+    branches: ['windows/**', 'release/**']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 env:
-  VERSION: 0.1.0-beta.2
-  BUILD_NUMBER: 2
+  VERSION: 1.0.0-beta.1
+  BUILD_NUMBER: 3
   # HCG Executable Maker main (Inno Setup installer, portable ZIP, installer test).
   MAKER_COMMIT: 595e989a47c9bf8d4807169cf653cf802a57784f
   # HCG Repo main with the Release Passport v1 schema (final).

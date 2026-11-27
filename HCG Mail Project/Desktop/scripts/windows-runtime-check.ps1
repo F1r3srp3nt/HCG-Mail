@@ -76,7 +76,8 @@ foreach ($t in $tls) {
     $file = Join-Path $data "tls-diagnosis-$host_-$port.txt"
     if (Test-Path $file) { Get-Content $file | ForEach-Object { Write-Host "      $_" } }
     if ($t.Valid) { Check ($code -eq 0) "TLS accepted: $($t.Target) ($($t.What), exit $code)" }
-    else { Check ($code -ne 0 -and (Test-Path $file)) "TLS rejected: $($t.Target) ($($t.What), exit $code)" }
+    # A refusal counts only when the certificate or TLS check refused it, not when the host could not be reached.
+    else { Check ($code -ne 0 -and (Test-Path $file) -and ((Get-Content $file -Raw) -match 'FAILED after .* (Certificate|Tls|RevocationUnavailable)')) "TLS rejected: $($t.Target) ($($t.What), exit $code)" }
 }
 
 # 3. Start-up, rendering, close, restart
