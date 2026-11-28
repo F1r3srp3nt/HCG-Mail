@@ -172,6 +172,11 @@ certificate, and checks the archive and the IPA at these paths. The same job sho
 parent folder as `ArchiveDir`, so the SDK wrote the archive's contents into that folder and there was no
 `*.xcarchive` inside it to find. The fix is in Maker (pass the `.xcarchive` path); HCG Mail needs no change for it.
 
+## 7. Full physical qualification
+
+After the first successful install, run [PHYSICAL_DEVICE_QUALIFICATION.md](PHYSICAL_DEVICE_QUALIFICATION.md): real mailboxes,
+IMAP/SMTP, attachments, Keychain, offline copy, Outbox, Wi-Fi and mobile data, background and restart.
+
 ## Troubleshooting
 
 | Message | Cause and fix |

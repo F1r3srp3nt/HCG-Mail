@@ -1,4 +1,7 @@
-# HCG Mail 0.1.0 (1) — internal TestFlight validation plan
+# HCG Mail 1.0.0 — internal TestFlight validation plan
+
+Before the first upload: [TESTFLIGHT_READINESS.md](TESTFLIGHT_READINESS.md) (gate, your build number) and the physical-device
+qualification [PHYSICAL_DEVICE_QUALIFICATION.md](PHYSICAL_DEVICE_QUALIFICATION.md).
 
 **Status:** not started. No build has been uploaded and no device has been tested. Record results below as they
 happen; do not mark a step as passed before it has been done on a physical device.
@@ -6,7 +9,7 @@ happen; do not mark a step as passed before it has been done on a physical devic
 ## Setup
 
 * **Build:** the Transporter upload of `artifacts/ios/ipa/HCGMail.iOS.ipa` (its SHA-256 is in
-  `HCGMail.iOS.ipa.sha256`). In App Store Connect → TestFlight, check that the build shows **0.1.0 (1)**.
+  `HCGMail.iOS.ipa.sha256`). In App Store Connect → TestFlight, check that the build shows **1.0.0 (<the build number you chose>)**.
 * **Testers:** internal testers only (App Store Connect users on HCG's team). Internal testing needs no Beta App
   Review. External testing would, and needs separate approval.
 * **Devices:** at least one iPhone (ideally a 6.1″ and a 6.9″ model) and one iPad, on the newest iOS/iPadOS and, if
@@ -23,7 +26,7 @@ happen; do not mark a step as passed before it has been done on a physical devic
 
 You do the upload and the TestFlight distribution yourself. Nothing in this repository does them.
 
-- [ ] **Build in TestFlight:** App Store Connect → TestFlight shows **0.1.0 (1)**, *Ready to Test*, with export
+- [ ] **Build in TestFlight:** App Store Connect → TestFlight shows **1.0.0 (<your build number>)**, *Ready to Test*, with export
       compliance answered.
 - [ ] **Same binary as checked:** its SHA-256 matches `artifacts/ios/ipa/HCGMail.iOS.ipa.sha256` from your
       `export-ipa.sh` run.
@@ -34,7 +37,7 @@ You do the upload and the TestFlight distribution yourself. Nothing in this repo
 - [ ] **Old copies removed:** any development build of HCG Mail (from `install-device.sh`, DEVICE_INSTALL.md) is
       deleted. Otherwise the TestFlight install may fail with a signature mismatch, and you could test the wrong
       binary.
-- [ ] **Install:** TestFlight → HCG Mail → **Install**. Confirm the version shown is 0.1.0 (1).
+- [ ] **Install:** TestFlight → HCG Mail → **Install**. Confirm the version shown is 1.0.0 (<your build number>).
 - [ ] **Record:** device model, iOS version, and whether a **real SIM or Wi-Fi only**. Test at least once on
       cellular data.
 - [ ] **Test mailboxes:** two are ready (see *Setup*), and their passwords are in your password manager, not in
