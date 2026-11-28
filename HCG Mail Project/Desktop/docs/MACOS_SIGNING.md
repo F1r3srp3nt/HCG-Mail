@@ -168,6 +168,9 @@ The macOS release workflow starts **only by hand** (Actions › macOS release (D
    python3 "$S/macos-evidence.py" --dist dist --signing dist --verify verify --schema <hcg-repo>/docs/schemas/release-passport-v1.schema.json \
      --run-url "signed on the owner's Mac, $(date -u +%F)" --commit <commit> --out manifest
    ```
+   This manifest is your own record. For the HCG Store upload, make the passports with Executable Maker's
+   `--release-passport` instead (`docs/MACOS_SHIP_WITH_EXECUTABLE_MAKER.md` § 4). Ship to Store reads only
+   `<file>.release-passport.json` next to each file, and it does not recognise this script's `owner-mac` build provider.
 7. **Real customer test:** upload to HCG Store as a private draft, download the ZIP or PKG with Safari on your MacBook, and open it normally. The expected result is one standard confirmation that the app was downloaded from the Internet, and nothing else.
 
 ### B. In CI: GitHub environment `macos-signing`
