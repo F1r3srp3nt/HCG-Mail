@@ -21,7 +21,7 @@ protection ends. It makes no claim beyond what the tests below show.
 - Each key is a random 256-bit key, one per account and purpose. It is created on first use.
 - Windows: a generic credential in **Windows Credential Manager**, `Persist = CRED_PERSIST_LOCAL_MACHINE`. Microsoft documents that this persistence is not roamed to other computers (`CRED_PERSIST_ENTERPRISE` would roam).
 - macOS: a generic-password item in the user's **login Keychain** (service "HCG Mail").
-- iOS: a Keychain item with `Synchronizable = false`, so it is not in iCloud Keychain.
+- iOS: a Keychain item with `Synchronizable = false` and accessibility `WhenUnlockedThisDeviceOnly` (`IosKeychainCredentialVault`): not in iCloud Keychain, readable only while the device is unlocked, and not migrated to another device.
 - Linux: no persistent store is available. Keys exist only in memory while HCG Mail runs. Copies become unreadable when it closes and are deleted. The Outbox is kept in memory for the session.
 - **On disk:** keys are never written to a file by HCG Mail, and never stored next to the data they protect (tested: no key bytes, raw or base64, in any data file).
 - **In memory:** while HCG Mail runs, keys it has used are held in process memory. They are not wiped from memory on exit.
@@ -46,7 +46,7 @@ protection ends. It makes no claim beyond what the tests below show.
 - **Key deletion removes the item from the credential store.** HCG Mail cannot make guarantees about copies of the store made by others:
   - **Backups.** A backup taken earlier (Windows File History or system images, macOS Time Machine, iOS device backups) may contain both the encrypted data folder and the credential store as it was then. Restoring such a backup can make those older copies readable again.
   - The macOS login Keychain is protected by the user's login password. Windows credentials are protected by the user's Windows logon (DPAPI).
-  - On iOS, Keychain items use the default accessibility class, so encrypted device backups include them.
+  - On iOS, items are `WhenUnlockedThisDeviceOnly`: Apple does not move them to a new device, but an encrypted backup restored onto the same iPhone can bring them back. Whether a deleted app's Keychain items are removed is iOS's decision, not HCG Mail's (checked on a device in `iOS/PHYSICAL_DEVICE_QUALIFICATION.md` P10).
 - **Anyone who can sign in as the user** on the running computer can use the user's credential store, and therefore read the offline copies, just as they could read the mailbox. The encryption protects against access to the files without the user's credential store (another account, a copied disk or folder, a lost device without the login); it does not protect against the signed-in user.
 - **Memory.** Keys and decrypted mail are in process memory while HCG Mail runs, and may appear in crash dumps or swap.
 - **Executable Maker's Signing Vault** is unrelated: it handles Apple signing identities on the Mac that builds HCG Mail, not HCG Mail's data keys. Its encrypted private-key backup is not implemented, so signing keys exist only in that Mac's keychain and the owner's own backups.

@@ -149,7 +149,12 @@ Apple asks this for every build, because `ITSAppUsesNonExemptEncryption` is not 
   * Certificate validation.
   * RSA/SHA signature *verification* for DKIM (authentication only).
   * Keychain storage by iOS.
-* **Proprietary or non-standard cryptography: none.** No encryption of user data beyond what TLS and iOS provide.
+  * **Since 1.0.0-beta.2: encryption of data at rest.** Offline copies of opened mail and Outbox messages are encrypted
+    on the device with **AES-256-GCM** (.NET `System.Security.Cryptography.AesGcm`). A random 256-bit key is used per
+    account and purpose and kept in the iOS Keychain (`HCG Mail Project/Desktop/docs/OFFLINE_DATA_SECURITY.md`). The algorithm is standard and
+    publicly specified, and its only purpose is protecting the user's own data on the device.
+* **Proprietary or non-standard cryptography: none.** Only standard, published algorithms through the platform and
+  .NET implementations.
 
 These facts usually qualify for the exemption for standard encryption in mass-market software (Category 5, Part 2).
 Choosing the exemption, and whether a French encryption declaration is needed for distribution in France, is **HCG's
