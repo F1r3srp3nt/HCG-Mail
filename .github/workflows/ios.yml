@@ -154,6 +154,9 @@ jobs:
         timeout-minutes: 40
         env:
           HCG_IOS_SIM_LOG_DIR: ${{ github.workspace }}/artifacts/ios-sim-logs
+          # The iPad is booted cold here (the iPhone was shut down): run-simulator.sh waits for the runner to settle
+          # after the boot, and the first install of the Debug app gets 10 minutes instead of 5.
+          HCG_IOS_INSTALL_TIMEOUT: '600'
         run: |
           HCG_IOS_APP="$(tail -1 "$RUNNER_TEMP/app-path.txt")" \
             scripts/run-simulator.sh --ipad --exclusive --preview --screen inbox --screenshot ../../artifacts/ios-screenshots/ipad.png
