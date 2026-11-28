@@ -21,7 +21,7 @@
 # CoreSimulator logs and the machine's load and memory, stops what it started, and exits non-zero.
 # Time limits in seconds (environment): HCG_IOS_FIND_TIMEOUT (300: listing the simulators took ~100 s on a busy CI
 # runner), HCG_IOS_BOOT_TIMEOUT (1500: a cold boot on a hosted CI runner has taken ~18 minutes), HCG_IOS_INSTALL_TIMEOUT (300), HCG_IOS_LAUNCH_TIMEOUT (180), HCG_IOS_READY_TIMEOUT (180),
-# HCG_IOS_SCREENSHOT_TIMEOUT (120). HCG_IOS_SIM_LOG_DIR keeps each stage's full output (default: a temporary folder).
+# HCG_IOS_SCREENSHOT_TIMEOUT (120), HCG_IOS_SETTLE_TIMEOUT (600) and HCG_IOS_QUIET_LOAD (4 × CPUs) for the settle stage. HCG_IOS_SIM_LOG_DIR keeps each stage's full output (default: a temporary folder).
 source "$(dirname "$0")/_common.sh"
 require_macos
 
@@ -45,6 +45,8 @@ done
 FIND_TIMEOUT="${HCG_IOS_FIND_TIMEOUT:-300}"
 BOOT_TIMEOUT="${HCG_IOS_BOOT_TIMEOUT:-1500}"
 INSTALL_TIMEOUT="${HCG_IOS_INSTALL_TIMEOUT:-300}"
+# After a boot: wait at most this long for the machine to become quiet before installing (see the settle stage).
+SETTLE_TIMEOUT="${HCG_IOS_SETTLE_TIMEOUT:-600}"
 LAUNCH_TIMEOUT="${HCG_IOS_LAUNCH_TIMEOUT:-180}"
 READY_TIMEOUT="${HCG_IOS_READY_TIMEOUT:-180}"
 SHOT_TIMEOUT="${HCG_IOS_SCREENSHOT_TIMEOUT:-120}"
@@ -188,6 +190,34 @@ if [[ $SHOW -eq 1 ]]; then
   stage_done
 fi
 [[ $BOOT_ONLY -eq 1 ]] && exit 0
+
+# `bootstatus -b` returns when the simulator accepts apps, but after a cold boot iOS keeps setting itself up for
+# minutes. On GitHub's xcode-27 runners (7.5 GB) the iPad Pro 13-inch boot drove the load average to ~700, and an
+# install started right then ran out of time (runs 46007756769, 46074732453; the iPhone install in the same jobs took
+# 3 s). So wait until the machine is quiet again, at most SETTLE_TIMEOUT seconds, and show what holds the CPU. On a
+# normal Mac the load is already low and this returns at once. It never fails the run: if the load stays high, the
+# install goes ahead with its own time limit.
+stage settle "$SETTLE_TIMEOUT"
+QUIET_LOAD="${HCG_IOS_QUIET_LOAD:-$(( $(sysctl -n hw.ncpu) * 4 ))}"
+load1() { sysctl -n vm.loadavg | awk '{ printf "%d", $2 }'; }
+settle() {
+  local start=$SECONDS next=0 l
+  while :; do
+    l="$(load1)"
+    if (( l <= QUIET_LOAD )); then echo "[$(now)] HCG-SIM: settle: load average $l (quiet at ≤ $QUIET_LOAD)"; return 0; fi
+    if (( SECONDS - start >= SETTLE_TIMEOUT )); then
+      echo "[$(now)] HCG-SIM: settle: load average still $l after $((SECONDS - start)) s; installing anyway"; return 0
+    fi
+    if (( SECONDS - start >= next )); then
+      echo "[$(now)] HCG-SIM: settle: load average $l, waiting for ≤ $QUIET_LOAD; busiest processes:"
+      ps -Arco pcpu,comm 2>/dev/null | head -6 | sed 's/^/    /' || true
+      next=$((next + 60))
+    fi
+    sleep 5
+  done
+}
+settle
+stage_done
 
 stage install "$INSTALL_TIMEOUT"
 bounded xcrun simctl install "$UDID" "$APP" || fail $? "$APP"
